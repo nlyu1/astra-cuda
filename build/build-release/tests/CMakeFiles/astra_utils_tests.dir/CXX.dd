@@ -1,3 +1,0 @@
-ninja_dyndep_version = 1.0
-build tests/CMakeFiles/astra_utils_tests.dir/astra_utils_tests.cc.o: dyndep
-

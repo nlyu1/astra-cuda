@@ -1,5 +1,0 @@
-ninja_dyndep_version = 1.0
-build pybind/CMakeFiles/astra_cuda.dir/bindings.cc.o: dyndep
-
-build pybind/CMakeFiles/astra_cuda.dir/order_matching/market_bindings.cc.o: dyndep
-
