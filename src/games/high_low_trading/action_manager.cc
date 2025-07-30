@@ -379,12 +379,12 @@ VecActionManager::VecActionManager(const Config& config, int num_envs)
     ASTRA_CHECK_GT(num_envs, 0);
 }
 
-std::vector<Action> VecActionManager::EncodeTradingActions(const at::Tensor& actions_tensor) const {
+std::vector<Action> VecActionManager::EncodeTradingActions(const torch::Tensor& actions_tensor) const {
     // Check tensor device and type
     if (!actions_tensor.is_cpu()) {
         AstraFatalError("EncodeTradingActions: tensor must be on CPU device");
     }
-    if (actions_tensor.scalar_type() != at::kInt) {
+    if (actions_tensor.scalar_type() != torch::kInt) {
         AstraFatalError("EncodeTradingActions: tensor must have int32 dtype");
     }
     
@@ -425,12 +425,12 @@ std::vector<Action> VecActionManager::EncodeTradingActions(const at::Tensor& act
     return result;
 }
 
-std::vector<Action> VecActionManager::EncodePermutations(const at::Tensor& permutations_tensor) const {
+std::vector<Action> VecActionManager::EncodePermutations(const torch::Tensor& permutations_tensor) const {
     // Check tensor device and type
     if (!permutations_tensor.is_cpu()) {
         AstraFatalError("EncodePermutations: tensor must be on CPU device");
     }
-    if (permutations_tensor.scalar_type() != at::kInt) {
+    if (permutations_tensor.scalar_type() != torch::kInt) {
         AstraFatalError("EncodePermutations: tensor must have int32 dtype");
     }
     
@@ -467,12 +467,12 @@ std::vector<Action> VecActionManager::EncodePermutations(const at::Tensor& permu
     return result;
 }
 
-std::vector<Action> VecActionManager::EncodeContractValues(const at::Tensor& values_tensor) const {
+std::vector<Action> VecActionManager::EncodeContractValues(const torch::Tensor& values_tensor) const {
     // Check tensor device and type
     if (!values_tensor.is_cpu()) {
         AstraFatalError("EncodeContractValues: tensor must be on CPU device");
     }
-    if (values_tensor.scalar_type() != at::kInt) {
+    if (values_tensor.scalar_type() != torch::kInt) {
         AstraFatalError("EncodeContractValues: tensor must have int32 dtype");
     }
     
@@ -501,12 +501,12 @@ std::vector<Action> VecActionManager::EncodeContractValues(const at::Tensor& val
     return result;
 }
 
-std::vector<Action> VecActionManager::EncodeHighLowActions(const at::Tensor& high_low_tensor) const {
+std::vector<Action> VecActionManager::EncodeHighLowActions(const torch::Tensor& high_low_tensor) const {
     // Check tensor device and type
     if (!high_low_tensor.is_cpu()) {
         AstraFatalError("EncodeHighLowActions: tensor must be on CPU device");
     }
-    if (high_low_tensor.scalar_type() != at::kInt) {
+    if (high_low_tensor.scalar_type() != torch::kInt) {
         AstraFatalError("EncodeHighLowActions: tensor must have int32 dtype");
     }
     
@@ -537,12 +537,12 @@ std::vector<Action> VecActionManager::EncodeHighLowActions(const at::Tensor& hig
     return result;
 }
 
-std::vector<Action> VecActionManager::EncodeCustomerSizes(const at::Tensor& sizes_tensor) const {
+std::vector<Action> VecActionManager::EncodeCustomerSizes(const torch::Tensor& sizes_tensor) const {
     // Check tensor device and type
     if (!sizes_tensor.is_cpu()) {
         AstraFatalError("EncodeCustomerSizes: tensor must be on CPU device");
     }
-    if (sizes_tensor.scalar_type() != at::kInt) {
+    if (sizes_tensor.scalar_type() != torch::kInt) {
         AstraFatalError("EncodeCustomerSizes: tensor must have int32 dtype");
     }
     

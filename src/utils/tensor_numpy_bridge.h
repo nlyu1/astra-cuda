@@ -21,7 +21,7 @@ static_assert(std::is_integral_v<Action>, "Action must be an integral type");
  * - Supports float and Action (int) types.
  * -------------------------------------------------------------------------*/
 template<typename T>
-inline py::array numpy_of_tensor(const at::Tensor& t)
+inline py::array numpy_of_tensor(const torch::Tensor& t)
 {
     if (!t.defined())       throw std::runtime_error("Tensor is undefined");
     if (!t.is_cpu())        throw std::runtime_error("Must be on CPU");
@@ -29,15 +29,15 @@ inline py::array numpy_of_tensor(const at::Tensor& t)
     
     // Check scalar type matches T
     if constexpr (std::is_same_v<T, float>) {
-        if (t.scalar_type() != at::kFloat) throw std::runtime_error("Expect float32");
+        if (t.scalar_type() != torch::kFloat) throw std::runtime_error("Expect float32");
     } else if constexpr (std::is_same_v<T, Action>) {
-        if (t.scalar_type() != at::kInt) throw std::runtime_error("Expect int32");
+        if (t.scalar_type() != torch::kInt) throw std::runtime_error("Expect int32");
     } else {
         static_assert(sizeof(T) == 0, "Unsupported type for tensor conversion. Only float and Action are supported.");
     }
 
     // Keep the tensor's storage alive: duplicate the intrusive_ptr in a capsule
-    auto* holder = new at::Tensor(t);   // cheap (increments refcount)
+    auto* holder = new torch::Tensor(t);   // cheap (increments refcount)
 
     auto sizes   = t.sizes();
     auto strides = t.strides();         // element-strides
@@ -56,7 +56,7 @@ inline py::array numpy_of_tensor(const at::Tensor& t)
             ndim,
             shape,
             byte_strides),
-        py::capsule(holder, [](void* p){ delete reinterpret_cast<at::Tensor*>(p); })
+        py::capsule(holder, [](void* p){ delete reinterpret_cast<torch::Tensor*>(p); })
     );
 }
 
@@ -69,7 +69,7 @@ inline py::array numpy_of_tensor(const at::Tensor& t)
  * - Supports float and Action (int) types.
  * -------------------------------------------------------------------------*/
 template<typename T>
-inline at::Tensor tensor_of_numpy(const py::array& arr)
+inline torch::Tensor tensor_of_numpy(const py::array& arr)
 {
     py::buffer_info info = arr.request();               //  ➜ owns GIL
     if (info.itemsize != sizeof(T))

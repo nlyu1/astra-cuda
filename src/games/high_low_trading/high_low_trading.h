@@ -99,6 +99,9 @@ inline constexpr int kDefaultMaxContractsPerTrade = 5;
 inline constexpr int kDefaultCustomerMaxSize = 5; 
 inline constexpr int kDefaultMaxContractValue = 30;
 inline constexpr int kDefaultNumPlayers = 5; 
+inline constexpr int kDefaultNumMarkets = 32768;
+inline constexpr int kDefaultThreadsPerBlock = 128; 
+inline constexpr int kDefaultDeviceId = 0; 
 
 enum class GamePhase {
   kChanceValue,
@@ -123,9 +126,9 @@ class HighLowTradingState : public State {
   Player CurrentPlayer() const override;
   std::string ToString(uint32_t index) const override;
   bool IsTerminal() const override;
-  void FillRewards(at::Tensor reward_buffer) const override;
-  void FillRewardsSinceLastAction(at::Tensor reward_buffer, Player player_id) const override;
-  void FillReturns(at::Tensor returns_buffer) const override;
+  void FillRewards(torch::Tensor reward_buffer) const override;
+  void FillRewardsSinceLastAction(torch::Tensor reward_buffer, Player player_id) const override;
+  void FillReturns(torch::Tensor returns_buffer) const override;
   std::string InformationStateString(Player player, uint32_t index) const override;
   // Each player's information state tensor: 
   // 1. Game setup & private information (11):
@@ -136,9 +139,9 @@ class HighLowTradingState : public State {
   // 2. Public information (num_timesteps * num_players * 6 + num_players * 2): quotes, positions
   //    - Positions (num_players, 2): [num_contracts, cash_position]
   //    - Quotes (num_timesteps, num_players, 6): [bid_px, ask_px, bid_sz, ask_sz, *player_id]
-  void FillInformationStateTensor(Player player, at::Tensor values) const override;
+  void FillInformationStateTensor(Player player, torch::Tensor values) const override;
   std::string ObservationString(Player player, uint32_t index) const override;
-  void FillObservationTensor(Player player, at::Tensor values) const override;
+  void FillObservationTensor(Player player, torch::Tensor values) const override;
   std::unique_ptr<State> Clone() const override;
   
   // Returns game state information for analysis/visualization/training.
@@ -177,26 +180,29 @@ class HighLowTradingState : public State {
  protected:
   void DoApplyAction(torch::Tensor move) override;
   const HighLowTradingGame* GetGame() const;
-  const ActionManager& GetActionManager() const;
   int GetContractValue() const; 
 
  private:
+  int num_envs_;
+  int num_players_;
+  int steps_per_player_;
+  int device_id_; 
   std::string PublicInformationString() const; 
-  torch::Tensor contract_values_; 
-  torch::Tensor contract_high_settle_; 
-  torch::Tensor player_permutation_; 
+  /* N = num_envs, P=num_players, T=rounds_per_player */
+  torch::Tensor contract_values_; // [N, 3] denoting 2 candidate values and settlement value. Int
+  torch::Tensor contract_high_settle_; // [N] bool 
+  torch::Tensor player_permutation_; // [N, P]
 
   order_matching::VecMarket market_; 
 
   // Purely for ExposeInfo uses
-  at::Tensor player_contract_over_time_; // [num_players, num_timesteps, 5] standing for (bid_px, ask_px, bid_sz, ask_sz, contract_position)
-  at::Tensor market_contract_over_time_; // [num_timesteps*5, 2+1+1] (best bid px, best ask px, last_price, volume)
+  torch::Tensor player_contract_over_time_; // [N, P, T, 5] int standing for (bid_px, ask_px, bid_sz, ask_sz, contract_position)
+  torch::Tensor market_contract_over_time_; // [N*P, 2+1+1] int (best bid px, best ask px, last_price, volume)
 };
 
 class HighLowTradingGame : public Game {
   public:
     explicit HighLowTradingGame(const GameParameters& params);
-    int NumDistinctActions() const override; 
     std::unique_ptr<State> NewInitialState() const override;
     std::vector<int> InformationStateTensorShape() const override;
     std::vector<int> ObservationTensorShape() const override;
@@ -210,14 +216,23 @@ class HighLowTradingGame : public Game {
     }
     int NumPlayers() const override { return GetNumPlayers(); }
 
-    int GetNumPlayers() const { return action_manager_.GetNumPlayers(); }
-    int GetStepsPerPlayer() const { return action_manager_.GetStepsPerPlayer(); }
-    int GetMaxContractsPerTrade() const { return action_manager_.GetMaxContractsPerTrade(); }
-    int GetMaxContractValue() const { return action_manager_.GetMaxContractValue(); }
-    int GetCustomerMaxSize() const { return action_manager_.GetCustomerMaxSize(); }
-
+    int GetNumPlayers() const { return num_players_; }
+    int GetStepsPerPlayer() const { return steps_per_player_; }
+    int GetMaxContractsPerTrade() const { return max_contracts_per_trade_; }
+    int GetMaxContractValue() const { return max_contract_value_; }
+    int GetCustomerMaxSize() const { return customer_max_size_; }
+    int GetNumMarkets() const { return num_markets_; }
+    int GetThreadsPerBlock() const { return threads_per_block_; }
+    int GetDeviceId() const { return device_id_; }
   private:
-    ActionManager action_manager_; 
+    int steps_per_player_; 
+    int max_contracts_per_trade_; 
+    int customer_max_size_; 
+    int max_contract_value_; 
+    int num_players_; 
+    int num_markets_;
+    int threads_per_block_;
+    int device_id_;
 };
 
 }  // namespace high_low_trading

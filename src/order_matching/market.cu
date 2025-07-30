@@ -330,7 +330,6 @@ VecMarket::VecMarket(uint32_t num_markets, uint32_t max_price_levels,
     cudaGetDeviceCount(&device_count);
     ASTRA_CHECK_GE(device_id, 0);
     ASTRA_CHECK_LT(device_id, device_count);
-    cudaSetDevice(device_id);
 
     // Configure tensor options for the specified device
     auto device = torch::Device(torch::kCUDA, device_id);
@@ -363,6 +362,38 @@ VecMarket::VecMarket(uint32_t num_markets, uint32_t max_price_levels,
     customer_portfolios_ = torch::zeros({num_markets, num_customers, 2}, options_i32);
     
     // TID counter is maintained on host side
+}
+
+VecMarket::VecMarket(const VecMarket& other)
+    : num_markets_(other.num_markets_),
+      max_price_levels_(other.max_price_levels_),
+      max_orders_per_market_(other.max_orders_per_market_),
+      max_fills_per_market_(other.max_fills_per_market_),
+      num_customers_(other.num_customers_),
+      global_tid_counter_(other.global_tid_counter_),
+      device_id_(other.device_id_),
+      threads_per_block_(other.threads_per_block_) {
+    
+    // Use torch::cuda::device_guard to ensure device changes are local to this scope
+    torch::cuda::CUDAGuard device_guard(device_id_);
+    
+    // Clone all tensors to create deep copies
+    // The clone() operation will create new tensors on the same device as the source
+    bid_heads_ = other.bid_heads_.clone();
+    ask_heads_ = other.ask_heads_.clone();
+    bid_tails_ = other.bid_tails_.clone();
+    ask_tails_ = other.ask_tails_.clone();
+    
+    order_prices_ = other.order_prices_.clone();
+    order_sizes_ = other.order_sizes_.clone();
+    order_customer_ids_ = other.order_customer_ids_.clone();
+    order_tid_ = other.order_tid_.clone();
+    order_is_bid_ = other.order_is_bid_.clone();
+    order_next_ = other.order_next_.clone();
+    
+    fill_counts_ = other.fill_counts_.clone();
+    order_next_slots_ = other.order_next_slots_.clone();
+    customer_portfolios_ = other.customer_portfolios_.clone();
 }
 
 VecMarket::~VecMarket() {
@@ -409,10 +440,7 @@ void VecMarket::AddTwoSidedQuotes(
     torch::Tensor bid_px, torch::Tensor bid_sz,
     torch::Tensor ask_px, torch::Tensor ask_sz,
     torch::Tensor customer_ids, FillBatch& fills)
-{
-    // Set the correct device
-    cudaSetDevice(device_id_);
-    
+{   
     // Validate input dimensions
     ASTRA_CHECK_EQ(bid_px.size(0), num_markets_);
     ASTRA_CHECK_EQ(bid_sz.size(0), num_markets_);
@@ -485,10 +513,7 @@ void VecMarket::AddTwoSidedQuotes(
 }
 
 void VecMarket::MatchAllMarkets(FillBatch& fills)
-{
-    // Set the correct device
-    cudaSetDevice(device_id_);
-    
+{   
     // Clear fill counts
     fills.fill_counts.zero_();
 
@@ -522,9 +547,6 @@ void VecMarket::MatchAllMarkets(FillBatch& fills)
 
 void VecMarket::GetBBOs(BBOBatch& bbos)
 {
-    // Set the correct device
-    cudaSetDevice(device_id_);
-
     // Launch BBO kernel
     dim3 blocks((num_markets_ + threads_per_block_ - 1) / threads_per_block_);
     dim3 threads(threads_per_block_);
@@ -619,8 +641,6 @@ std::string VecMarket::ToString(uint32_t market_id) const
             slot = order_next_acc[market_id][slot];
         }
     }
-    
-    // Buy orders are already in the right order (highest price first from traversal)
     
     // Build output string
     std::stringstream ss;

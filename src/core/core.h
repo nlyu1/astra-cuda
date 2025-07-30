@@ -222,19 +222,19 @@ class State {
   //       have a final reward. Games with intermediate rewards must override
   //       both this method and Returns().
   // Players are indexed by the last dimension 
-  virtual void FillRewards(at::Tensor reward_buffer) const {
+  virtual void FillRewards(torch::Tensor reward_buffer) const {
     AstraFatalError("Not implemented"); 
   }
 
   // Convenient function to keep track of the players' cumulative rewards since last action
-  virtual void FillRewardsSinceLastAction(at::Tensor reward_buffer, Player player_id) const {
+  virtual void FillRewardsSinceLastAction(torch::Tensor reward_buffer, Player player_id) const {
     AstraFatalError("Not implemented"); 
   }
 
   // Returns sums of all rewards for each player up to the current state.
   // For games that only have a final reward, it should be 0 for all
   // non-terminal states, and the terminal utility for the final state.
-  virtual void FillReturns(at::Tensor returns_buffer ) const  {
+  virtual void FillReturns(torch::Tensor returns_buffer ) const  {
     AstraFatalError("Not implemented"); 
   }
 
@@ -351,10 +351,10 @@ class State {
   // Implementations should start with: 
   //   ASTRA_CHECK_GE(player, 0);
   //   ASTRA_CHECK_LT(player, num_players_);
-  virtual void FillInformationStateTensor(Player player, at::Tensor values) const {
+  virtual void FillInformationStateTensor(Player player, torch::Tensor values) const {
     AstraFatalError("InformationStateTensor unimplemented!");
   }
-  Player FillInformationStateTensor(at::Tensor values) const {
+  Player FillInformationStateTensor(torch::Tensor values) const {
     Player player = CurrentPlayer(); 
     FillInformationStateTensor(player, values);
     return player;

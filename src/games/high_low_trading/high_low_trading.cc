@@ -38,6 +38,9 @@ const GameType kGameType{/*short_name=*/"high_low_trading",
                           {"customer_max_size", GameParameter(kDefaultCustomerMaxSize)},
                           {"max_contract_value", GameParameter(kDefaultMaxContractValue)},
                           {"players", GameParameter(kDefaultNumPlayers)},
+                          {"num_markets", GameParameter(kDefaultNumMarkets)},
+                          {"threads_per_block", GameParameter(kDefaultThreadsPerBlock)},
+                          {"device_id", GameParameter(kDefaultDeviceId)}
                          },
                          /*default_loadable=*/true};
 
@@ -52,26 +55,59 @@ HighLowTradingState::HighLowTradingState(std::shared_ptr<const Game> game)
       AstraFatalError("HighLowTradingState: game is not a HighLowTradingGame"); 
     }
 
+    // Initialize member variables
+    num_envs_ = derived_game->GetNumMarkets();
+    num_players_ = derived_game->GetNumPlayers();
+    steps_per_player_ = derived_game->GetStepsPerPlayer();
+    device_id_ = derived_game->GetDeviceId();
+
+    // Configure tensor options for the specified device
+    auto device = torch::Device(torch::kCUDA, device_id_);
+    auto options_u32 = torch::TensorOptions().dtype(torch::kUInt32).device(device);
+    auto options_i32 = torch::TensorOptions().dtype(torch::kInt32).device(device);
+    auto options_bool = torch::TensorOptions().dtype(torch::kBool).device(device);
+
+    // Initialize tensors with appropriate shapes
+    contract_values_ = torch::zeros({num_envs_, 3}, options_u32);
+    contract_high_settle_ = torch::zeros({num_envs_}, options_bool);
+    player_permutation_ = torch::zeros({num_envs_, num_players_}, options_u32);
+    
+    // Initialize tracking tensors for ExposeInfo
+    player_contract_over_time_ = torch::zeros({num_envs_, num_players_, steps_per_player_, 5}, options_i32);
+    market_contract_over_time_ = torch::zeros({num_envs_ * num_players_, 4}, options_i32); // best bid, best ask, last_price, volume
+
     // Heuristic for how many fills there'll be
-    return; 
+    int max_active_orders_per_market = num_players_ * steps_per_player_ * 2; // Both bids and asks might be resident
+    int max_active_fills_per_market = std::min(
+      max_active_orders_per_market, 
+      derived_game->GetMaxContractsPerTrade() * 2); 
+    
+    // Initialize market
+    market_ = order_matching::VecMarket(
+      /*num_markets=*/num_envs_, 
+      /*max_price_levels=*/derived_game->GetMaxContractValue(),
+      /*max_active_orders_per_market=*/max_active_orders_per_market, 
+      /*max_active_fills_per_market=*/max_active_fills_per_market, 
+      /*num_customers=*/num_players_, 
+      /*device_id=*/device_id_, 
+      /*threads_per_block=*/derived_game->GetThreadsPerBlock()
+    );
 }
 
-// Todo: Implement deep copy of fields
-// HighLowTradingState::HighLowTradingState(const HighLowTradingState& other)
-//     : State(other),
-//       contract_values_(other.contract_values_),
-//       contract_high_settle_(other.contract_high_settle_),
-//       player_permutation_(other.player_permutation_),
-//       player_quotes_(other.player_quotes_),
-//       player_positions_(other.player_positions_),
-//       player_position_delta_(other.player_position_delta_),
-//       player_target_positions_(other.player_target_positions_),
-//       order_fills_(other.order_fills_),
-//       market_(other.market_),
-//       // Deep copy the tensors to ensure truly independent copies
-//       player_contract_over_time_(other.player_contract_over_time_.clone()),
-//       market_contract_over_time_(other.market_contract_over_time_.clone()) {
-// }
+HighLowTradingState::HighLowTradingState(const HighLowTradingState& other)
+    : State(other),
+      num_envs_(other.num_envs_),
+      num_players_(other.num_players_),
+      steps_per_player_(other.steps_per_player_),
+      device_id_(other.device_id_),
+      // Deep copy the tensors to ensure truly independent copies
+      contract_values_(other.contract_values_.clone()),
+      contract_high_settle_(other.contract_high_settle_.clone()),
+      player_permutation_(other.player_permutation_.clone()),
+      market_(other.market_),
+      player_contract_over_time_(other.player_contract_over_time_.clone()),
+      market_contract_over_time_(other.market_contract_over_time_.clone()) {
+}
 
 Player HighLowTradingState::CurrentPlayer() const {
   if (IsTerminal()) {
@@ -157,16 +193,16 @@ int HighLowTradingState::GetContractValue() const {
 // To provide more granular rewards, each contract fill movement in the direction 
 // of the target position is rewarded with "max_contract_value" reward. 
 // Harmful moves are penalized
-void HighLowTradingState::FillRewards(at::Tensor reward_buffer) const {
+void HighLowTradingState::FillRewards(torch::Tensor reward_buffer) const {
   AstraFatalError("Not implemented"); 
 }
 
 // Returns is modeled as (customer penalty) + portfolio value
-void HighLowTradingState::FillReturns(at::Tensor returns_buffer) const {
+void HighLowTradingState::FillReturns(torch::Tensor returns_buffer) const {
   AstraFatalError("Not implemented"); 
 }
 
-void HighLowTradingState::FillRewardsSinceLastAction(at::Tensor reward_buffer, Player player_id) const {
+void HighLowTradingState::FillRewardsSinceLastAction(torch::Tensor reward_buffer, Player player_id) const {
   AstraFatalError("Not implemented"); 
 }
 
@@ -384,28 +420,25 @@ std::string HighLowTradingState::ObservationString(Player player, uint32_t index
   return InformationStateString(player, index); 
 }
 
-void HighLowTradingState::ObservationTensor(Player player,
-  std::span<ObservationScalarType> values) const {
-  return InformationStateTensor(player, values); 
+void HighLowTradingState::FillObservationTensor(Player player,
+  torch::Tensor values) const {
+  return FillInformationStateTensor(player, values); 
 }
 
 HighLowTradingGame::HighLowTradingGame(const GameParameters& params)
     : Game(kGameType, params),
-      action_manager_(Config(
-        ParameterValue<int>("steps_per_player"), 
-        ParameterValue<int>("max_contracts_per_trade"),
-        ParameterValue<int>("customer_max_size"),
-        ParameterValue<int>("max_contract_value"),
-        ParameterValue<int>("players")
-      )) {
+      steps_per_player_(ParameterValue<int>("steps_per_player")),
+      max_contracts_per_trade_(ParameterValue<int>("max_contracts_per_trade")),
+      customer_max_size_(ParameterValue<int>("customer_max_size")),
+      max_contract_value_(ParameterValue<int>("max_contract_value")),
+      num_players_(ParameterValue<int>("players")),
+      num_markets_(ParameterValue<int>("num_markets")),
+      threads_per_block_(ParameterValue<int>("threads_per_block")),
+      device_id_(ParameterValue<int>("device_id")) {
 }
 
 std::unique_ptr<State> HighLowTradingGame::NewInitialState() const {
   return std::unique_ptr<State>(new HighLowTradingState(shared_from_this()));
-}
-
-int HighLowTradingGame::NumDistinctActions() const {
-  return GetActionManager().valid_action_range(GamePhase::kPlayerTrading).second + 1; 
 }
 
 }  // namespace high_low_trading

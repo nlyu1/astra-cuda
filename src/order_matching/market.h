@@ -104,6 +104,17 @@ public:
         uint32_t max_active_orders_per_market, uint32_t max_active_fills_per_market,
         uint32_t num_customers = 16, int device_id = 0, uint32_t threads_per_block = 64); 
     
+    /**
+     * @brief Copy constructor that creates a deep copy of another VecMarket
+     * 
+     * Creates a new VecMarket instance with cloned tensors from the source market.
+     * All tensors are deep copied to ensure complete independence between instances.
+     * The global TID counter is also copied to maintain consistency.
+     * 
+     * @param other The VecMarket instance to copy from
+     */
+    VecMarket(const VecMarket& other);
+    
     ~VecMarket(); 
 
     /**

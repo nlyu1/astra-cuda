@@ -128,7 +128,6 @@ target_compile_options(astra_deps INTERFACE
         -mprefer-vector-width=512
         -march=native
         -mtune=native
-        -Wno-dev
         -DNDEBUG>)
 # --- Linker Options ---
 target_link_options(astra_deps INTERFACE

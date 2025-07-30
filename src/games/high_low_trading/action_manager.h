@@ -218,22 +218,22 @@ class VecActionManager {
     
     // Encode trading actions from tensor of shape [num_envs, 4] 
     // with columns [bid_price, ask_price, bid_size, ask_size]
-    std::vector<Action> EncodeTradingActions(const at::Tensor& actions_tensor) const;
+    std::vector<Action> EncodeTradingActions(const torch::Tensor& actions_tensor) const;
     
     // Encode permutations from tensor of shape [num_envs, num_players]
-    std::vector<Action> EncodePermutations(const at::Tensor& permutations_tensor) const;
+    std::vector<Action> EncodePermutations(const torch::Tensor& permutations_tensor) const;
     
     // Encode contract values from tensor of shape [num_envs] 
     // with values in range [1, max_contract_value]
-    std::vector<Action> EncodeContractValues(const at::Tensor& values_tensor) const;
+    std::vector<Action> EncodeContractValues(const torch::Tensor& values_tensor) const;
     
     // Encode high/low actions from tensor of shape [num_envs]
     // with boolean values (0 = low, 1 = high)
-    std::vector<Action> EncodeHighLowActions(const at::Tensor& high_low_tensor) const;
+    std::vector<Action> EncodeHighLowActions(const torch::Tensor& high_low_tensor) const;
     
     // Encode customer sizes from tensor of shape [num_envs]
     // with values in range [-customer_max_size, customer_max_size] excluding 0
-    std::vector<Action> EncodeCustomerSizes(const at::Tensor& sizes_tensor) const;
+    std::vector<Action> EncodeCustomerSizes(const torch::Tensor& sizes_tensor) const;
     
     int GetNumEnvs() const { return num_envs_; }
     int GetNumPlayers() const { return config_.num_players_; }
