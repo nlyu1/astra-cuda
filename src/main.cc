@@ -106,7 +106,7 @@ int main() {
     std::vector<int> permutation(num_players);
     std::iota(permutation.begin(), permutation.end(), 0); // Fill with 0, 1, 2, ..., num_players-1
     std::shuffle(permutation.begin(), permutation.end(), rng);
-    torch::Tensor perm_tensor = torch::tensor({permutation}, options.dtype(torch::kInt32));
+    torch::Tensor perm_tensor = torch::from_blob(permutation.data(), {1, num_players}, torch::kInt32).to(device).clone();
     
     std::cout << "\nMove 2 - Player permutation: [";
     for (int i = 0; i < num_players; ++i) {
@@ -140,7 +140,7 @@ int main() {
     for (int i = 0; i < num_customers; ++i) {
         target_positions[i] = target_dist(rng);
     }
-    torch::Tensor targets_tensor = torch::tensor({target_positions}, options.dtype(torch::kInt32));
+    torch::Tensor targets_tensor = torch::from_blob(target_positions.data(), {1, num_customers}, torch::kInt32).to(device).clone();
     
     std::cout << "\nMove 3 - Customer target positions: [";
     for (int i = 0; i < num_customers; ++i) {
