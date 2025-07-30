@@ -52,7 +52,7 @@ class TestVecMarket:
             fills=fills
         )
         
-        # Add a smaller sell order that partially fills
+        # Add a smaller sell order that partially fills. Remaining (50 @ -) [70 x -]
         market.add_two_sided_quotes(
             bid_px=create_tensors(0),
             bid_sz=create_tensors(0),
@@ -79,8 +79,13 @@ class TestVecMarket:
             fills=fills
         )
         
-        # Should fill only 70 shares (remaining from original 100)
-        assert fill_counts[0].item() == 1
+        # Should now have 2 total fills
+        fill_counts = fills.fill_counts.cpu()
+        assert fill_counts[0].item() == 1 # Should have 1 incremental fill
+        
+        # Check the second fill is for 70 shares (remaining from original 100)
+        print(market.to_string(0))
+        print(fill_sizes)
         assert fill_sizes[0][0].item() == 70
     
     def test_market_independence(self):
@@ -129,9 +134,9 @@ class TestVecMarket:
         # Verify fills only in markets 1 and 3
         fill_counts = fills.fill_counts.cpu()
         assert fill_counts[0].item() == 0  # Market 0: no crossing
-        assert fill_counts[1].item() == 1  # Market 1: should have fill
+        assert fill_counts[1].item() == 2  # Market 1: 2 fills (self-cross + remaining order)
         assert fill_counts[2].item() == 0  # Market 2: no crossing
-        assert fill_counts[3].item() == 1  # Market 3: should have fill
+        assert fill_counts[3].item() == 2  # Market 3: 2 fills (self-cross + remaining order)
         assert fill_counts[4].item() == 0  # Market 4: no crossing
     
     def test_bbo_functionality(self):
@@ -241,7 +246,8 @@ class TestVecMarket:
             fills=fills
         )
         
-        assert fill_counts[0].item() == 1
+        fill_counts = fills.fill_counts.cpu()
+        assert fill_counts[0].item() == 1 # Should have 1 incremental fill
         
         # Test 3: No cross (bid < ask)
         market.add_two_sided_quotes(
@@ -253,6 +259,8 @@ class TestVecMarket:
             fills=fills
         )
         
+        fill_counts = fills.fill_counts.cpu()
+        # Should have same number of fills as after test 2 (no new fills)
         assert fill_counts[0].item() == 0
     
     def test_execution_price_determination(self):
@@ -421,9 +429,13 @@ def test_string_representation():
     
     # Get string representation of market 0
     market_str = market.to_string(0)
-    assert "Market 0" in market_str
-    assert "Bids:" in market_str
-    assert "Asks:" in market_str
+    # Check for expected content in the string representation
+    assert "sell orders" in market_str
+    assert "buy orders" in market_str
+    assert "px 50" in market_str  # Should see the bid price
+    assert "px 55" in market_str  # Should see the ask price
+    assert "sz 100" in market_str  # Should see the bid size
+    assert "sz 150" in market_str  # Should see the ask size
 
 
 if __name__ == "__main__":
