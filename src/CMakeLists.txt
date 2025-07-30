@@ -149,6 +149,15 @@ set(ASTRA_OBJECTS
 add_subdirectory(order_matching)
 list(APPEND ASTRA_OBJECTS order_matching)
 
+# Build core game interface
+add_subdirectory(core)
+list(APPEND ASTRA_OBJECTS core)
+
+# Add games
+add_subdirectory(games)
+list(APPEND ASTRA_OBJECTS games)
+
+# Main and others
 add_executable(main main.cc)
 set_property(TARGET main PROPERTY CXX_STANDARD 20)
 set_property(TARGET main PROPERTY INTERPROCEDURAL_OPTIMIZATION FALSE) # Disable LTO for main to avoid linking issues

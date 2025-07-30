@@ -89,20 +89,27 @@
 
 #include "core.h"
 #include "market.h"
-#include "action_manager.h" // Game default parameters are all packaged inside "action_manager.h" 
 #include "astra_utils.h"
 
 namespace astra {
 namespace high_low_trading {
 
-class HighLowTradingGame;
+inline constexpr int kDefaultStepsPerPlayer = 20; 
+inline constexpr int kDefaultMaxContractsPerTrade = 5; 
+inline constexpr int kDefaultCustomerMaxSize = 5; 
+inline constexpr int kDefaultMaxContractValue = 30;
+inline constexpr int kDefaultNumPlayers = 5; 
 
-class PlayerPosition {
-  public:
-    int num_contracts=0; 
-    int cash_balance=0; 
-    std::string ToString() const; 
-}; 
+enum class GamePhase {
+  kChanceValue,
+  kChanceHighLow, 
+  kChancePermutation, 
+  kCustomerSize, 
+  kPlayerTrading, 
+  kTerminal, 
+};
+
+class HighLowTradingGame;
 
 // Expose these for registration. 
 extern const GameType kGameType;
@@ -114,12 +121,12 @@ class HighLowTradingState : public State {
   HighLowTradingState(const HighLowTradingState& other);
 
   Player CurrentPlayer() const override;
-  std::string ActionToString(Player player, Action move) const override;
-  std::string ToString() const override;
+  std::string ToString(uint32_t index) const override;
   bool IsTerminal() const override;
-  std::vector<RewardType> Returns() const override;
-  std::vector<RewardType> Rewards() const override;
-  std::string InformationStateString(Player player) const override;
+  void FillRewards(at::Tensor reward_buffer) const override;
+  void FillRewardsSinceLastAction(at::Tensor reward_buffer, Player player_id) const override;
+  void FillReturns(at::Tensor returns_buffer) const override;
+  std::string InformationStateString(Player player, uint32_t index) const override;
   // Each player's information state tensor: 
   // 1. Game setup & private information (11):
   //    - Game setup (5): [num_steps, max_contracts_per_trade, customer_max_size, max_contract_value, players]
@@ -129,17 +136,10 @@ class HighLowTradingState : public State {
   // 2. Public information (num_timesteps * num_players * 6 + num_players * 2): quotes, positions
   //    - Positions (num_players, 2): [num_contracts, cash_position]
   //    - Quotes (num_timesteps, num_players, 6): [bid_px, ask_px, bid_sz, ask_sz, *player_id]
-  void InformationStateTensor(Player player,
-                              std::span<ObservationScalarType> values) const override;
-  std::string ObservationString(Player player) const override;
-  void ObservationTensor(Player player,
-                         std::span<ObservationScalarType> values) const override;
+  void FillInformationStateTensor(Player player, at::Tensor values) const override;
+  std::string ObservationString(Player player, uint32_t index) const override;
+  void FillObservationTensor(Player player, at::Tensor values) const override;
   std::unique_ptr<State> Clone() const override;
-  void UndoAction(Player player, Action move) override;
-  std::vector<std::pair<Action, double>> ChanceOutcomes() const override;
-  std::vector<Action> LegalActions() const override;
-  std::unique_ptr<State> ResampleFromInfostate(
-      int player_id, std::function<double()> rng) const override;
   
   // Returns game state information for analysis/visualization/training.
   // The returned ExposeInfo map contains the following keys:
@@ -175,39 +175,18 @@ class HighLowTradingState : public State {
   ExposeInfo expose_info() const override;
    
  protected:
-  void DoApplyAction(Action move) override;
+  void DoApplyAction(torch::Tensor move) override;
   const HighLowTradingGame* GetGame() const;
   const ActionManager& GetActionManager() const;
   int GetContractValue() const; 
 
  private:
-  // Helper function to reduce bloating 
-  void HandleQuoteAction(order_matching::customerId customer_id, PlayerQuoteAction customer_quote); 
-
   std::string PublicInformationString() const; 
-  std::array<ChanceContractValueAction, 2> contract_values_; 
-  ChanceHighLowAction contract_high_settle_; 
-  
-  // PERMUTATION SYSTEM: Maps players to roles randomly
-  // Role IDs (fixed): 0=ValueCheater1, 1=ValueCheater2, 2=HighLowCheater, 3+=Customers
-  // 
-  // permutation_[player_id] → role_id (what role does this player have?)
-  // inv_permutation_[role_id] → player_id (which player has this role?)
-  //
-  // Example: permutation_=[2,0,3,1,4] means Player0→HighLow, Player1→Value1, Player2→Customer, etc.
-  //          inv_permutation_=[1,3,0,2,4] means Value1→Player1, HighLow→Player0, etc.
-  ChancePermutationAction player_permutation_; 
-  std::vector<std::pair<int, PlayerQuoteAction>> player_quotes_; 
-  std::vector<PlayerPosition> player_positions_; 
-  
-  // Target positions for customer players (indexed by player_id, not role_id)
-  // 0 = no target (non-customer players), non-zero = customer target position
-  // Assignment: customer role_id → player_id via inv_permutation_[role_id] → target stored at player_id
-  std::vector<int> player_target_positions_; 
-  // Records the last applied actions' resulting change in each player's position 
-  std::vector<int> player_position_delta_; 
-  std::vector<order_matching::OrderFillEntry> order_fills_; 
-  order_matching::Market market_; 
+  torch::Tensor contract_values_; 
+  torch::Tensor contract_high_settle_; 
+  torch::Tensor player_permutation_; 
+
+  order_matching::VecMarket market_; 
 
   // Purely for ExposeInfo uses
   at::Tensor player_contract_over_time_; // [num_players, num_timesteps, 5] standing for (bid_px, ask_px, bid_sz, ask_sz, contract_position)
@@ -218,7 +197,6 @@ class HighLowTradingGame : public Game {
   public:
     explicit HighLowTradingGame(const GameParameters& params);
     int NumDistinctActions() const override; 
-    int MaxChanceOutcomes() const override; 
     std::unique_ptr<State> NewInitialState() const override;
     std::vector<int> InformationStateTensorShape() const override;
     std::vector<int> ObservationTensorShape() const override;
@@ -230,16 +208,7 @@ class HighLowTradingGame : public Game {
       // See action_manager.h: four chance moves (high, low, choice, permutation) with num_customer assignments. 
       return 4 + (GetNumPlayers() - 3); 
     }
-    RewardType MinUtility() const override { return -MaxUtility(); }
-    RewardType MaxUtility() const override {
-      return (GetMaxContractValue() - 1) * GetMaxContractsPerTrade() * GetStepsPerPlayer() * GetNumPlayers(); 
-    }
     int NumPlayers() const override { return GetNumPlayers(); }
-    std::optional<RewardType> UtilitySum() const override { 
-      AstraFatalError("UtilitySum not implemented.");
-    }
-
-    const ActionManager& GetActionManager() const { return action_manager_; }
 
     int GetNumPlayers() const { return action_manager_.GetNumPlayers(); }
     int GetStepsPerPlayer() const { return action_manager_.GetStepsPerPlayer(); }

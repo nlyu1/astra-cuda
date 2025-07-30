@@ -200,8 +200,9 @@ class State {
   // directly applied. If kSampled, then a dummy outcome is passed and the
   // sampling of and outcome should be done in this function and then applied.
   //
-  // Games should implement DoApplyAction.
-  virtual void ApplyAction(torch::Tensor action_id);
+  // Games should implement DoApplyAction. 
+  // Returns the player who just applied the action
+  virtual Player ApplyAction(torch::Tensor action_id);
 
   // Returns a string representation of the state. 
   virtual std::string ToString(uint32_t index) const = 0;
@@ -220,30 +221,21 @@ class State {
   //       The default implementation is only correct for games that only
   //       have a final reward. Games with intermediate rewards must override
   //       both this method and Returns().
-  virtual at::Tensor Rewards() const {
+  // Players are indexed by the last dimension 
+  virtual void FillRewards(at::Tensor reward_buffer) const {
+    AstraFatalError("Not implemented"); 
+  }
+
+  // Convenient function to keep track of the players' cumulative rewards since last action
+  virtual void FillRewardsSinceLastAction(at::Tensor reward_buffer, Player player_id) const {
     AstraFatalError("Not implemented"); 
   }
 
   // Returns sums of all rewards for each player up to the current state.
   // For games that only have a final reward, it should be 0 for all
   // non-terminal states, and the terminal utility for the final state.
-  virtual std::vector<RewardType> Returns() const = 0;
-
-  // Returns Reward for one player (see above for definition). If Rewards for
-  // multiple players are required it is more efficient to use Rewards() above.
-  virtual RewardType PlayerReward(Player player) const {
-    auto rewards = Rewards();
-    ASTRA_CHECK_LT(player, rewards.size());
-    return rewards[player];
-  }
-
-  // Returns Return for one player (see above for definition). If Returns for
-  // multiple players are required it is more efficient to use Returns() above.
-  virtual RewardType PlayerReturn(Player player) const {
-    auto returns = Returns();
-    ASTRA_CHECK_GE(player, 0);
-    ASTRA_CHECK_LT(player, returns.size());
-    return returns[player];
+  virtual void FillReturns(at::Tensor returns_buffer ) const  {
+    AstraFatalError("Not implemented"); 
   }
 
   // Expose python-viewable information 
@@ -282,25 +274,6 @@ class State {
     bool operator==(const PlayerAction&) const;
   };
 
-  // For backward-compatibility reasons, this is the history of actions only.
-  // To get the (player, action) pairs, use `FullHistory` instead.
-  std::vector<Action> History() const {
-    std::vector<Action> history;
-    history.reserve(history_.size());
-    for (auto& h : history_) {
-        history.push_back(h.action);
-    }
-    return history;
-  }
-
-  // The full (player, action) history.
-  const std::vector<PlayerAction>& FullHistory() const { return history_; }
-
-  // A string representation for the history. There should be a one to one
-  // mapping between histories (i.e. sequences of actions for all players,
-  // including chance) and the `State` objects.
-  std::string HistoryString() const { return StrJoin(History(), ", "); }
-
   // Return how many moves have been done so far in the game.
   // When players make simultaneous moves, this counts only as a one move.
   // Chance transitions count also as one move.
@@ -309,12 +282,7 @@ class State {
   int MoveNumber() const { return move_number_; }
 
   // Is this a first state in the game, i.e. the initial state (root node)?
-  bool IsInitialState() const { return history_.empty(); }
-
-  // Is this a first non-chance node in the game, i.e. the first decision or
-  // simultaneous move node (or terminal). Note: only works with
-  // ChanceMode::kExplicitStochastic.
-  // bool IsInitialNonChanceState() const;
+  bool IsInitialState() const { return move_number_ == 0; }
 
   // For imperfect information games. Returns an identifier for the current
   // information state for the specified player.
@@ -360,14 +328,13 @@ class State {
   // or Section 2.1 of https://arxiv.org/abs/1906.11110
 
   // There are currently no use-case for calling this function with
-  // `kChancePlayerId`. Thus, games are expected to raise an error in those
-  // cases using (and it's tested in api_test.py). Use this:
+  // `kChancePlayerId`. Use this:
   //   ASTRA_CHECK_GE(player, 0);
   //   ASTRA_CHECK_LT(player, num_players_);
-  virtual std::string InformationStateString(Player player) const {
+  virtual std::string InformationStateString(Player player, uint32_t index) const {
     AstraFatalError("InformationStateString is not implemented.");
   }
-  std::string InformationStateString() const {
+  std::string InformationStateString(uint32_t index) const {
     return InformationStateString(CurrentPlayer());
   }
 
@@ -381,20 +348,16 @@ class State {
   // this is required in some applications (e.g. final observation in an RL
   // environment).
   //
-  // There are currently no use-case for calling this function with
-  // `kChancePlayerId`. Thus, games are expected to raise an error in those
-  // cases.
-  //
-  // Implementations should start with (and it's tested in api_test.py):
+  // Implementations should start with: 
   //   ASTRA_CHECK_GE(player, 0);
   //   ASTRA_CHECK_LT(player, num_players_);
-  virtual void InformationStateTensor(Player player,
-                                      std::span<ObservationScalarType> values) const {
+  virtual void FillInformationStateTensor(Player player, at::Tensor values) const {
     AstraFatalError("InformationStateTensor unimplemented!");
   }
-  std::vector<ObservationScalarType> InformationStateTensor(Player player) const;
-  std::vector<ObservationScalarType> InformationStateTensor() const {
-    return InformationStateTensor(CurrentPlayer());
+  Player FillInformationStateTensor(at::Tensor values) const {
+    Player player = CurrentPlayer(); 
+    FillInformationStateTensor(player, values);
+    return player;
   }
   // We have functions for observations which are parallel to those for
   // information states. An observation should have the following properties:
@@ -420,11 +383,11 @@ class State {
   // Implementations should start with (and it's tested in api_test.py):
   //   ASTRA_CHECK_GE(player, 0);
   //   ASTRA_CHECK_LT(player, num_players_);
-  virtual std::string ObservationString(Player player) const {
+  virtual std::string ObservationString(Player player, uint32_t index) const {
     AstraFatalError("ObservationString is not implemented.");
   }
-  std::string ObservationString() const {
-    return ObservationString(CurrentPlayer());
+  std::string ObservationString(uint32_t index) const {
+    return ObservationString(CurrentPlayer(), index);
   }
 
   // Returns the view of the game, preferably from `player`'s perspective.
@@ -432,50 +395,25 @@ class State {
   // Implementations should start with (and it's tested in api_test.py):
   //   ASTRA_CHECK_GE(player, 0);
   //   ASTRA_CHECK_LT(player, num_players_);
-  virtual void ObservationTensor(Player player,
-                                 std::span<ObservationScalarType> values) const {
+  virtual void FillObservationTensor(Player player,
+                                 torch::Tensor values) const {
     AstraFatalError("ObservationTensor unimplemented!");
   }
-  std::vector<ObservationScalarType> ObservationTensor(Player player) const;
-  std::vector<ObservationScalarType> ObservationTensor() const {
-    return ObservationTensor(CurrentPlayer());
+  Player FillObservationTensor(torch::Tensor values) const {
+    Player player = CurrentPlayer();
+    FillObservationTensor(player, values);
+    return player; 
   }
 
   // Return a copy of this state.
   virtual std::unique_ptr<State> Clone() const = 0;
 
   // Creates the child from State corresponding to action.
-  std::unique_ptr<State> Child(Action action) const {
+  std::unique_ptr<State> Child(torch::Tensor action) const {
     std::unique_ptr<State> child = Clone();
     child->ApplyAction(action);
     return child;
   }
-
-  // Undoes the last action, which must be supplied. This is a fast method to
-  // undo an action. It is only necessary for algorithms that need a fast undo
-  // (e.g. minimax search).
-  // One must call history_.pop_back() and --move_number_ in the implementations
-  // (and do these appropriately especially in simultaneous games).
-  virtual void UndoAction(Player player, Action action) {
-    AstraFatalError("UndoAction function is not overridden; not undoing.");
-  }
-
-  // Change the state of the game by applying the specified actions, one per
-  // player, for simultaneous action games. This function encodes the logic of
-  // the game rules. Element i of the vector is the action for player i.
-  //
-  // Every player must submit a action. If some of the players have no legal
-  // actions at this node, then 0 should be passed instead.
-  //
-  // Simultaneous games should implement DoApplyActions.
-  void ApplyActions(const std::vector<Action>& actions);
-
-  // A helper version of ApplyActions that first does legality checks.
-  void ApplyActionsWithLegalityChecks(const std::vector<Action>& actions);
-
-
-  // The size of the action space. See `Game` for a full description.
-  int NumDistinctActions() const { return num_distinct_actions_; }
 
   // Returns the number of players in this game.
   int NumPlayers() const { return num_players_; }
@@ -483,114 +421,25 @@ class State {
   // Get the game object that generated this state.
   std::shared_ptr<const Game> GetGame() const { return game_; }
 
-  // Get the chance outcomes and their probabilities.
-  //
-  // Chance actions do not have a separate UID space from regular actions.
-  //
-  // Note: what is returned here depending on the game's chance_mode (in
-  // its GameType):
-  //   - Option 1. kExplicit. All chance node outcomes are returned along with
-  //     their respective probabilities. Then State::ApplyAction(...) is
-  //     deterministic.
-  //   - Option 2. kSampled. Return a dummy single action here with probability
-  //     1, and then State::ApplyAction(...) does the real sampling. In this
-  //     case, the game has to maintain its own RNG.
-  virtual ActionsAndProbs ChanceOutcomes() const {
-    AstraFatalError("ChanceOutcomes unimplemented!");
-  }
-
-  // Lists the valid chance outcomes at the current state.
-  // Derived classes may substitute this with a more efficient implementation.
-  virtual std::vector<Action> LegalChanceOutcomes() const {
-    ActionsAndProbs outcomes_with_probs = ChanceOutcomes();
-    std::vector<Action> outcome_list;
-    outcome_list.reserve(outcomes_with_probs.size());
-    for (auto& pair : outcomes_with_probs) {
-      outcome_list.push_back(pair.first);
-    }
-    return outcome_list;
-  }
-
   // Returns the type of the state. Either Chance, Terminal, MeanField or
   // Decision. See StateType definition for definitions of the different types.
   StateType GetType() const;
 
-  // Serializes a state into a string.
-  //
-  // The default implementation writes out a sequence of actions, one per line,
-  // taken from the initial state. Note: this default serialization scheme will
-  // not work games whose chance mode is kSampledStochastic, as there is
-  // currently no general way to set the state's seed to ensure that it samples
-  // the same chance event at chance nodes.
-  //
-  // If overridden, this must be the inverse of Game::DeserializeState.
-  virtual std::string Serialize() const;
-
-  // Resamples a new history from the information state from player_id's view.
-  // This resamples a private for the other players, but holds player_id's
-  // privates constant, and the public information constant.
-  // The privates are sampled uniformly at each chance node. For games with
-  // partially-revealed actions that require some policy, we sample uniformly
-  // from the list of actions that are consistent with what player_id observed.
-  // For rng, we need something that returns a double in [0, 1). This value will
-  // be interpreted as a cumulative distribution function, and will be used to
-  // sample from the legal chance actions. A good choice would be
-  // std::uniform_real_distribution<double>(0., 1.).
-  //
-  // Default implementation checks if the game is a perfect information game.
-  // If so, it returns a clone, otherwise an error is thrown.
-  virtual std::unique_ptr<State> ResampleFromInfostate(
-      int player_id, std::function<double()> rng) const;
-
-  // Returns a vector of states & probabilities that are consistent with the
-  // infostate from the view of the current player. By default, this is not
-  // implemented and returns an empty list. This doesn't make any attempt to
-  // correct for the opponent's policy in the probabilities, and so this is
-  // wrong for any state that's not the first non-chance node.
-  // virtual std::unique_ptr<HistoryDistribution>
-  // GetHistoriesConsistentWithInfostate(int player_id) const {
-  //   return {};
-  // }
-
-  // virtual std::unique_ptr<HistoryDistribution>
-  // GetHistoriesConsistentWithInfostate() const {
-  //   return GetHistoriesConsistentWithInfostate(CurrentPlayer());
-  // }
-
-  // Returns a vector of all actions that are consistent with the information
-  // revealed by taking action. E.g. in Poker, this does nothing but return the
-  // current action as poker only has public actions. In a game like Battleship,
-  // where the placement phase is hidden, this would return all possible
-  // placements.
-  virtual std::vector<Action> ActionsConsistentWithInformationFrom(
-      Action action) const {
-    AstraFatalError(
-        "ActionsConsistentWithInformationFrom has not been implemented.");
-    return {};
-  }
-
  protected:
   // See ApplyAction.
-  virtual void DoApplyAction(Action action_id) {
+  virtual void DoApplyAction(torch::Tensor action_id) {
     AstraFatalError("DoApplyAction is not implemented.");
-  }
-  // See ApplyActions.
-  virtual void DoApplyActions(const std::vector<Action>& actions) {
-    AstraFatalError("DoApplyActions is not implemented.");
   }
 
   // The game that created this state, plus some static information about it,
   // cached here for efficient access.
   const std::shared_ptr<const Game> game_;
-  const int num_distinct_actions_;
   const int num_players_;
 
   // Information that changes over the course of the game.
-  std::vector<PlayerAction> history_;
   int move_number_;
 };
 
-std::ostream& operator<<(std::ostream& stream, const State& state); // check
 
 class Game : public std::enable_shared_from_this<Game> {
   public:
@@ -598,29 +447,8 @@ class Game : public std::enable_shared_from_this<Game> {
    Game(const Game&) = delete;
    Game& operator=(const Game&) = delete;
  
-   // Maximum number of distinct actions in the game for any one player. This is
-   // not the same as max number of legal actions in any state as distinct
-   // actions are independent of the context (state), and often independent of
-   // the player as well. So, for instance in Tic-Tac-Toe this value is 9, one
-   // for each square. In games where pieces move, like e.g. Breakthrough, then
-   // it would be 64*6*2, since from an 8x8 board a single piece could only ever
-   // move to at most 6 places, and it can be a regular move or a capture move.
-   // Note: chance node outcomes are not included in this count.
-   // For example, this would correspond to the size of the policy net head
-   // learning which move to play.
-   virtual int NumDistinctActions() const = 0;
- 
    // Returns a newly allocated initial state.
    virtual std::unique_ptr<State> NewInitialState() const = 0;
- 
-   // Return a new state from a string description. This is an unspecified and
-   // unrestricted function to construct a new state from a string.
-   virtual std::unique_ptr<State> NewInitialState(const std::string& str) const {
-     AstraFatalError("NewInitialState from string is not implemented.");
-   }
- 
-   // Maximum number of distinct chance outcomes for chance nodes in the game.
-   virtual int MaxChanceOutcomes() const { return 0; }
  
    // If the game is parameterizable, returns an object with the current
    // parameter values, including defaulted values. Returns empty parameters
@@ -635,15 +463,6 @@ class Game : public std::enable_shared_from_this<Game> {
    // The number of players in this instantiation of the game.
    // Does not include the chance-player.
    virtual int NumPlayers() const = 0;
- 
-   // Utility range. These functions define the lower and upper bounds on the
-   // values returned by State::PlayerReturn(Player player) over all valid player
-   // numbers. This range should be as tight as possible; the intention is to
-   // give some information to algorithms that require it, and so their
-   // performance may suffer if the range is not tight. Loss/draw/win outcomes
-   // are common among games and should use the standard values of {-1,0,1}.
-   virtual RewardType MinUtility() const = 0;
-   virtual RewardType MaxUtility() const = 0;
  
    // Static information on the game type. This should match the information
    // provided when registering the game.
@@ -661,17 +480,6 @@ class Game : public std::enable_shared_from_this<Game> {
    virtual std::vector<int> InformationStateTensorShape() const {
      AstraFatalError("InformationStateTensorShape unimplemented.");
    }
-   virtual TensorLayout InformationStateTensorLayout() const {
-     return TensorLayout::kCHW;
-   }
- 
-   // The size of the (flat) vector needed for the information state tensor-like
-   // format.
-   int InformationStateTensorSize() const {
-     std::vector<int> shape = InformationStateTensorShape();
-     return shape.empty() ? 0
-                          : std::accumulate(shape.begin(), shape.end(), 1, std::multiplies<int>());
-   }
  
    // Describes the structure of the observation representation in a
    // tensor-like format. This is especially useful for experiments involving
@@ -681,35 +489,6 @@ class Game : public std::enable_shared_from_this<Game> {
    virtual std::vector<int> ObservationTensorShape() const {
      AstraFatalError("ObservationTensorShape unimplemented.");
    }
-   virtual TensorLayout ObservationTensorLayout() const {
-     return TensorLayout::kCHW;
-   }
- 
-   // The size of the (flat) vector needed for the observation tensor-like
-   // format.
-   int ObservationTensorSize() const {
-     std::vector<int> shape = ObservationTensorShape();
-     return shape.empty() ? 0
-                          : std::accumulate(shape.begin(), shape.end(), 1, std::multiplies<int>());
-   }
- 
-   // Describes the structure of the policy representation in a
-   // tensor-like format. This is especially useful for experiments involving
-   // reinforcement learning and neural networks. Note: the actual policy is
-   // expected to be in the shape of a 1-D vector.
-   virtual std::vector<int> PolicyTensorShape() const {
-     return {NumDistinctActions()};
-   }
- 
-   // Returns a newly allocated state built from a string. Caller takes ownership
-   // of the state.
-   //
-   // The default implementation assumes a sequence of actions, one per line,
-   // that is taken from the initial state.
-   //
-   // If this method is overridden, then it should be the inverse of
-   // State::Serialize (i.e. that method should also be overridden).
-   virtual std::unique_ptr<State> DeserializeState(const std::string& str) const;
  
    // The maximum length of any one game (in terms of number of decision nodes
    // visited in the game tree). For a simultaneous action game, this is the
@@ -731,38 +510,6 @@ class Game : public std::enable_shared_from_this<Game> {
    // must never be higher than this value.
    virtual int MaxMoveNumber() const {
      return MaxGameLength() + MaxChanceNodesInHistory();
-   }
- 
-   // The maximum length of any history in the game.
-   // The value State::History().size() must never be higher than this value.
-   virtual int MaxHistoryLength() const {
-     if (GetType().dynamics == GameType::Dynamics::kSimultaneous) {
-       // The history of simultaneous move games is flattened, so count number
-       // of actions of each player.
-       return MaxGameLength() * NumPlayers() + MaxChanceNodesInHistory();
-     }
-     if (GetType().dynamics == GameType::Dynamics::kSequential) {
-       return MaxGameLength() + MaxChanceNodesInHistory();
-     }
-     AstraFatalError("Unknown game dynamics.");
-   }
- 
-   // A string representation of the game, which can be passed to
-   // DeserializeGame. The difference with Game::ToString is that it also
-   // serializes internal RNG state used with sampled stochastic game
-   // implementations.
-   std::string Serialize() const;
- 
-   // A string representation of the game, which can be passed to LoadGame.
-   std::string ToString() const;
- 
-   // Returns true if these games are equal, false otherwise.
-   virtual bool operator==(const Game& other) const {
-     // GetParameters() includes default values. So comparing GetParameters
-     // instead of game_parameters_ makes sure that game equality is independent
-     // of the presence of explicitly passed game parameters with default values.
-     return game_type_.short_name == other.game_type_.short_name &&
-            GetParameters() == other.GetParameters();
    }
  
    // Get and set game's internal RNG state for de/serialization purposes. These
@@ -804,7 +551,7 @@ class Game : public std::enable_shared_from_this<Game> {
        auto default_iter = game_type_.parameter_specification.find(key);
        if (default_iter == game_type_.parameter_specification.end()) {
          AstraFatalError(StrCat("The parameter for ", key,
-                                      " is missing in game ", ToString()));
+                                      " is missing in game."));
        }
        default_game_parameter = default_iter->second;
      }
@@ -824,8 +571,7 @@ class Game : public std::enable_shared_from_this<Game> {
          AstraFatalError(StrCat("Parameter ", key, " is defaulted to ",
                                       default_game_parameter.ToReprString(),
                                       " having previously been defaulted to ",
-                                      iter->second.ToReprString(), " in game ",
-                                      ToString()));
+                                      iter->second.ToReprString(), " in game."));
        }
      }
      return default_game_parameter.value<T>();

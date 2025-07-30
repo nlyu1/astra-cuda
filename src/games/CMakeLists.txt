@@ -1,7 +1,5 @@
 set(GAME_SOURCES
     registration.h
-    high_low_trading/action_manager.cc
-    high_low_trading/action_manager.h
     high_low_trading/high_low_trading.cc
     high_low_trading/high_low_trading.h
 )
