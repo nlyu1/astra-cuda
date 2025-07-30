@@ -102,11 +102,7 @@ cmake -S ./src -B ./build/build-release -G Ninja \
   -DCMAKE_CUDA_HOST_COMPILER=$CONDA_PREFIX/bin/x86_64-conda-linux-gnu-g++
 ```
 
-Build features:
-- Auto-detects PyTorch and CUDA architectures
-- LTO disabled (compiler version mismatch)
-- Debug builds include sanitizers
-- Supports CUDA architectures: 87, 89, 90, 100, 101, 120
+To install to python, run `pip install .` under the root directory. 
 
 ## Quick Start
 

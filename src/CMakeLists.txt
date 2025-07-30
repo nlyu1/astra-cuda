@@ -9,7 +9,7 @@ set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CUDA_STANDARD 20)
 set(CMAKE_CUDA_STANDARD_REQUIRED ON)
-set(CMAKE_CUDA_ARCHITECTURES 87 89 90 100 101 120)
+set(CMAKE_CUDA_ARCHITECTURES 89 120)
 
 # Force CUDA to use the conda compiler if available
 if(DEFINED ENV{CONDA_PREFIX})
@@ -52,7 +52,15 @@ execute_process(
   OUTPUT_STRIP_TRAILING_WHITESPACE)
 message(STATUS "✅ Found Torch_DIR: ${Torch_DIR}")
 find_package(Torch REQUIRED HINTS "${Torch_DIR}")
-target_link_libraries(astra_deps INTERFACE "${TORCH_LIBRARIES}")
+# Additional linking to enable pytorch extensions: https://github.com/pytorch/pytorch/issues/108041
+execute_process(
+  COMMAND ${Python_EXECUTABLE} -c "import torch; from pathlib import Path; print(Path(torch.utils.cmake_prefix_path).parent.parent / 'lib')"
+  OUTPUT_VARIABLE Torch_LIB_DIR
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+message(STATUS "✅ Found Torch_LIB_DIR: ${Torch_LIB_DIR}")
+find_library(TORCH_PYTHON_LIBRARY torch_python PATH "${Torch_LIB_DIR}")
+# find_library(TORCH_PYTHON_LIBRARY torch_python HINTS "${Torch_DIR}")
+target_link_libraries(astra_deps INTERFACE ${TORCH_LIBRARIES} ${TORCH_PYTHON_LIBRARY})
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
 
 # ============================================================================
@@ -141,8 +149,8 @@ set(ASTRA_OBJECTS
 add_subdirectory(order_matching)
 list(APPEND ASTRA_OBJECTS order_matching)
 
-add_executable(main main.cc)
-target_link_libraries(main ${ASTRA_OBJECTS})
+# add_executable(main main.cc)
+# target_link_libraries(main ${ASTRA_OBJECTS})
 
 # building tests
 enable_testing()

@@ -1,3 +1,5 @@
+#include <torch/extension.h>
+
 #include <pybind11/numpy.h>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
@@ -10,7 +12,7 @@ namespace py = pybind11;
 
 namespace astra {
 
-PYBIND11_MODULE(astra_cuda, m) {
+PYBIND11_MODULE(TORCH_EXTENSION_NAME, m) {
     m.doc() = "Astra: GPU-based multi-agent trading environments.";
     m.attr("__version__") = ASTRA_VERSION;
 

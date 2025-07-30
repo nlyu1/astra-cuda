@@ -1,57 +1,90 @@
-# Tests Module
+# Astra CUDA Tests
 
-Unit tests and benchmarks for the ASTRA codebase.
+This directory contains all tests for the Astra CUDA order matching system.
 
-## Components
+## Test Structure
 
-### Market Tests (`market_tests.cu`)
+- `unit_tests/` - C++ unit tests for core functionality
+  - `market_tests.cu` - Tests for VecMarket CUDA implementation
+  - `astra_utils_tests.cc` - Tests for utility functions
 
-GPU unit tests for order matching:
-- Partial fills
-- Market independence
-- Time priority (FIFO at same price)
-- BBO calculations
-- Ring buffer wraparound
-- Zero-size order handling
-- Portfolio updates
+- `integration/` - Python integration tests  
+  - `test_vec_market.py` - Tests for Python bindings and end-to-end functionality
 
-```bash
-./build/build-release/tests/market_tests
-```
-
-### Utils Tests (`astra_utils_tests.cc`)
-
-Tests for utility functions:
-- String manipulation (StrCat, StrJoin, StrSplit)
-- Number parsing (SimpleAtoi, SimpleAtod)
-- Error handling macros
-- Type casting
-
-```bash
-./build/build-release/tests/astra_utils_tests
-```
-
-### Market Benchmark (`benchmark_market.cc`)
-
-Performance benchmarking:
-- Market configurations: 64 to 65,536
-- Thread block sizes: 64 to 1024
-- Metrics: throughput (markets/sec), latency, speedup, efficiency
-
-```bash
-# Default GPU
-./build/build-release/tests/benchmark_market
-
-# Specific GPU
-./build/build-release/tests/benchmark_market -i 1
-```
+- `benchmark_market.cc` - Performance benchmarking tool
 
 ## Running Tests
 
-All tests:
+### Quick Start
 ```bash
-cd build/build-release
-ctest --verbose
+# From this directory
+./run_tests.sh
+
+# Or specify a custom build directory
+./run_tests.sh /path/to/build
+
+# Include benchmarks
+./run_tests.sh /path/to/build --benchmark
 ```
 
-Individual tests are standalone executables in `build/build-release/tests/`
+### Running Individual Test Types
+
+#### C++ Unit Tests
+```bash
+# After building the project
+cd ../../build/build-release
+ctest
+# Or run individually:
+./tests/unit_tests/market_tests
+./tests/unit_tests/astra_utils_tests
+```
+
+#### Python Integration Tests
+```bash
+# Ensure the project is built first
+cd ../../build/build-release
+# Using CMake target
+cmake --build . --target python_tests
+# Or directly:
+PYTHONPATH=. python tests/integration/test_vec_market.py
+```
+
+#### Benchmarks
+```bash
+cd ../../build/build-release
+./tests/benchmark_market -i 0  # GPU 0
+./tests/benchmark_market -i 1  # GPU 1
+```
+
+## Test Requirements
+
+- C++ tests: No additional requirements beyond build dependencies
+- Python tests: Install with `pip install -r requirements.txt`
+  - pytest (optional but recommended)
+  - torch (should already be in conda environment)
+
+## Adding New Tests
+
+### C++ Tests
+1. Add new test file to `unit_tests/`
+2. Update `unit_tests/CMakeLists.txt` to include the new test
+3. Follow the pattern in existing test files
+
+### Python Tests
+1. Add new test file to `integration/`
+2. Update `CMakeLists.txt` to copy the file if needed
+3. Use pytest conventions for test discovery
+
+## Test Coverage
+
+The tests cover:
+- Basic market operations (add orders, matching)
+- Partial fills and order priority
+- Market independence and parallelism
+- Best bid/offer (BBO) functionality
+- Zero-size order handling
+- Ring buffer wraparound
+- Price crossing logic
+- Execution price determination
+- Multi-GPU support
+- Python bindings functionality

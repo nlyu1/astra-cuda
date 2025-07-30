@@ -1,12 +1,12 @@
 [build-system]
-requires = ["scikit-build-core", "pybind11"]
+requires = ["scikit-build-core", "pybind11", "torch >= 2.7.0"]
 build-backend = "scikit_build_core.build"
 
 [project]
 name = "astra_cuda"
 version = "0.0.1"
 requires-python = ">=3.12"
-dependencies = ["numpy"]
+dependencies = ["numpy", "torch >= 2.7.0"]
 
 [tool.scikit-build]
 cmake.version = ">=4.0.3"
