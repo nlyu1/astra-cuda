@@ -1,0 +1,12 @@
+{
+	"InstallScripts" : 
+	[
+		"/home/nlyu/Code/astra-cuda/build/build-release/cmake_install.cmake",
+		"/home/nlyu/Code/astra-cuda/build/build-release/_deps/pybind11-build/cmake_install.cmake",
+		"/home/nlyu/Code/astra-cuda/build/build-release/_deps/fmt-build/cmake_install.cmake",
+		"/home/nlyu/Code/astra-cuda/build/build-release/utils/cmake_install.cmake",
+		"/home/nlyu/Code/astra-cuda/build/build-release/order_matching/cmake_install.cmake",
+		"/home/nlyu/Code/astra-cuda/build/build-release/tests/cmake_install.cmake"
+	],
+	"Parallel" : false
+}

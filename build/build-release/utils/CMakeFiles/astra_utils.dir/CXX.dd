@@ -1,0 +1,5 @@
+ninja_dyndep_version = 1.0
+build utils/CMakeFiles/astra_utils.dir/astra_utils.cc.o: dyndep
+
+build utils/CMakeFiles/astra_utils.dir/game_parameters.cc.o: dyndep
+

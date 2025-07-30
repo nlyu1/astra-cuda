@@ -1,0 +1,5 @@
+add_library(order_matching STATIC market.cu)
+set_target_properties(order_matching PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
+
+target_include_directories(order_matching PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(order_matching PUBLIC astra_utils astra_deps)
