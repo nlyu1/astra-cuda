@@ -1,0 +1,11 @@
+{
+"rules": [
+{
+"primary-output": "pybind/CMakeFiles/astra_cuda.dir/bindings.cc.o",
+"requires": [
+]
+}
+],
+"version": 0,
+"revision": 0
+}

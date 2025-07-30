@@ -24,7 +24,6 @@
 // PARALLELIZATION STRATEGY:
 // - One CUDA thread per market for order insertion and matching
 // - Coalesced memory access patterns for optimal GPU performance
-// - Warp-level synchronization where beneficial
 //
 // MATCHING ALGORITHM:
 // 1. Add bid order to appropriate price level (maintaining time priority)
@@ -62,7 +61,8 @@ constexpr uint32_t NULL_INDEX = 0xFFFFFFFF;
 constexpr uint32_t MAX_CUSTOMERS = 1024; 
 
 // Structure for returning best bid/offer information
-struct BBOBatch {
+class BBOBatch {
+public:
     torch::Tensor best_bid_prices;  // [num_markets] uint32_t
     torch::Tensor best_bid_sizes;   // [num_markets] uint32_t
     torch::Tensor best_ask_prices;  // [num_markets] uint32_t
@@ -70,7 +70,8 @@ struct BBOBatch {
 };
 
 // Structure for returning fill information
-struct FillBatch {
+class FillBatch {
+public:
     torch::Tensor fill_prices;        // [num_markets, max_fills] uint32_t - execution price
     torch::Tensor fill_sizes;         // [num_markets, max_fills] uint32_t - fill size
     torch::Tensor fill_customer_ids;  // [num_markets, max_fills] uint32_t - taker customer ID

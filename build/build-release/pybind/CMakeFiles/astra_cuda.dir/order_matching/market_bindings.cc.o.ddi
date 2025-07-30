@@ -1,0 +1,11 @@
+{
+"rules": [
+{
+"primary-output": "pybind/CMakeFiles/astra_cuda.dir/order_matching/market_bindings.cc.o",
+"requires": [
+]
+}
+],
+"version": 0,
+"revision": 0
+}

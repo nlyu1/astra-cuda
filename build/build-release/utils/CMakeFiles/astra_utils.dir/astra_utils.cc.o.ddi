@@ -1,0 +1,11 @@
+{
+"rules": [
+{
+"primary-output": "utils/CMakeFiles/astra_utils.dir/astra_utils.cc.o",
+"requires": [
+]
+}
+],
+"version": 0,
+"revision": 0
+}

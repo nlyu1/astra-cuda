@@ -120,11 +120,8 @@ target_compile_options(astra_deps INTERFACE
         -mprefer-vector-width=512
         -march=native
         -mtune=native
+        -Wno-dev
         -DNDEBUG>)
-target_compile_options(astra_deps INTERFACE
-    $<$<CONFIG:Release>:$<$<COMPILE_LANGUAGE:CUDA>:-O3>>
-    $<$<CONFIG:Debug>:$<$<COMPILE_LANGUAGE:CUDA>:-G>>
-)
 # --- Linker Options ---
 target_link_options(astra_deps INTERFACE
     -fopenmp
@@ -144,10 +141,13 @@ set(ASTRA_OBJECTS
 add_subdirectory(order_matching)
 list(APPEND ASTRA_OBJECTS order_matching)
 
-
 add_executable(main main.cc)
 target_link_libraries(main ${ASTRA_OBJECTS})
 
 # building tests
 enable_testing()
 add_subdirectory(tests)
+
+##### Pybind11 bindings #####
+add_subdirectory(pybind) # Defines target "astra_cuda"
+install(TARGETS astra_cuda DESTINATION .)

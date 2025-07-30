@@ -1,0 +1,15 @@
+[build-system]
+requires = ["scikit-build-core", "pybind11"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "astra_cuda"
+version = "0.0.1"
+requires-python = ">=3.12"
+dependencies = ["numpy"]
+
+[tool.scikit-build]
+cmake.version = ">=4.0.3"
+cmake.source-dir = "src"
+cmake.args = ["-G", "Ninja", "-DCMAKE_BUILD_TYPE=Release"]
+# cmake.args = ["-G", "Ninja", "-DCMAKE_BUILD_TYPE=Debug"]
