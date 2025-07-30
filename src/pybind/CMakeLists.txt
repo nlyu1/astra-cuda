@@ -1,6 +1,6 @@
 set(ASTRA_PYBIND_SOURCES 
-    bindings.cu
-    order_matching/market_bindings.cu
+    bindings.cc
+    order_matching/market_bindings.cc
 )
 
 pybind11_add_module(astra_cuda MODULE ${ASTRA_PYBIND_SOURCES})

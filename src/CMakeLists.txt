@@ -149,8 +149,10 @@ set(ASTRA_OBJECTS
 add_subdirectory(order_matching)
 list(APPEND ASTRA_OBJECTS order_matching)
 
-# add_executable(main main.cc)
-# target_link_libraries(main ${ASTRA_OBJECTS})
+add_executable(main main.cc)
+set_property(TARGET main PROPERTY CXX_STANDARD 20)
+set_property(TARGET main PROPERTY INTERPROCEDURAL_OPTIMIZATION FALSE) # Disable LTO for main to avoid linking issues
+target_link_libraries(main ${ASTRA_OBJECTS})
 
 # building tests
 enable_testing()

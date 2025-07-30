@@ -84,8 +84,8 @@ class TestVecMarket:
         assert fill_counts[0].item() == 1 # Should have 1 incremental fill
         
         # Check the second fill is for 70 shares (remaining from original 100)
-        print(market.to_string(0))
-        print(fill_sizes)
+        # Need to refresh the CPU copy after the new order
+        fill_sizes = fills.fill_sizes.cpu()
         assert fill_sizes[0][0].item() == 70
     
     def test_market_independence(self):
