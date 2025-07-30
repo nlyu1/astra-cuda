@@ -139,24 +139,9 @@ struct GameType {
 // This information may depend on the game parameters, and hence cannot
 // be part of `GameType`.
 struct GameInfo {
-  // The size of the action space. See `Game` for a full description.
-  int num_distinct_actions;
-
-  // Maximum number of distinct chance outcomes for chance nodes in the game.
-  int max_chance_outcomes;
-
   // The number of players in this instantiation of the game.
   // Does not include the chance-player.
   int num_players;
-
-  // Utility range. These functions define the lower and upper bounds on the
-  // values returned by State::PlayerReturn(Player player) over all valid player
-  // numbers. This range should be as tight as possible; the intention is to
-  // give some information to algorithms that require it, and so their
-  // performance may suffer if the range is not tight. Loss/draw/win outcomes
-  // are common among games and should use the standard values of {-1,0,1}.
-  RewardType min_utility;
-  RewardType max_utility;
 
   // The total utility for all players, if this is a constant-sum-utility game.
   // Should be zero if the game is zero-sum.
@@ -183,15 +168,6 @@ std::ostream& operator<<(std::ostream& stream, GameType::Information value); // 
 std::ostream& operator<<(std::ostream& stream, GameType::Utility value); // check 
 std::ostream& operator<<(std::ostream& stream, GameType::RewardModel value); // check
 
-// The probability of taking each possible action in a particular info state.
-using ActionsAndProbs = std::vector<std::pair<Action, double>>;
-
-// We alias this here as we can't import state_distribution.h or we'd have a
-// circular dependency.
-// using HistoryDistribution =
-//     std::pair<std::vector<std::unique_ptr<State>>, std::vector<double>>;
-
-// Forward declarations.
 class Game;
 
 // An abstract class that represents a state of the game.
@@ -207,7 +183,7 @@ class State {
   // since this shared pointer to the parent is required, Game objects cannot
   // be used as value types and should always be created via a shared pointer.
   // See the documentation of the Game object for further details.
-  State(std::shared_ptr<const Game> game); // check  
+  State(std::shared_ptr<const Game> game);
   State(const State&) = default;
 
   // Returns current player. Player numbers start from 0.
@@ -225,87 +201,10 @@ class State {
   // sampling of and outcome should be done in this function and then applied.
   //
   // Games should implement DoApplyAction.
-  virtual void ApplyAction(Action action_id); // check
+  virtual void ApplyAction(torch::Tensor action_id);
 
-  // Helper versions of ApplyAction that first does a legality check.
-  virtual void ApplyActionWithLegalityCheck(Action action_id); // check 
-
-  // `LegalActions(Player player)` is valid for all nodes in all games,
-  // returning an empty list for players who don't act at this state. The
-  // actions should be returned in ascending order.
-  //
-  // This default implementation is fine for turn-based games, but should
-  // be overridden by simultaneous-move games. At least one player should have a
-  // legal action or the game should be terminal.
-  //
-  // Since games mostly override LegalActions(), this method will not be visible
-  // in derived classes unless a using directive is added.
-  virtual std::vector<Action> LegalActions(Player player) const {
-    if (!IsTerminal() && player == CurrentPlayer()) {
-      return IsChanceNode() ? LegalChanceOutcomes() : LegalActions();
-    } else {
-      return {};
-    }
-  }
-
-  // `LegalActions()` returns the actions for the current player (including at
-  // chance nodes). All games should implement this function.
-  // At a player node, all returned actions should be in
-  // [0, NumDistinctActions()). For a chance node, they should all be in
-  // [0, MaxChanceOutcomes()).
-  // The actions should be returned in ascending order.
-  // If the state is non-terminal (and not a mean field node), there must be at
-  // least one legal action.
-  //
-  // In simultaneous-move games, the abstract base class implements it in
-  // terms of LegalActions(player) and LegalChanceOutcomes(), and so derived
-  // classes only need to implement `LegalActions(Player player)`.
-  // This will result in LegalActions() being hidden unless a using directive
-  // is added.
-  virtual std::vector<Action> LegalActions() const = 0; // check 
-
-  // Returns a vector containing 1 for legal actions and 0 for illegal actions.
-  // The length is `game.NumDistinctActions()` for player nodes, and
-  // `game.MaxChanceOutcomes()` for chance nodes.
-  std::vector<int> LegalActionsMask(Player player) const; // check 
-
-  // Convenience function for turn-based games.
-  std::vector<int> LegalActionsMask() const {
-    return LegalActionsMask(CurrentPlayer());
-  } // check
-
-  // Returns a string representation of the specified action for the player.
-  // The representation may depend on the current state of the game, e.g.
-  // for chess the string "Nf3" would correspond to different starting squares
-  // in different states (and hence probably different action ids).
-  // This method will format chance outcomes if player == kChancePlayerId
-  virtual std::string ActionToString(Player player, Action action_id) const = 0;
-  std::string ActionToString(Action action_id) const {
-    return ActionToString(CurrentPlayer(), action_id);
-  }
-
-  // Reverses the mapping done by ActionToString.
-  // Note: This currently just loops over all legal actions, converts them into
-  // a string, and checks equality, so it can be very slow.
-  virtual Action StringToAction(Player player,
-                                const std::string& action_str) const;
-  Action StringToAction(const std::string& action_str) const {
-    return StringToAction(CurrentPlayer(), action_str);
-  }
-
-  // Returns a string representation of the state. Also used as in the default
-  // implementation of operator==.
-  virtual std::string ToString() const = 0;
-
-  // Returns true if these states are equal, false otherwise. Two states are
-  // equal if they are the same world state; the interpretation might differ
-  // across games. For instance, in an imperfect information game, the full
-  // history might be relevant for distinguishing states whereas it might not be
-  // relevant for single-player games or perfect information games such as
-  // Tic-Tac-Toe, where only the current board state is necessary.
-  virtual bool operator==(const State& other) const {
-    return ToString() == other.ToString();
-  }
+  // Returns a string representation of the state. 
+  virtual std::string ToString(uint32_t index) const = 0;
 
   // Is this a terminal state? (i.e. has the game ended?)
   virtual bool IsTerminal() const = 0;
@@ -321,12 +220,8 @@ class State {
   //       The default implementation is only correct for games that only
   //       have a final reward. Games with intermediate rewards must override
   //       both this method and Returns().
-  virtual std::vector<RewardType> Rewards() const {
-    if (IsTerminal()) {
-      return Returns();
-    } else {
-      return std::vector<RewardType>(num_players_, 0.0);
-    }
+  virtual at::Tensor Rewards() const {
+    AstraFatalError("Not implemented"); 
   }
 
   // Returns sums of all rewards for each player up to the current state.

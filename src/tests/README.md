@@ -11,7 +11,9 @@ This directory contains all tests for the Astra CUDA order matching system.
 - `integration/` - Python integration tests  
   - `test_vec_market.py` - Tests for Python bindings and end-to-end functionality
 
-- `benchmark_market.cc` - Performance benchmarking tool
+- `benchmarks/` - Performance benchmarking tools
+  - `benchmark_market.cc` - C++ benchmark for market throughput
+  - `benchmark_market.py` - Python benchmark wrapper
 
 ## Running Tests
 
@@ -52,8 +54,10 @@ PYTHONPATH=. python tests/integration/test_vec_market.py
 #### Benchmarks
 ```bash
 cd ../../build/build-release
-./tests/benchmark_market -i 0  # GPU 0
-./tests/benchmark_market -i 1  # GPU 1
+./tests/benchmarks/benchmark_market -i 0  # GPU 0
+./tests/benchmarks/benchmark_market -i 1  # GPU 1
+# Or run Python benchmark:
+python tests/benchmarks/benchmark_market.py
 ```
 
 ## Test Requirements

@@ -420,13 +420,38 @@ void VecMarket::AddTwoSidedQuotes(
     ASTRA_CHECK_EQ(ask_sz.size(0), num_markets_);
     ASTRA_CHECK_EQ(customer_ids.size(0), num_markets_);
 
-    // Ensure tensors are on the correct GPU and contiguous
+    // Assert tensors are on the correct GPU and contiguous
     auto device = torch::Device(torch::kCUDA, device_id_);
-    bid_px = bid_px.to(device).contiguous();
-    bid_sz = bid_sz.to(device).contiguous();
-    ask_px = ask_px.to(device).contiguous();
-    ask_sz = ask_sz.to(device).contiguous();
-    customer_ids = customer_ids.to(device).contiguous();
+    if (bid_px.device() != device) {
+        AstraFatalError("bid_px tensor must be on device " + std::to_string(device_id_));
+    }
+    if (!bid_px.is_contiguous()) {
+        AstraFatalError("bid_px tensor must be contiguous");
+    }
+    if (bid_sz.device() != device) {
+        AstraFatalError("bid_sz tensor must be on device " + std::to_string(device_id_));
+    }
+    if (!bid_sz.is_contiguous()) {
+        AstraFatalError("bid_sz tensor must be contiguous");
+    }
+    if (ask_px.device() != device) {
+        AstraFatalError("ask_px tensor must be on device " + std::to_string(device_id_));
+    }
+    if (!ask_px.is_contiguous()) {
+        AstraFatalError("ask_px tensor must be contiguous");
+    }
+    if (ask_sz.device() != device) {
+        AstraFatalError("ask_sz tensor must be on device " + std::to_string(device_id_));
+    }
+    if (!ask_sz.is_contiguous()) {
+        AstraFatalError("ask_sz tensor must be contiguous");
+    }
+    if (customer_ids.device() != device) {
+        AstraFatalError("customer_ids tensor must be on device " + std::to_string(device_id_));
+    }
+    if (!customer_ids.is_contiguous()) {
+        AstraFatalError("customer_ids tensor must be contiguous");
+    }
 
     // Launch kernel
     dim3 blocks((num_markets_ + threads_per_block_ - 1) / threads_per_block_);

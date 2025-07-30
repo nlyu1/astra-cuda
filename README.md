@@ -124,10 +124,10 @@ ctest --verbose
 
 ```bash
 # Benchmark on default GPU
-./build/build-release/tests/benchmark_market
+./build/build-release/tests/benchmarks/benchmark_market
 
 # Benchmark on specific GPU
-./build/build-release/tests/benchmark_market -i 1
+./build/build-release/tests/benchmarks/benchmark_market -i 1
 ```
 
 ### Example Usage
