@@ -49,49 +49,44 @@ std::shared_ptr<const Game> Factory(const GameParameters& params) {
 }
 
 HighLowTradingState::HighLowTradingState(std::shared_ptr<const Game> game)
-    : State(game) {
+    : State(game),
+      num_envs_(static_cast<const HighLowTradingGame*>(game.get())->GetNumMarkets()),
+      num_players_(static_cast<const HighLowTradingGame*>(game.get())->GetNumPlayers()),
+      steps_per_player_(static_cast<const HighLowTradingGame*>(game.get())->GetStepsPerPlayer()),
+      device_id_(static_cast<const HighLowTradingGame*>(game.get())->GetDeviceId()),
+      market_(
+        /*num_markets=*/static_cast<const HighLowTradingGame*>(game.get())->GetNumMarkets(), 
+        /*max_price_levels=*/static_cast<const HighLowTradingGame*>(game.get())->GetMaxContractValue(),
+        /*max_active_orders_per_market=*/static_cast<const HighLowTradingGame*>(game.get())->GetNumPlayers() * 
+                                         static_cast<const HighLowTradingGame*>(game.get())->GetStepsPerPlayer() * 2,
+        /*max_active_fills_per_market=*/std::min(
+          static_cast<const HighLowTradingGame*>(game.get())->GetNumPlayers() * 
+          static_cast<const HighLowTradingGame*>(game.get())->GetStepsPerPlayer() * 2,
+          static_cast<const HighLowTradingGame*>(game.get())->GetMaxContractsPerTrade() * 2),
+        /*num_customers=*/static_cast<const HighLowTradingGame*>(game.get())->GetNumPlayers(), 
+        /*device_id=*/static_cast<const HighLowTradingGame*>(game.get())->GetDeviceId(), 
+        /*threads_per_block=*/static_cast<const HighLowTradingGame*>(game.get())->GetThreadsPerBlock()
+      ) {
     auto derived_game = static_cast<const HighLowTradingGame*>(game.get()); 
     if (derived_game == nullptr) {
       AstraFatalError("HighLowTradingState: game is not a HighLowTradingGame"); 
     }
 
-    // Initialize member variables
-    num_envs_ = derived_game->GetNumMarkets();
-    num_players_ = derived_game->GetNumPlayers();
-    steps_per_player_ = derived_game->GetStepsPerPlayer();
-    device_id_ = derived_game->GetDeviceId();
-
     // Configure tensor options for the specified device
     auto device = torch::Device(torch::kCUDA, device_id_);
-    auto options_u32 = torch::TensorOptions().dtype(torch::kUInt32).device(device);
     auto options_i32 = torch::TensorOptions().dtype(torch::kInt32).device(device);
     auto options_bool = torch::TensorOptions().dtype(torch::kBool).device(device);
 
     // Initialize tensors with appropriate shapes
-    contract_values_ = torch::zeros({num_envs_, 3}, options_u32);
+    contract_values_ = torch::zeros({num_envs_, 3}, options_i32);
     contract_high_settle_ = torch::zeros({num_envs_}, options_bool);
-    player_permutation_ = torch::zeros({num_envs_, num_players_}, options_u32);
+    player_permutation_ = torch::zeros({num_envs_, num_players_}, options_i32);
+    inv_permutation_ = torch::zeros({num_envs_, num_players_}, options_i32);
+    target_positions_ = torch::zeros({num_envs_, num_players_}, options_i32);
     
     // Initialize tracking tensors for ExposeInfo
     player_contract_over_time_ = torch::zeros({num_envs_, num_players_, steps_per_player_, 5}, options_i32);
     market_contract_over_time_ = torch::zeros({num_envs_ * num_players_, 4}, options_i32); // best bid, best ask, last_price, volume
-
-    // Heuristic for how many fills there'll be
-    int max_active_orders_per_market = num_players_ * steps_per_player_ * 2; // Both bids and asks might be resident
-    int max_active_fills_per_market = std::min(
-      max_active_orders_per_market, 
-      derived_game->GetMaxContractsPerTrade() * 2); 
-    
-    // Initialize market
-    market_ = order_matching::VecMarket(
-      /*num_markets=*/num_envs_, 
-      /*max_price_levels=*/derived_game->GetMaxContractValue(),
-      /*max_active_orders_per_market=*/max_active_orders_per_market, 
-      /*max_active_fills_per_market=*/max_active_fills_per_market, 
-      /*num_customers=*/num_players_, 
-      /*device_id=*/device_id_, 
-      /*threads_per_block=*/derived_game->GetThreadsPerBlock()
-    );
 }
 
 HighLowTradingState::HighLowTradingState(const HighLowTradingState& other)
@@ -104,6 +99,8 @@ HighLowTradingState::HighLowTradingState(const HighLowTradingState& other)
       contract_values_(other.contract_values_.clone()),
       contract_high_settle_(other.contract_high_settle_.clone()),
       player_permutation_(other.player_permutation_.clone()),
+      inv_permutation_(other.inv_permutation_.clone()),
+      target_positions_(other.target_positions_.clone()),
       market_(other.market_),
       player_contract_over_time_(other.player_contract_over_time_.clone()),
       market_contract_over_time_(other.market_contract_over_time_.clone()) {
@@ -122,8 +119,111 @@ Player HighLowTradingState::CurrentPlayer() const {
   return kTerminalPlayerId;
 }
 
+void HighLowTradingState::ApplyCandidateValues(torch::Tensor move) {
+  // First chance move: setting two candidate contract values
+  ASTRA_CHECK_EQ(move.dim(), 2);
+  ASTRA_CHECK_EQ(move.size(1), 2);
+  
+  // Ensure values are within valid range [1, max_contract_value]
+  auto min_val = torch::min(move).item<int>();
+  auto max_val = torch::max(move).item<int>();
+  ASTRA_CHECK_GE(min_val, 1);
+  ASTRA_CHECK_LE(max_val, GetGame()->GetMaxContractValue());
+  
+  // Populate first two columns of contract_values
+  contract_values_.index({torch::indexing::Slice(), torch::indexing::Slice(0, 2)}) = move;
+}
+
+void HighLowTradingState::ApplyHighLowSettle(torch::Tensor move) {
+  // Second chance move: determining high/low settlement
+  ASTRA_CHECK_EQ(move.dim(), 1);
+      
+  // Ensure values are 0 or 1
+  auto min_val = torch::min(move).item<int>();
+  auto max_val = torch::max(move).item<int>();
+  ASTRA_CHECK_GE(min_val, 0);
+  ASTRA_CHECK_LE(max_val, 1);
+
+  // Store high/low choice
+  contract_high_settle_ = move.to(torch::kBool);
+
+  // Compute max and min values from the two candidate values
+  auto max_values = torch::max(contract_values_.index({torch::indexing::Slice(), 0}), 
+                                contract_values_.index({torch::indexing::Slice(), 1}));
+  auto min_values = torch::min(contract_values_.index({torch::indexing::Slice(), 0}), 
+                                contract_values_.index({torch::indexing::Slice(), 1}));
+
+  // Set settlement value: move * max + (1 - move) * min
+  contract_values_.index({torch::indexing::Slice(), 2}) = 
+      move * max_values + (1 - move) * min_values;
+}
+
+void HighLowTradingState::ApplyPermutation(torch::Tensor move) {
+  // Third chance move: player role permutation. We won't check that this is a valid permutation
+  ASTRA_CHECK_EQ(move.dim(), 2);
+  ASTRA_CHECK_EQ(move.size(1), num_players_);
+  
+  // Ensure values are valid player indices [0, P-1]
+  auto min_val = torch::min(move).item<int>();
+  auto max_val = torch::max(move).item<int>();
+  ASTRA_CHECK_GE(min_val, 0);
+  ASTRA_CHECK_LT(max_val, num_players_);
+  
+  // Populate player permutation
+  player_permutation_ = move;
+  inv_permutation_ = move.argsort(/*dim=*/1, /*descending=*/false);
+  // Need to double-check correctness
+  // for (int j = 0; j < num_envs_; ++j) {
+  //   for (int p = 0; p < num_players_; ++p) {
+  //     ASTRA_CHECK_EQ(move[j, p], player_permutation_[j, inv_permutation_[j, p]]);
+  //   }
+  // }
+}
+
+void HighLowTradingState::ApplyCustomerSize(torch::Tensor move) {
+  ASTRA_CHECK_EQ(move.dim(), 2);
+  ASTRA_CHECK_EQ(move.size(1), num_players_ - 3);
+  
+  // Customer roles start at index 3 (roles 0,1 are ValueCheaters, role 2 is HighLowCheater)
+  // move contains target positions for customer roles [3, 4, ..., P-1]
+  // inv_permutation_[j, r] tells us which player has role r in environment j
+  
+  // For each customer role r in [3, P-1]:
+  //   - The player with role r is inv_permutation_[j, r]  
+  //   - The target position comes from move[j, r - 3]
+  
+  // Get player indices for each customer role across all environments
+  // inv_permutation_[:, 3:] gives us which players have customer roles
+  auto customer_player_indices = inv_permutation_.index({
+      torch::indexing::Slice(), 
+      torch::indexing::Slice(3, torch::indexing::None)
+  });
+  
+  // Use scatter to assign target positions to the correct players
+  // We need to scatter move values to the positions indicated by customer_player_indices
+  target_positions_.scatter_(
+      /*dim=*/1, 
+      /*index=*/customer_player_indices.to(torch::kInt64),
+      /*src=*/move.to(target_positions_.dtype())
+  );
+}
+
 void HighLowTradingState::DoApplyAction(torch::Tensor move) {
-  AstraFatalError("Not implemented"); 
+  int move_number = MoveNumber();
+  ASTRA_CHECK_EQ(move.size(0), num_envs_); 
+  
+  if (move_number == 0) {
+    ApplyCandidateValues(move);
+  } else if (move_number == 1) {
+    ApplyHighLowSettle(move);
+  } else if (move_number == 2) {
+    ApplyPermutation(move);
+  } else if (move_number == 3) {
+    ApplyCustomerSize(move);
+  } else {
+    // We're in player trading mode 
+    AstraFatalError("Move not implemented"); 
+  }
 }
 
 const HighLowTradingGame* HighLowTradingState::GetGame() const {
@@ -184,9 +284,10 @@ bool HighLowTradingState::IsTerminal() const {
   return MoveNumber() >= game_->MaxGameLength(); 
 }
 
-int HighLowTradingState::GetContractValue() const {
-  ASTRA_CHECK_GE(MoveNumber(), 3); 
-  return 0;
+torch::Tensor HighLowTradingState::GetContractValue() const {
+  ASTRA_CHECK_GE(MoveNumber(), 2); 
+  // Return the settlement values (third column) for all environments
+  return contract_values_.index({torch::indexing::Slice(), 2}); 
 }
 
 // We model instantaneous reward as (portfolio value at terminal timestep)

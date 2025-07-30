@@ -176,11 +176,17 @@ class HighLowTradingState : public State {
   //
   // Note: Role assignments are only populated after MoveNumber() >= MaxChanceNodesInHistory()
   ExposeInfo expose_info() const override;
+
+  torch::Tensor GetContractValue() const; 
    
  protected:
   void DoApplyAction(torch::Tensor move) override;
+  // Helper values to handle different kinds of actions 
+  void ApplyCandidateValues(torch::Tensor move);
+  void ApplyHighLowSettle(torch::Tensor move);
+  void ApplyPermutation(torch::Tensor move);
+  void ApplyCustomerSize(torch::Tensor move);
   const HighLowTradingGame* GetGame() const;
-  int GetContractValue() const; 
 
  private:
   int num_envs_;
@@ -191,7 +197,10 @@ class HighLowTradingState : public State {
   /* N = num_envs, P=num_players, T=rounds_per_player */
   torch::Tensor contract_values_; // [N, 3] denoting 2 candidate values and settlement value. Int
   torch::Tensor contract_high_settle_; // [N] bool 
+  // If permutation[player] = ((0 / 1), (2), (...)) then (ValueCheater, HighLowCheater, Customer)
   torch::Tensor player_permutation_; // [N, P]
+  torch::Tensor inv_permutation_; // [N, P]
+  torch::Tensor target_positions_; // [N, P]
 
   order_matching::VecMarket market_; 
 
@@ -211,8 +220,11 @@ class HighLowTradingGame : public Game {
       return MaxChanceNodesInHistory() + GetStepsPerPlayer() * GetNumPlayers(); 
     }
     int MaxChanceNodesInHistory() const override {
-      // See action_manager.h: four chance moves (high, low, choice, permutation) with num_customer assignments. 
-      return 4 + (GetNumPlayers() - 3); 
+      // Three chance moves (high/low) [N, 2]
+      // Contract settlement choice [N]
+      // Permutation [N, P]
+      // Num_customer assignments [N, P-2]
+      return 4; 
     }
     int NumPlayers() const override { return GetNumPlayers(); }
 

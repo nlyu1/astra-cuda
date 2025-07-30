@@ -374,9 +374,6 @@ VecMarket::VecMarket(const VecMarket& other)
       device_id_(other.device_id_),
       threads_per_block_(other.threads_per_block_) {
     
-    // Use torch::cuda::device_guard to ensure device changes are local to this scope
-    torch::cuda::CUDAGuard device_guard(device_id_);
-    
     // Clone all tensors to create deep copies
     // The clone() operation will create new tensors on the same device as the source
     bid_heads_ = other.bid_heads_.clone();
