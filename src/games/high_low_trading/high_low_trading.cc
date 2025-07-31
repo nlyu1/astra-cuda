@@ -256,12 +256,11 @@ void HighLowTradingState::ApplyPlayerTrading(torch::Tensor move) {
   market_.CopyCustomerPortfoliosTo(player_last_positions_); 
   
   // Extract columns from move tensor and make them contiguous
-  // Convert to uint32 as required by market_.AddTwoSidedQuotes
-  auto bid_prices = move.index({torch::indexing::Slice(), 0}).to(torch::kUInt32).contiguous();
-  auto ask_prices = move.index({torch::indexing::Slice(), 1}).to(torch::kUInt32).contiguous();
-  auto bid_sizes = move.index({torch::indexing::Slice(), 2}).to(torch::kUInt32).contiguous();
-  auto ask_sizes = move.index({torch::indexing::Slice(), 3}).to(torch::kUInt32).contiguous();
-  auto customer_ids = torch::ones({num_envs_}, torch::kUInt32).to(torch::Device(torch::kCUDA, device_id_)) * player;
+  auto bid_prices = move.index({torch::indexing::Slice(), 0}).contiguous();
+  auto ask_prices = move.index({torch::indexing::Slice(), 1}).contiguous();
+  auto bid_sizes = move.index({torch::indexing::Slice(), 2}).contiguous();
+  auto ask_sizes = move.index({torch::indexing::Slice(), 3}).contiguous();
+  auto customer_ids = torch::ones({num_envs_}, torch::kInt32).to(torch::Device(torch::kCUDA, device_id_)) * player;
   
   // Compute the fills 
   market_.AddTwoSidedQuotes(
@@ -368,7 +367,7 @@ const HighLowTradingGame* HighLowTradingState::GetGame() const {
   return static_cast<const HighLowTradingGame*>(game_.get()); 
 }
 
-std::string HighLowTradingState::ToString(uint32_t index) const {
+std::string HighLowTradingState::ToString(int32_t index) const {
   std::ostringstream result;
   result << "********** Game setup **********\n";
   
@@ -593,7 +592,7 @@ void HighLowTradingState::FillInformationStateTensor(Player player,
   // }
 }
 
-std::string HighLowTradingState::InformationStateString(Player player, uint32_t index) const {
+std::string HighLowTradingState::InformationStateString(Player player, int32_t index) const {
   ASTRA_CHECK_GE(player, 0);
   ASTRA_CHECK_LT(player, GetGame()->NumPlayers());
   
@@ -662,7 +661,7 @@ std::vector<int> HighLowTradingGame::ObservationTensorShape() const {
   return InformationStateTensorShape(); 
 }
 
-std::string HighLowTradingState::ObservationString(Player player, uint32_t index) const {
+std::string HighLowTradingState::ObservationString(Player player, int32_t index) const {
   return InformationStateString(player, index); 
 }
 
@@ -687,7 +686,7 @@ std::unique_ptr<State> HighLowTradingGame::NewInitialState() const {
   return std::unique_ptr<State>(new HighLowTradingState(shared_from_this()));
 }
 
-std::string HighLowTradingState::PublicInformationString(uint32_t index) const {
+std::string HighLowTradingState::PublicInformationString(int32_t index) const {
   std::ostringstream result;
   result << "********** Game Configuration **********\n";
   result << fmt::format("Environment: {} / {}\n", index, num_envs_);
@@ -715,8 +714,8 @@ std::string HighLowTradingState::PublicInformationString(uint32_t index) const {
   // Get fills from fill_batch_
   if (fill_batch_.fill_counts.defined()) {
     auto fill_counts_cpu = fill_batch_.fill_counts.cpu();
-    auto fill_counts_accessor = fill_counts_cpu.accessor<uint32_t, 1>();
-    uint32_t num_fills_for_env = fill_counts_accessor[index];
+    auto fill_counts_accessor = fill_counts_cpu.accessor<int32_t, 1>();
+    int32_t num_fills_for_env = fill_counts_accessor[index];
     
     result << fmt::format("Number of fills: {}\n", num_fills_for_env);
     
@@ -731,17 +730,17 @@ std::string HighLowTradingState::PublicInformationString(uint32_t index) const {
       auto fill_tid_cpu = fill_batch_.fill_tid.cpu();
       auto fill_quote_tid_cpu = fill_batch_.fill_quote_tid.cpu();
       
-      auto fill_prices_accessor = fill_prices_cpu.accessor<uint32_t, 2>();
-      auto fill_sizes_accessor = fill_sizes_cpu.accessor<uint32_t, 2>();
-      auto fill_customer_ids_accessor = fill_customer_ids_cpu.accessor<uint32_t, 2>();
-      auto fill_quoter_ids_accessor = fill_quoter_ids_cpu.accessor<uint32_t, 2>();
+      auto fill_prices_accessor = fill_prices_cpu.accessor<int32_t, 2>();
+      auto fill_sizes_accessor = fill_sizes_cpu.accessor<int32_t, 2>();
+      auto fill_customer_ids_accessor = fill_customer_ids_cpu.accessor<int32_t, 2>();
+      auto fill_quoter_ids_accessor = fill_quoter_ids_cpu.accessor<int32_t, 2>();
       auto fill_is_sell_quote_accessor = fill_is_sell_quote_cpu.accessor<bool, 2>();
-      auto fill_quote_sizes_accessor = fill_quote_sizes_cpu.accessor<uint32_t, 2>();
-      auto fill_tid_accessor = fill_tid_cpu.accessor<uint32_t, 2>();
-      auto fill_quote_tid_accessor = fill_quote_tid_cpu.accessor<uint32_t, 2>();
+      auto fill_quote_sizes_accessor = fill_quote_sizes_cpu.accessor<int32_t, 2>();
+      auto fill_tid_accessor = fill_tid_cpu.accessor<int32_t, 2>();
+      auto fill_quote_tid_accessor = fill_quote_tid_cpu.accessor<int32_t, 2>();
       
       // Iterate through fills for this environment
-      for (uint32_t i = 0; i < num_fills_for_env; ++i) {
+      for (int32_t i = 0; i < num_fills_for_env; ++i) {
         result << fmt::format(
           "Order fill: id={} {} {} contracts at px={} on t={}. Quote: id={} {} sz={}, submitted t={}\n",
           fill_customer_ids_accessor[index][i],
@@ -789,9 +788,9 @@ std::string HighLowTradingState::PublicInformationString(uint32_t index) const {
   auto market_contract_accessor = market_contract_cpu.accessor<int32_t, 2>();
   
   for (int t = 0; t < current_trade_move && t < (num_players_ * steps_per_player_); ++t) {
-    uint32_t best_bid = static_cast<uint32_t>(market_contract_accessor[t][0]);
-    uint32_t best_ask = static_cast<uint32_t>(market_contract_accessor[t][1]);
-    uint32_t last_price = static_cast<uint32_t>(market_contract_accessor[t][2]);
+    int32_t best_bid = static_cast<int32_t>(market_contract_accessor[t][0]);
+    int32_t best_ask = static_cast<int32_t>(market_contract_accessor[t][1]);
+    int32_t last_price = static_cast<int32_t>(market_contract_accessor[t][2]);
     
     result << fmt::format("Time {}: Bid: {} @ Ask: {}{}\n", 
                          t,

@@ -157,10 +157,10 @@ market.GetBBOs(bbos);
 ### Memory Limits
 Adjust in `market.h`:
 ```cpp
-constexpr uint32_t MAX_MARKETS = ...;
-constexpr uint32_t MAX_ACTIVE_ORDERS_PER_MARKET = ...;
-constexpr uint32_t MAX_ACTIVE_FILLS_PER_MARKET = ...;
-constexpr uint32_t MAX_CUSTOMERS = ...; 
+constexpr int32_t MAX_MARKETS = ...;
+constexpr int32_t MAX_ACTIVE_ORDERS_PER_MARKET = ...;
+constexpr int32_t MAX_ACTIVE_FILLS_PER_MARKET = ...;
+constexpr int32_t MAX_CUSTOMERS = ...; 
 ```
 
 ### Documentation

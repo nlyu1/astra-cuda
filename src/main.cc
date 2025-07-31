@@ -30,31 +30,21 @@ int main() {
   auto game = Factory(params);
   auto state = game->NewInitialState();
   
-  const uint32_t ENV_INDEX = 32;  // Focus on environment 32
+  const int32_t ENV_INDEX = 32;  // Focus on environment 32
   const int num_envs = 128;
   
   // Helper to create 2D tensor for multi-column actions
-  auto make_2d_tensor = [&](const std::vector<std::vector<int>>& values, bool use_uint32 = false) {
+  auto make_2d_tensor = [&](const std::vector<std::vector<int>>& values) {
     int rows = values.size();
     int cols = values[0].size();
     torch::Tensor tensor;
-    if (use_uint32) {
-      tensor = torch::zeros({rows, cols}, torch::kUInt32);
-      auto accessor = tensor.accessor<uint32_t, 2>();
-      for (int i = 0; i < rows; ++i) {
-        for (int j = 0; j < cols; ++j) {
-          accessor[i][j] = static_cast<uint32_t>(values[i][j]);
-        }
-      }
-    } else {
-      tensor = torch::zeros({rows, cols}, torch::kInt32);
-      auto accessor = tensor.accessor<int32_t, 2>();
+    tensor = torch::zeros({rows, cols}, torch::kInt32);
+    auto accessor = tensor.accessor<int32_t, 2>();
       for (int i = 0; i < rows; ++i) {
         for (int j = 0; j < cols; ++j) {
           accessor[i][j] = values[i][j];
         }
       }
-    }
     return tensor.to(torch::Device(torch::kCUDA, 0));
   };
   
@@ -152,7 +142,7 @@ int main() {
       quotes[ENV_INDEX] = {bid_px, ask_px, bid_sz, ask_sz};
       
       // Apply the action - use uint32 for trading actions
-      state->ApplyAction(make_2d_tensor(quotes, true));
+      state->ApplyAction(make_2d_tensor(quotes));
       
       // Get immediate rewards
       trading_state->FillRewards(rewards_buffer);

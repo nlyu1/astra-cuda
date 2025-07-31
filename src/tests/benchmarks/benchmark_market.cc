@@ -18,9 +18,9 @@ using namespace astra::order_matching;
 using namespace astra;
 
 struct BenchmarkResult {
-    uint32_t num_markets_per_block;  // threads per block
-    uint32_t num_blocks;
-    uint32_t total_markets;
+    int32_t num_markets_per_block;  // threads per block
+    int32_t num_blocks;
+    int32_t total_markets;
     double latency_ms;
     double max_latency_ms;
     double operations_per_second;  // operations (batches) per second
@@ -34,15 +34,15 @@ struct BenchmarkResult {
 // Global variable to store device ID from command line
 int test_device_id = 0;
 
-BenchmarkResult test_market_throughput(uint32_t num_markets_per_block, uint32_t num_blocks) {
+BenchmarkResult test_market_throughput(int32_t num_markets_per_block, int32_t num_blocks) {
     // Calculate total markets
-    uint32_t total_markets = num_markets_per_block * num_blocks;
+    int32_t total_markets = num_markets_per_block * num_blocks;
     
     // Market parameters
-    const uint32_t max_price_levels = 128;
-    const uint32_t max_active_orders_per_market = 1024;
-    const uint32_t max_active_fills_per_market = 1024;
-    const uint32_t num_customers = 16;  // Number of customers per market
+    const int32_t max_price_levels = 128;
+    const int32_t max_active_orders_per_market = 1024;
+    const int32_t max_active_fills_per_market = 1024;
+    const int32_t num_customers = 16;  // Number of customers per market
     
     // Create VecMarket instance - device_id passed from main()
     auto market = std::make_unique<VecMarket>(
@@ -61,7 +61,7 @@ BenchmarkResult test_market_throughput(uint32_t num_markets_per_block, uint32_t 
     
     // Prepare tensors on GPU
     auto device = torch::Device(torch::kCUDA, test_device_id);
-    auto options = torch::TensorOptions().dtype(torch::kUInt32).device(device);
+    auto options = torch::TensorOptions().dtype(torch::kInt32).device(device);
     
     // Benchmark parameters
     const int warmup_steps = 100;
@@ -254,16 +254,16 @@ int main(int argc, char* argv[]) {
     std::cout << std::endl;
     
     // Test configurations
-    std::vector<std::pair<uint32_t, uint32_t>> configs;
+    std::vector<std::pair<int32_t, int32_t>> configs;
     
     // Varying threads per block (num_markets_per_block)
-    std::vector<uint32_t> threads_per_block = {64, 128, 256, 512, 1024};
-    std::vector<uint32_t> num_blocks = {1, 64, 128, 256, 512, 1024};
+    std::vector<int32_t> threads_per_block = {64, 128, 256, 512, 1024};
+    std::vector<int32_t> num_blocks = {1, 64, 128, 256, 512, 1024};
     
     // Generate all combinations that don't exceed MAX_MARKETS (106496)
     for (auto tpb : threads_per_block) {
         for (auto nb : num_blocks) {
-            uint32_t total = tpb * nb;
+            int32_t total = tpb * nb;
             if (total <= 106496) {  // MAX_MARKETS constraint
                 configs.push_back({tpb, nb});
             }

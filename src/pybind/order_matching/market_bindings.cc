@@ -33,7 +33,7 @@ void AddOrderMatchingBindings(pybind11::module& m) {
     .def_readwrite("fill_counts",        &FillBatch::fill_counts);
 
     py::classh<VecMarket>(m, "VecMarket")
-    .def(py::init<uint32_t, uint32_t, uint32_t, uint32_t, uint32_t, int, uint32_t>(),
+    .def(py::init<int32_t, int32_t, int32_t, int32_t, int32_t, int, int32_t>(),
          py::arg("num_markets"),
          py::arg("max_price_levels"),
          py::arg("max_active_orders_per_market"), 

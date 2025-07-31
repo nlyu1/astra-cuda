@@ -165,8 +165,8 @@ VecMarket market0(10000, 128, 64, 1024, 0);
 VecMarket market1(20000, 128, 64, 1024, 1, 512);
 
 // Tensors will automatically be placed on the correct device
-torch::Tensor bid_prices = torch::randint(0, 100, {10000}, torch::kUInt32);
-torch::Tensor bid_sizes = torch::randint(1, 1000, {10000}, torch::kUInt32);
+torch::Tensor bid_prices = torch::randint(0, 100, {10000}, torch::kInt32);
+torch::Tensor bid_sizes = torch::randint(1, 1000, {10000}, torch::kInt32);
 // ... other tensors ...
 
 // AddTwoSidedQuotes will automatically move tensors to the correct device

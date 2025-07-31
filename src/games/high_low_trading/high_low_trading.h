@@ -124,12 +124,12 @@ class HighLowTradingState : public State {
   HighLowTradingState(const HighLowTradingState& other);
 
   Player CurrentPlayer() const override;
-  std::string ToString(uint32_t index) const override;
+  std::string ToString(int32_t index) const override;
   bool IsTerminal() const override;
   void FillRewards(torch::Tensor reward_buffer) const override;
   void FillRewardsSinceLastAction(torch::Tensor reward_buffer, Player player_id) const override;
   void FillReturns(torch::Tensor returns_buffer) const override;
-  std::string InformationStateString(Player player, uint32_t index) const override;
+  std::string InformationStateString(Player player, int32_t index) const override;
   // Each player's information state tensor: 
   // 1. Game setup & private information (11):
   //    - Game setup (5): [num_steps, max_contracts_per_trade, customer_max_size, max_contract_value, players]
@@ -140,7 +140,7 @@ class HighLowTradingState : public State {
   //    - Positions (num_players, 2): [num_contracts, cash_position]
   //    - Quotes (num_timesteps, num_players, 6): [bid_px, ask_px, bid_sz, ask_sz, *player_id]
   void FillInformationStateTensor(Player player, torch::Tensor values) const override;
-  std::string ObservationString(Player player, uint32_t index) const override;
+  std::string ObservationString(Player player, int32_t index) const override;
   void FillObservationTensor(Player player, torch::Tensor values) const override;
   std::unique_ptr<State> Clone() const override;
   
@@ -211,7 +211,7 @@ class HighLowTradingState : public State {
   int num_players_;
   int steps_per_player_;
   int device_id_; 
-  std::string PublicInformationString(uint32_t index) const; 
+  std::string PublicInformationString(int32_t index) const; 
   /* N = num_envs, P=num_players, T=rounds_per_player */
   torch::Tensor contract_values_; // [N, 3] denoting 2 candidate values and settlement value. Int
   torch::Tensor contract_high_settle_; // [N] bool 

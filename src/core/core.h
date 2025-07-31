@@ -205,7 +205,7 @@ class State {
   virtual Player ApplyAction(torch::Tensor action_id);
 
   // Returns a string representation of the state. 
-  virtual std::string ToString(uint32_t index) const = 0;
+  virtual std::string ToString(int32_t index) const = 0;
 
   // Is this a terminal state? (i.e. has the game ended?)
   virtual bool IsTerminal() const = 0;
@@ -331,10 +331,10 @@ class State {
   // `kChancePlayerId`. Use this:
   //   ASTRA_CHECK_GE(player, 0);
   //   ASTRA_CHECK_LT(player, num_players_);
-  virtual std::string InformationStateString(Player player, uint32_t index) const {
+  virtual std::string InformationStateString(Player player, int32_t index) const {
     AstraFatalError("InformationStateString is not implemented.");
   }
-  std::string InformationStateString(uint32_t index) const {
+  std::string InformationStateString(int32_t index) const {
     return InformationStateString(CurrentPlayer());
   }
 
@@ -383,10 +383,10 @@ class State {
   // Implementations should start with (and it's tested in api_test.py):
   //   ASTRA_CHECK_GE(player, 0);
   //   ASTRA_CHECK_LT(player, num_players_);
-  virtual std::string ObservationString(Player player, uint32_t index) const {
+  virtual std::string ObservationString(Player player, int32_t index) const {
     AstraFatalError("ObservationString is not implemented.");
   }
-  std::string ObservationString(uint32_t index) const {
+  std::string ObservationString(int32_t index) const {
     return ObservationString(CurrentPlayer(), index);
   }
 

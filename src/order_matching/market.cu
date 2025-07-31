@@ -15,36 +15,36 @@ namespace order_matching {
 // ================================================================================
 
 __global__ void add_orders_kernel(
-    const uint32_t* bid_px, const uint32_t* bid_sz,
-    const uint32_t* ask_px, const uint32_t* ask_sz,
-    const uint32_t* customer_ids,
-    uint32_t* bid_heads, uint32_t* bid_tails,
-    uint32_t* ask_heads, uint32_t* ask_tails,
-    uint32_t* order_prices, uint32_t* order_sizes,
-    uint32_t* order_customer_ids, uint32_t* order_tid,
-    bool* order_is_bid, uint32_t* order_next,
-    uint32_t* order_next_slots, int32_t* customer_portfolios,
-    uint32_t base_tid, uint32_t num_markets, 
-    uint32_t max_orders_per_market, uint32_t max_price_levels,
-    uint32_t num_customers)
+    const int32_t* bid_px, const int32_t* bid_sz,
+    const int32_t* ask_px, const int32_t* ask_sz,
+    const int32_t* customer_ids,
+    int32_t* bid_heads, int32_t* bid_tails,
+    int32_t* ask_heads, int32_t* ask_tails,
+    int32_t* order_prices, int32_t* order_sizes,
+    int32_t* order_customer_ids, int32_t* order_tid,
+    bool* order_is_bid, int32_t* order_next,
+    int32_t* order_next_slots, int32_t* customer_portfolios,
+    int32_t base_tid, int32_t num_markets, 
+    int32_t max_orders_per_market, int32_t max_price_levels,
+    int32_t num_customers)
 {
     // Each thread handles exactly one market's bid-ask quotes independently - no synchronization needed!
     // Markets are completely independent and customers submit exactly one two-sided quote per market.
-    uint32_t market_id = blockIdx.x * blockDim.x + threadIdx.x;
+    int32_t market_id = blockIdx.x * blockDim.x + threadIdx.x;
     if (market_id >= num_markets) return;
 
     // Get bid and ask data for this market
-    uint32_t bid_price = bid_px[market_id];
-    uint32_t bid_size = bid_sz[market_id];
-    uint32_t ask_price = ask_px[market_id];
-    uint32_t ask_size = ask_sz[market_id];
-    uint32_t customer_id = customer_ids[market_id];
+    int32_t bid_price = bid_px[market_id];
+    int32_t bid_size = bid_sz[market_id];
+    int32_t ask_price = ask_px[market_id];
+    int32_t ask_size = ask_sz[market_id];
+    int32_t customer_id = customer_ids[market_id];
 
     // Process bid order if size > 0
     if (bid_size > 0 && bid_price < max_price_levels) {
         // Get next order slot for this market (ring buffer) - no atomic needed!
-        uint32_t bid_slot = order_next_slots[market_id]++ % max_orders_per_market;
-        uint32_t bid_idx = market_id * max_orders_per_market + bid_slot;
+        int32_t bid_slot = order_next_slots[market_id]++ % max_orders_per_market;
+        int32_t bid_idx = market_id * max_orders_per_market + bid_slot;
 
         // Fill order details
         order_prices[bid_idx] = bid_price;
@@ -55,8 +55,8 @@ __global__ void add_orders_kernel(
         order_next[bid_idx] = NULL_INDEX;
 
         // Add to price level linked list
-        uint32_t price_idx = market_id * max_price_levels + bid_price;
-        uint32_t old_tail = bid_tails[price_idx];
+        int32_t price_idx = market_id * max_price_levels + bid_price;
+        int32_t old_tail = bid_tails[price_idx];
         bid_tails[price_idx] = bid_slot;
         
         if (old_tail == NULL_INDEX) {
@@ -64,7 +64,7 @@ __global__ void add_orders_kernel(
             bid_heads[price_idx] = bid_slot;
         } else {
             // Link previous tail to this new order
-            uint32_t old_tail_idx = market_id * max_orders_per_market + old_tail;
+            int32_t old_tail_idx = market_id * max_orders_per_market + old_tail;
             order_next[old_tail_idx] = bid_slot;
         }
     }
@@ -72,8 +72,8 @@ __global__ void add_orders_kernel(
     // Process ask order if size > 0
     if (ask_size > 0 && ask_price < max_price_levels) {
         // Get next order slot for this market (ring buffer) - no atomic needed!
-        uint32_t ask_slot = order_next_slots[market_id]++ % max_orders_per_market;
-        uint32_t ask_idx = market_id * max_orders_per_market + ask_slot;
+        int32_t ask_slot = order_next_slots[market_id]++ % max_orders_per_market;
+        int32_t ask_idx = market_id * max_orders_per_market + ask_slot;
 
         // Fill order details
         order_prices[ask_idx] = ask_price;
@@ -84,8 +84,8 @@ __global__ void add_orders_kernel(
         order_next[ask_idx] = NULL_INDEX;
 
         // Add to price level linked list
-        uint32_t price_idx = market_id * max_price_levels + ask_price;
-        uint32_t old_tail = ask_tails[price_idx];
+        int32_t price_idx = market_id * max_price_levels + ask_price;
+        int32_t old_tail = ask_tails[price_idx];
         ask_tails[price_idx] = ask_slot;
         
         if (old_tail == NULL_INDEX) {
@@ -93,31 +93,31 @@ __global__ void add_orders_kernel(
             ask_heads[price_idx] = ask_slot;
         } else {
             // Link previous tail to this new order
-            uint32_t old_tail_idx = market_id * max_orders_per_market + old_tail;
+            int32_t old_tail_idx = market_id * max_orders_per_market + old_tail;
             order_next[old_tail_idx] = ask_slot;
         }
     }
 }
 
 __global__ void match_orders_kernel(
-    uint32_t* bid_heads, uint32_t* ask_heads,
-    uint32_t* bid_tails, uint32_t* ask_tails,
-    uint32_t* order_prices, uint32_t* order_sizes,
-    uint32_t* order_customer_ids, uint32_t* order_tid,
-    bool* order_is_bid, uint32_t* order_next,
-    uint32_t* fill_prices, uint32_t* fill_sizes,
-    uint32_t* fill_customer_ids, uint32_t* fill_quoter_ids,
-    bool* fill_is_sell_quote, uint32_t* fill_quote_sizes,
-    uint32_t* fill_tid, uint32_t* fill_quote_tid,
-    uint32_t* fill_counts, int32_t* customer_portfolios,
-    uint32_t num_markets, uint32_t max_orders_per_market,
-    uint32_t max_price_levels, uint32_t max_fills_per_market,
-    uint32_t num_customers)
+    int32_t* bid_heads, int32_t* ask_heads,
+    int32_t* bid_tails, int32_t* ask_tails,
+    int32_t* order_prices, int32_t* order_sizes,
+    int32_t* order_customer_ids, int32_t* order_tid,
+    bool* order_is_bid, int32_t* order_next,
+    int32_t* fill_prices, int32_t* fill_sizes,
+    int32_t* fill_customer_ids, int32_t* fill_quoter_ids,
+    bool* fill_is_sell_quote, int32_t* fill_quote_sizes,
+    int32_t* fill_tid, int32_t* fill_quote_tid,
+    int32_t* fill_counts, int32_t* customer_portfolios,
+    int32_t num_markets, int32_t max_orders_per_market,
+    int32_t max_price_levels, int32_t max_fills_per_market,
+    int32_t num_customers)
 {
-    uint32_t market_id = blockIdx.x * blockDim.x + threadIdx.x;
+    int32_t market_id = blockIdx.x * blockDim.x + threadIdx.x;
     if (market_id >= num_markets) return;
 
-    uint32_t fill_count = 0;
+    int32_t fill_count = 0;
 
     // Find best bid and ask prices
     int best_bid_price = -1;
@@ -125,7 +125,7 @@ __global__ void match_orders_kernel(
 
     // Scan for best bid (highest price with orders)
     for (int p = max_price_levels - 1; p >= 0; p--) {
-        uint32_t head_idx = market_id * max_price_levels + p;
+        int32_t head_idx = market_id * max_price_levels + p;
         if (bid_heads[head_idx] != NULL_INDEX) {
             best_bid_price = p;
             break;
@@ -133,8 +133,8 @@ __global__ void match_orders_kernel(
     }
 
     // Scan for best ask (lowest price with orders)
-    for (uint32_t p = 0; p < max_price_levels; p++) {
-        uint32_t head_idx = market_id * max_price_levels + p;
+    for (int32_t p = 0; p < max_price_levels; p++) {
+        int32_t head_idx = market_id * max_price_levels + p;
         if (ask_heads[head_idx] != NULL_INDEX) {
             best_ask_price = p;
             break;
@@ -146,38 +146,38 @@ __global__ void match_orders_kernel(
            best_bid_price >= best_ask_price) {
         
         // Get head orders at best prices
-        uint32_t bid_head_idx = market_id * max_price_levels + best_bid_price;
-        uint32_t ask_head_idx = market_id * max_price_levels + best_ask_price;
+        int32_t bid_head_idx = market_id * max_price_levels + best_bid_price;
+        int32_t ask_head_idx = market_id * max_price_levels + best_ask_price;
         
-        uint32_t bid_slot = bid_heads[bid_head_idx];
-        uint32_t ask_slot = ask_heads[ask_head_idx];
+        int32_t bid_slot = bid_heads[bid_head_idx];
+        int32_t ask_slot = ask_heads[ask_head_idx];
         
         if (bid_slot == NULL_INDEX || ask_slot == NULL_INDEX) break;
         
-        uint32_t bid_idx = market_id * max_orders_per_market + bid_slot;
-        uint32_t ask_idx = market_id * max_orders_per_market + ask_slot;
+        int32_t bid_idx = market_id * max_orders_per_market + bid_slot;
+        int32_t ask_idx = market_id * max_orders_per_market + ask_slot;
         
         // Get order details
-        uint32_t bid_size = order_sizes[bid_idx];
-        uint32_t ask_size = order_sizes[ask_idx];
-        uint32_t bid_customer = order_customer_ids[bid_idx];
-        uint32_t ask_customer = order_customer_ids[ask_idx];
-        uint32_t bid_tid = order_tid[bid_idx];
-        uint32_t ask_tid = order_tid[ask_idx];
-        uint32_t bid_price = order_prices[bid_idx];
-        uint32_t ask_price = order_prices[ask_idx];
+        int32_t bid_size = order_sizes[bid_idx];
+        int32_t ask_size = order_sizes[ask_idx];
+        int32_t bid_customer = order_customer_ids[bid_idx];
+        int32_t ask_customer = order_customer_ids[ask_idx];
+        int32_t bid_tid = order_tid[bid_idx];
+        int32_t ask_tid = order_tid[ask_idx];
+        int32_t bid_price = order_prices[bid_idx];
+        int32_t ask_price = order_prices[ask_idx];
         
         // Determine which order is the resting (quote) order based on tid
         // The order with lower tid arrived first and is the quote
         bool bid_is_quote = bid_tid < ask_tid;
-        uint32_t trade_price = bid_is_quote ? bid_price : ask_price;
-        uint32_t trade_size = min(bid_size, ask_size);
+        int32_t trade_price = bid_is_quote ? bid_price : ask_price;
+        int32_t trade_size = min(bid_size, ask_size);
         
         // Check that we haven't exceeded max fills - if triggered, increase MAX_ACTIVE_FILLS_PER_MARKET
         assert(fill_count < max_fills_per_market && "Exceeded maximum fills per market!");
         
         // Record fill
-        uint32_t fill_idx = market_id * max_fills_per_market + fill_count;
+        int32_t fill_idx = market_id * max_fills_per_market + fill_count;
         fill_prices[fill_idx] = trade_price;
         fill_sizes[fill_idx] = trade_size;
         
@@ -201,8 +201,8 @@ __global__ void match_orders_kernel(
         
         // Update customer portfolios (same for both cases)
         if (bid_customer < num_customers && ask_customer < num_customers) {
-            uint32_t bid_customer_idx = (market_id * num_customers + bid_customer) * 2;
-            uint32_t ask_customer_idx = (market_id * num_customers + ask_customer) * 2;
+            int32_t bid_customer_idx = (market_id * num_customers + bid_customer) * 2;
+            int32_t ask_customer_idx = (market_id * num_customers + ask_customer) * 2;
             
             // Bid customer (buyer): gains contracts, loses cash
             customer_portfolios[bid_customer_idx] += trade_size;
@@ -228,7 +228,7 @@ __global__ void match_orders_kernel(
                 // Find next best bid
                 best_bid_price = -1;
                 for (int p = max_price_levels - 1; p >= 0; p--) {
-                    uint32_t idx = market_id * max_price_levels + p;
+                    int32_t idx = market_id * max_price_levels + p;
                     if (bid_heads[idx] != NULL_INDEX) {
                         best_bid_price = p;
                         break;
@@ -244,8 +244,8 @@ __global__ void match_orders_kernel(
                 ask_tails[ask_head_idx] = NULL_INDEX;
                 // Find next best ask
                 best_ask_price = max_price_levels;
-                for (uint32_t p = 0; p < max_price_levels; p++) {
-                    uint32_t idx = market_id * max_price_levels + p;
+                for (int32_t p = 0; p < max_price_levels; p++) {
+                    int32_t idx = market_id * max_price_levels + p;
                     if (ask_heads[idx] != NULL_INDEX) {
                         best_ask_price = p;
                         break;
@@ -260,14 +260,14 @@ __global__ void match_orders_kernel(
 }
 
 __global__ void get_bbo_kernel(
-    const uint32_t* bid_heads, const uint32_t* ask_heads,
-    const uint32_t* order_sizes, const uint32_t* order_prices,
-    uint32_t* best_bid_prices, uint32_t* best_bid_sizes,
-    uint32_t* best_ask_prices, uint32_t* best_ask_sizes,
-    uint32_t num_markets, uint32_t max_orders_per_market,
-    uint32_t max_price_levels)
+    const int32_t* bid_heads, const int32_t* ask_heads,
+    const int32_t* order_sizes, const int32_t* order_prices,
+    int32_t* best_bid_prices, int32_t* best_bid_sizes,
+    int32_t* best_ask_prices, int32_t* best_ask_sizes,
+    int32_t num_markets, int32_t max_orders_per_market,
+    int32_t max_price_levels)
 {
-    uint32_t market_id = blockIdx.x * blockDim.x + threadIdx.x;
+    int32_t market_id = blockIdx.x * blockDim.x + threadIdx.x;
     if (market_id >= num_markets) return;
 
     // Initialize outputs
@@ -278,10 +278,10 @@ __global__ void get_bbo_kernel(
 
     // Find best bid (highest price with orders)
     for (int p = max_price_levels - 1; p >= 0; p--) {
-        uint32_t head_idx = market_id * max_price_levels + p;
-        uint32_t head_slot = bid_heads[head_idx];
+        int32_t head_idx = market_id * max_price_levels + p;
+        int32_t head_slot = bid_heads[head_idx];
         if (head_slot != NULL_INDEX) {
-            uint32_t order_idx = market_id * max_orders_per_market + head_slot;
+            int32_t order_idx = market_id * max_orders_per_market + head_slot;
             best_bid_prices[market_id] = p;
             best_bid_sizes[market_id] = order_sizes[order_idx];
             break;
@@ -289,11 +289,11 @@ __global__ void get_bbo_kernel(
     }
 
     // Find best ask (lowest price with orders)
-    for (uint32_t p = 0; p < max_price_levels; p++) {
-        uint32_t head_idx = market_id * max_price_levels + p;
-        uint32_t head_slot = ask_heads[head_idx];
+    for (int32_t p = 0; p < max_price_levels; p++) {
+        int32_t head_idx = market_id * max_price_levels + p;
+        int32_t head_slot = ask_heads[head_idx];
         if (head_slot != NULL_INDEX) {
-            uint32_t order_idx = market_id * max_orders_per_market + head_slot;
+            int32_t order_idx = market_id * max_orders_per_market + head_slot;
             best_ask_prices[market_id] = p;
             best_ask_sizes[market_id] = order_sizes[order_idx];
             break;
@@ -305,9 +305,9 @@ __global__ void get_bbo_kernel(
 // VECMARKET CLASS IMPLEMENTATION
 // ================================================================================
 
-VecMarket::VecMarket(uint32_t num_markets, uint32_t max_price_levels,
-                     uint32_t max_active_orders_per_market, uint32_t max_active_fills_per_market,
-                     uint32_t num_customers, int device_id, uint32_t threads_per_block)
+VecMarket::VecMarket(int32_t num_markets, int32_t max_price_levels,
+                     int32_t max_active_orders_per_market, int32_t max_active_fills_per_market,
+                     int32_t num_customers, int device_id, int32_t threads_per_block)
     : num_markets_(num_markets),
       max_price_levels_(max_price_levels),
       max_orders_per_market_(max_active_orders_per_market),
@@ -333,29 +333,29 @@ VecMarket::VecMarket(uint32_t num_markets, uint32_t max_price_levels,
 
     // Configure tensor options for the specified device
     auto device = torch::Device(torch::kCUDA, device_id);
-    auto options_u32 = torch::TensorOptions().dtype(torch::kUInt32).device(device);
+    auto options_options_i32 = torch::TensorOptions().dtype(torch::kInt32).device(device);
     auto options_bool = torch::TensorOptions().dtype(torch::kBool).device(device);
     auto options_i32 = torch::TensorOptions().dtype(torch::kInt32).device(device);
 
     // Initialize price level linked lists
-    bid_heads_ = torch::full({num_markets, max_price_levels}, NULL_INDEX, options_u32);
-    ask_heads_ = torch::full({num_markets, max_price_levels}, NULL_INDEX, options_u32);
-    bid_tails_ = torch::full({num_markets, max_price_levels}, NULL_INDEX, options_u32);
-    ask_tails_ = torch::full({num_markets, max_price_levels}, NULL_INDEX, options_u32);
+    bid_heads_ = torch::full({num_markets, max_price_levels}, NULL_INDEX, options_options_i32);
+    ask_heads_ = torch::full({num_markets, max_price_levels}, NULL_INDEX, options_options_i32);
+    bid_tails_ = torch::full({num_markets, max_price_levels}, NULL_INDEX, options_options_i32);
+    ask_tails_ = torch::full({num_markets, max_price_levels}, NULL_INDEX, options_options_i32);
 
     // Initialize order pool
-    order_prices_ = torch::zeros({num_markets, max_active_orders_per_market}, options_u32);
-    order_sizes_ = torch::zeros({num_markets, max_active_orders_per_market}, options_u32);
-    order_customer_ids_ = torch::zeros({num_markets, max_active_orders_per_market}, options_u32);
-    order_tid_ = torch::zeros({num_markets, max_active_orders_per_market}, options_u32);
+    order_prices_ = torch::zeros({num_markets, max_active_orders_per_market}, options_options_i32);
+    order_sizes_ = torch::zeros({num_markets, max_active_orders_per_market}, options_options_i32);
+    order_customer_ids_ = torch::zeros({num_markets, max_active_orders_per_market}, options_options_i32);
+    order_tid_ = torch::zeros({num_markets, max_active_orders_per_market}, options_options_i32);
     order_is_bid_ = torch::zeros({num_markets, max_active_orders_per_market}, options_bool);
-    order_next_ = torch::full({num_markets, max_active_orders_per_market}, NULL_INDEX, options_u32);
+    order_next_ = torch::full({num_markets, max_active_orders_per_market}, NULL_INDEX, options_options_i32);
 
     // Initialize fill pool - not used internally, created on demand in MatchAllMarkets
-    fill_counts_ = torch::zeros({num_markets}, options_u32);
+    fill_counts_ = torch::zeros({num_markets}, options_options_i32);
 
     // Initialize market state
-    order_next_slots_ = torch::zeros({num_markets}, options_u32);
+    order_next_slots_ = torch::zeros({num_markets}, options_options_i32);
     
     // Initialize customer portfolios: [num_markets, num_customers, 2]
     // Index 0: number of contracts, Index 1: cash amount
@@ -401,19 +401,19 @@ FillBatch VecMarket::NewFillBatch() const
 {
     // Create fill tensors on the correct device
     auto device = torch::Device(torch::kCUDA, device_id_);
-    auto options_u32 = torch::TensorOptions().dtype(torch::kUInt32).device(device);
+    auto options_options_i32 = torch::TensorOptions().dtype(torch::kInt32).device(device);
     auto options_bool = torch::TensorOptions().dtype(torch::kBool).device(device);
     
     FillBatch batch;
-    batch.fill_prices = torch::zeros({num_markets_, max_fills_per_market_}, options_u32);
-    batch.fill_sizes = torch::zeros({num_markets_, max_fills_per_market_}, options_u32);
-    batch.fill_customer_ids = torch::zeros({num_markets_, max_fills_per_market_}, options_u32);
-    batch.fill_quoter_ids = torch::zeros({num_markets_, max_fills_per_market_}, options_u32);
+    batch.fill_prices = torch::zeros({num_markets_, max_fills_per_market_}, options_options_i32);
+    batch.fill_sizes = torch::zeros({num_markets_, max_fills_per_market_}, options_options_i32);
+    batch.fill_customer_ids = torch::zeros({num_markets_, max_fills_per_market_}, options_options_i32);
+    batch.fill_quoter_ids = torch::zeros({num_markets_, max_fills_per_market_}, options_options_i32);
     batch.fill_is_sell_quote = torch::zeros({num_markets_, max_fills_per_market_}, options_bool);
-    batch.fill_quote_sizes = torch::zeros({num_markets_, max_fills_per_market_}, options_u32);
-    batch.fill_tid = torch::zeros({num_markets_, max_fills_per_market_}, options_u32);
-    batch.fill_quote_tid = torch::zeros({num_markets_, max_fills_per_market_}, options_u32);
-    batch.fill_counts = torch::zeros({num_markets_}, options_u32);
+    batch.fill_quote_sizes = torch::zeros({num_markets_, max_fills_per_market_}, options_options_i32);
+    batch.fill_tid = torch::zeros({num_markets_, max_fills_per_market_}, options_options_i32);
+    batch.fill_quote_tid = torch::zeros({num_markets_, max_fills_per_market_}, options_options_i32);
+    batch.fill_counts = torch::zeros({num_markets_}, options_options_i32);
     
     return batch;
 }
@@ -422,15 +422,15 @@ BBOBatch VecMarket::NewBBOBatch() const
 {
     // Create BBO tensors on the correct device
     auto device = torch::Device(torch::kCUDA, device_id_);
-    auto options_u32 = torch::TensorOptions().dtype(torch::kUInt32).device(device);
+    auto options_options_i32 = torch::TensorOptions().dtype(torch::kInt32).device(device);
     
     BBOBatch batch;
-    batch.best_bid_prices = torch::zeros({num_markets_}, options_u32);
-    batch.best_bid_sizes = torch::zeros({num_markets_}, options_u32);
-    batch.best_ask_prices = torch::zeros({num_markets_}, options_u32);
-    batch.best_ask_sizes = torch::zeros({num_markets_}, options_u32);
+    batch.best_bid_prices = torch::zeros({num_markets_}, options_options_i32);
+    batch.best_bid_sizes = torch::zeros({num_markets_}, options_options_i32);
+    batch.best_ask_prices = torch::zeros({num_markets_}, options_options_i32);
+    batch.best_ask_sizes = torch::zeros({num_markets_}, options_options_i32);
     // Initialize last_prices with NULL_INDEX to indicate no trades yet
-    batch.last_prices = torch::full({num_markets_}, NULL_INDEX, options_u32);
+    batch.last_prices = torch::full({num_markets_}, NULL_INDEX, options_options_i32);
     
     return batch;
 }
@@ -485,15 +485,15 @@ void VecMarket::AddTwoSidedQuotes(
     dim3 threads(threads_per_block_);
 
     add_orders_kernel<<<blocks, threads>>>(
-        bid_px.data_ptr<uint32_t>(), bid_sz.data_ptr<uint32_t>(),
-        ask_px.data_ptr<uint32_t>(), ask_sz.data_ptr<uint32_t>(),
-        customer_ids.data_ptr<uint32_t>(),
-        bid_heads_.data_ptr<uint32_t>(), bid_tails_.data_ptr<uint32_t>(),
-        ask_heads_.data_ptr<uint32_t>(), ask_tails_.data_ptr<uint32_t>(),
-        order_prices_.data_ptr<uint32_t>(), order_sizes_.data_ptr<uint32_t>(),
-        order_customer_ids_.data_ptr<uint32_t>(), order_tid_.data_ptr<uint32_t>(),
-        order_is_bid_.data_ptr<bool>(), order_next_.data_ptr<uint32_t>(),
-        order_next_slots_.data_ptr<uint32_t>(), customer_portfolios_.data_ptr<int32_t>(),
+        bid_px.data_ptr<int32_t>(), bid_sz.data_ptr<int32_t>(),
+        ask_px.data_ptr<int32_t>(), ask_sz.data_ptr<int32_t>(),
+        customer_ids.data_ptr<int32_t>(),
+        bid_heads_.data_ptr<int32_t>(), bid_tails_.data_ptr<int32_t>(),
+        ask_heads_.data_ptr<int32_t>(), ask_tails_.data_ptr<int32_t>(),
+        order_prices_.data_ptr<int32_t>(), order_sizes_.data_ptr<int32_t>(),
+        order_customer_ids_.data_ptr<int32_t>(), order_tid_.data_ptr<int32_t>(),
+        order_is_bid_.data_ptr<bool>(), order_next_.data_ptr<int32_t>(),
+        order_next_slots_.data_ptr<int32_t>(), customer_portfolios_.data_ptr<int32_t>(),
         global_tid_counter_, num_markets_, max_orders_per_market_, max_price_levels_,
         num_customers_
     );
@@ -521,16 +521,16 @@ void VecMarket::MatchAllMarkets(FillBatch& fills)
     dim3 threads(threads_per_block_);
 
     match_orders_kernel<<<blocks, threads>>>(
-        bid_heads_.data_ptr<uint32_t>(), ask_heads_.data_ptr<uint32_t>(),
-        bid_tails_.data_ptr<uint32_t>(), ask_tails_.data_ptr<uint32_t>(),
-        order_prices_.data_ptr<uint32_t>(), order_sizes_.data_ptr<uint32_t>(),
-        order_customer_ids_.data_ptr<uint32_t>(), order_tid_.data_ptr<uint32_t>(),
-        order_is_bid_.data_ptr<bool>(), order_next_.data_ptr<uint32_t>(),
-        fills.fill_prices.data_ptr<uint32_t>(), fills.fill_sizes.data_ptr<uint32_t>(),
-        fills.fill_customer_ids.data_ptr<uint32_t>(), fills.fill_quoter_ids.data_ptr<uint32_t>(),
-        fills.fill_is_sell_quote.data_ptr<bool>(), fills.fill_quote_sizes.data_ptr<uint32_t>(),
-        fills.fill_tid.data_ptr<uint32_t>(), fills.fill_quote_tid.data_ptr<uint32_t>(),
-        fills.fill_counts.data_ptr<uint32_t>(), customer_portfolios_.data_ptr<int32_t>(),
+        bid_heads_.data_ptr<int32_t>(), ask_heads_.data_ptr<int32_t>(),
+        bid_tails_.data_ptr<int32_t>(), ask_tails_.data_ptr<int32_t>(),
+        order_prices_.data_ptr<int32_t>(), order_sizes_.data_ptr<int32_t>(),
+        order_customer_ids_.data_ptr<int32_t>(), order_tid_.data_ptr<int32_t>(),
+        order_is_bid_.data_ptr<bool>(), order_next_.data_ptr<int32_t>(),
+        fills.fill_prices.data_ptr<int32_t>(), fills.fill_sizes.data_ptr<int32_t>(),
+        fills.fill_customer_ids.data_ptr<int32_t>(), fills.fill_quoter_ids.data_ptr<int32_t>(),
+        fills.fill_is_sell_quote.data_ptr<bool>(), fills.fill_quote_sizes.data_ptr<int32_t>(),
+        fills.fill_tid.data_ptr<int32_t>(), fills.fill_quote_tid.data_ptr<int32_t>(),
+        fills.fill_counts.data_ptr<int32_t>(), customer_portfolios_.data_ptr<int32_t>(),
         num_markets_, max_orders_per_market_, max_price_levels_, max_fills_per_market_,
         num_customers_
     );
@@ -551,10 +551,10 @@ void VecMarket::GetBBOs(BBOBatch& bbos)
     dim3 threads(threads_per_block_);
 
     get_bbo_kernel<<<blocks, threads>>>(
-        bid_heads_.data_ptr<uint32_t>(), ask_heads_.data_ptr<uint32_t>(),
-        order_sizes_.data_ptr<uint32_t>(), order_prices_.data_ptr<uint32_t>(),
-        bbos.best_bid_prices.data_ptr<uint32_t>(), bbos.best_bid_sizes.data_ptr<uint32_t>(),
-        bbos.best_ask_prices.data_ptr<uint32_t>(), bbos.best_ask_sizes.data_ptr<uint32_t>(),
+        bid_heads_.data_ptr<int32_t>(), ask_heads_.data_ptr<int32_t>(),
+        order_sizes_.data_ptr<int32_t>(), order_prices_.data_ptr<int32_t>(),
+        bbos.best_bid_prices.data_ptr<int32_t>(), bbos.best_bid_sizes.data_ptr<int32_t>(),
+        bbos.best_ask_prices.data_ptr<int32_t>(), bbos.best_ask_sizes.data_ptr<int32_t>(),
         num_markets_, max_orders_per_market_, max_price_levels_
     );
 
@@ -567,7 +567,7 @@ void VecMarket::GetBBOs(BBOBatch& bbos)
     // BBOBatch is populated in-place, nothing to return
 }
 
-std::string VecMarket::ToString(uint32_t market_id) const
+std::string VecMarket::ToString(int32_t market_id) const
 {
     // Validate market_id
     if (market_id >= num_markets_) {
@@ -585,21 +585,21 @@ std::string VecMarket::ToString(uint32_t market_id) const
     auto order_next = order_next_.cpu();
     
     // Get accessors (only for the ones we actually use)
-    auto bid_heads_acc = bid_heads.accessor<uint32_t, 2>();
-    auto ask_heads_acc = ask_heads.accessor<uint32_t, 2>();
-    auto order_sizes_acc = order_sizes.accessor<uint32_t, 2>();
-    auto order_customer_ids_acc = order_customer_ids.accessor<uint32_t, 2>();
-    auto order_tid_acc = order_tid.accessor<uint32_t, 2>();
-    auto order_next_acc = order_next.accessor<uint32_t, 2>();
+    auto bid_heads_acc = bid_heads.accessor<int32_t, 2>();
+    auto ask_heads_acc = ask_heads.accessor<int32_t, 2>();
+    auto order_sizes_acc = order_sizes.accessor<int32_t, 2>();
+    auto order_customer_ids_acc = order_customer_ids.accessor<int32_t, 2>();
+    auto order_tid_acc = order_tid.accessor<int32_t, 2>();
+    auto order_next_acc = order_next.accessor<int32_t, 2>();
     
     // Collect all sell orders (asks) for this market
-    std::vector<std::tuple<uint32_t, uint32_t, uint32_t, uint32_t>> sell_orders; // price, size, customer_id, tid
+    std::vector<std::tuple<int32_t, int32_t, int32_t, int32_t>> sell_orders; // price, size, customer_id, tid
     
     // Traverse all ask price levels from lowest to highest
-    for (uint32_t price = 0; price < max_price_levels_; ++price) {
-        uint32_t slot = ask_heads_acc[market_id][price];
+    for (int32_t price = 0; price < max_price_levels_; ++price) {
+        int32_t slot = ask_heads_acc[market_id][price];
         while (slot != NULL_INDEX) {
-            uint32_t size = order_sizes_acc[market_id][slot];
+            int32_t size = order_sizes_acc[market_id][slot];
             if (size > 0) {
                 sell_orders.push_back({
                     price,
@@ -622,16 +622,16 @@ std::string VecMarket::ToString(uint32_t market_id) const
         });
     
     // Collect all buy orders (bids) for this market
-    std::vector<std::tuple<uint32_t, uint32_t, uint32_t, uint32_t>> buy_orders; // price, size, customer_id, tid
+    std::vector<std::tuple<int32_t, int32_t, int32_t, int32_t>> buy_orders; // price, size, customer_id, tid
     
     // Traverse all bid price levels from highest to lowest
     for (int price = max_price_levels_ - 1; price >= 0; --price) {
-        uint32_t slot = bid_heads_acc[market_id][price];
+        int32_t slot = bid_heads_acc[market_id][price];
         while (slot != NULL_INDEX) {
-            uint32_t size = order_sizes_acc[market_id][slot];
+            int32_t size = order_sizes_acc[market_id][slot];
             if (size > 0) {
                 buy_orders.push_back({
-                    static_cast<uint32_t>(price),
+                    static_cast<int32_t>(price),
                     size,
                     order_customer_ids_acc[market_id][slot],
                     order_tid_acc[market_id][slot]
@@ -690,21 +690,21 @@ void VecMarket::Reset()
 
 // CUDA kernel to update last prices based on fills
 __global__ void update_last_prices_kernel(
-    uint32_t* last_prices,
-    const uint32_t* fill_counts,
-    const uint32_t* fill_prices,
-    uint32_t num_markets,
-    uint32_t max_fills_per_market)
+    int32_t* last_prices,
+    const int32_t* fill_counts,
+    const int32_t* fill_prices,
+    int32_t num_markets,
+    int32_t max_fills_per_market)
 {
-    uint32_t market_id = blockIdx.x * blockDim.x + threadIdx.x;
+    int32_t market_id = blockIdx.x * blockDim.x + threadIdx.x;
     if (market_id >= num_markets) return;
     
-    uint32_t fill_count = fill_counts[market_id];
+    int32_t fill_count = fill_counts[market_id];
     
     // If there were fills, update last price to the last fill's price
     if (fill_count > 0) {
-        uint32_t last_fill_idx = fill_count - 1;
-        uint32_t price_idx = market_id * max_fills_per_market + last_fill_idx;
+        int32_t last_fill_idx = fill_count - 1;
+        int32_t price_idx = market_id * max_fills_per_market + last_fill_idx;
         last_prices[market_id] = fill_prices[price_idx];
     }
     // Otherwise, last_prices[market_id] remains unchanged
@@ -728,17 +728,17 @@ void BBOBatch::UpdateLastPrices(FillBatch& fills)
     ASTRA_CHECK_EQ(fills.fill_prices.device(), last_prices.device());
     
     // Get dimensions
-    uint32_t num_markets = fills.fill_counts.size(0);
-    uint32_t max_fills = fills.fill_prices.size(1);
+    int32_t num_markets = fills.fill_counts.size(0);
+    int32_t max_fills = fills.fill_prices.size(1);
     
     // Launch kernel with 64 threads per block as requested
-    uint32_t threads_per_block = 64;
-    uint32_t num_blocks = (num_markets + threads_per_block - 1) / threads_per_block;
+    int32_t threads_per_block = 64;
+    int32_t num_blocks = (num_markets + threads_per_block - 1) / threads_per_block;
     
     update_last_prices_kernel<<<num_blocks, threads_per_block>>>(
-        last_prices.data_ptr<uint32_t>(),
-        fills.fill_counts.data_ptr<uint32_t>(),
-        fills.fill_prices.data_ptr<uint32_t>(),
+        last_prices.data_ptr<int32_t>(),
+        fills.fill_counts.data_ptr<int32_t>(),
+        fills.fill_prices.data_ptr<int32_t>(),
         num_markets,
         max_fills
     );

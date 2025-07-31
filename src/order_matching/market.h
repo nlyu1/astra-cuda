@@ -19,7 +19,7 @@
 // - Order book uses price-level indexing: bid_heads_[market][price], ask_heads_[market][price]
 // - Orders stored in pre-allocated pools indexed by [market][slot]
 // - Ring buffer design for order and fill pools with wraparound
-// - All indices use uint32_t with NULL_INDEX (0xFFFFFFFF) as null pointer
+// - All indices use int32_t with NULL_INDEX (0xFFFFFFFF) as null pointer
 //
 // PARALLELIZATION STRATEGY:
 // - One CUDA thread per market for order insertion and matching
@@ -53,25 +53,25 @@
 namespace astra {
 namespace order_matching {
 
-constexpr uint32_t MAX_MARKETS = 106496;
-constexpr uint32_t PRICE_LEVELS = 128; 
-constexpr uint32_t MAX_ACTIVE_ORDERS_PER_MARKET = 1024; 
-constexpr uint32_t MAX_ACTIVE_FILLS_PER_MARKET = 1024; 
-constexpr uint32_t NULL_INDEX = 0xFFFFFFFF;
-constexpr uint32_t MAX_CUSTOMERS = 1024; 
+constexpr int32_t MAX_MARKETS = 106496;
+constexpr int32_t PRICE_LEVELS = 128; 
+constexpr int32_t MAX_ACTIVE_ORDERS_PER_MARKET = 1024; 
+constexpr int32_t MAX_ACTIVE_FILLS_PER_MARKET = 1024; 
+constexpr int32_t NULL_INDEX = 0xFFFFFFFF;
+constexpr int32_t MAX_CUSTOMERS = 1024; 
 
 // Structure for returning fill information
 class FillBatch {
     public:
-        torch::Tensor fill_prices;        // [num_markets, max_fills] uint32_t - execution price
-        torch::Tensor fill_sizes;         // [num_markets, max_fills] uint32_t - fill size
-        torch::Tensor fill_customer_ids;  // [num_markets, max_fills] uint32_t - taker customer ID
-        torch::Tensor fill_quoter_ids;    // [num_markets, max_fills] uint32_t - quoter customer ID
+        torch::Tensor fill_prices;        // [num_markets, max_fills] int32_t - execution price
+        torch::Tensor fill_sizes;         // [num_markets, max_fills] int32_t - fill size
+        torch::Tensor fill_customer_ids;  // [num_markets, max_fills] int32_t - taker customer ID
+        torch::Tensor fill_quoter_ids;    // [num_markets, max_fills] int32_t - quoter customer ID
         torch::Tensor fill_is_sell_quote; // [num_markets, max_fills] bool - true if sell quote, false if buy quote
-        torch::Tensor fill_quote_sizes;   // [num_markets, max_fills] uint32_t - size of the quote order
-        torch::Tensor fill_tid;           // [num_markets, max_fills] uint32_t - time ID of the taker order
-        torch::Tensor fill_quote_tid;     // [num_markets, max_fills] uint32_t - time ID of the quote order
-        torch::Tensor fill_counts;        // [num_markets] uint32_t - number of fills per market
+        torch::Tensor fill_quote_sizes;   // [num_markets, max_fills] int32_t - size of the quote order
+        torch::Tensor fill_tid;           // [num_markets, max_fills] int32_t - time ID of the taker order
+        torch::Tensor fill_quote_tid;     // [num_markets, max_fills] int32_t - time ID of the quote order
+        torch::Tensor fill_counts;        // [num_markets] int32_t - number of fills per market
         
         // Default constructor
         FillBatch() = default;
@@ -92,11 +92,11 @@ class FillBatch {
 // Structure for returning best bid/offer information
 class BBOBatch {
 public:
-    torch::Tensor best_bid_prices;  // [num_markets] uint32_t
-    torch::Tensor best_bid_sizes;   // [num_markets] uint32_t
-    torch::Tensor best_ask_prices;  // [num_markets] uint32_t
-    torch::Tensor best_ask_sizes;   // [num_markets] uint32_t
-    torch::Tensor last_prices;      // [num_markets] uint32_t
+    torch::Tensor best_bid_prices;  // [num_markets] int32_t
+    torch::Tensor best_bid_sizes;   // [num_markets] int32_t
+    torch::Tensor best_ask_prices;  // [num_markets] int32_t
+    torch::Tensor best_ask_sizes;   // [num_markets] int32_t
+    torch::Tensor last_prices;      // [num_markets] int32_t
     
     // Default constructor. 
     BBOBatch() = default;
@@ -133,9 +133,9 @@ public:
      * @param threads_per_block Number of threads per block for CUDA kernels (default: 256)
      * @throws AstraFatalError if any parameter exceeds system constraints or device is invalid
      */
-    VecMarket(uint32_t num_markets, uint32_t max_price_levels, 
-        uint32_t max_active_orders_per_market, uint32_t max_active_fills_per_market,
-        uint32_t num_customers = 16, int device_id = 0, uint32_t threads_per_block = 64); 
+    VecMarket(int32_t num_markets, int32_t max_price_levels, 
+        int32_t max_active_orders_per_market, int32_t max_active_fills_per_market,
+        int32_t num_customers = 16, int device_id = 0, int32_t threads_per_block = 64); 
     
     /**
      * @brief Copy constructor that creates a deep copy of another VecMarket
@@ -190,11 +190,11 @@ public:
      * - Updates order pool with order details
      * - Handles ring buffer wraparound for order slots
      * 
-     * @param bid_px Bid prices for each market [num_markets] uint32_t on GPU
-     * @param bid_sz Bid sizes for each market [num_markets] uint32_t on GPU
-     * @param ask_px Ask prices for each market [num_markets] uint32_t on GPU
-     * @param ask_sz Ask sizes for each market [num_markets] uint32_t on GPU
-     * @param customer_ids Customer IDs for each market [num_markets] uint32_t on GPU
+     * @param bid_px Bid prices for each market [num_markets] int32_t on GPU
+     * @param bid_sz Bid sizes for each market [num_markets] int32_t on GPU
+     * @param ask_px Ask prices for each market [num_markets] int32_t on GPU
+     * @param ask_sz Ask sizes for each market [num_markets] int32_t on GPU
+     * @param customer_ids Customer IDs for each market [num_markets] int32_t on GPU
      * @param fills FillBatch to populate with matched orders (must be created with NewFillBatch)
      */
     void AddTwoSidedQuotes(
@@ -232,7 +232,7 @@ public:
      * @param market_id The market to display (must be < num_markets)
      * @return String representation of the market's order book
      */
-    std::string ToString(uint32_t market_id) const;
+    std::string ToString(int32_t market_id) const;
     
     /**
      * @brief Resets all market state to initial empty state
@@ -317,18 +317,18 @@ private:
 
     // Customer states: two indices correspond to number of contracts and amount of cash, respectively
     torch::Tensor customer_portfolios_; // int32[num_markets, num_customers, 2]
-    uint32_t global_tid_counter_;    // Global transaction ID counter (host-side)
+    int32_t global_tid_counter_;    // Global transaction ID counter (host-side)
     
     // System parameters
-    uint32_t num_markets_;
-    uint32_t max_price_levels_;
-    uint32_t max_orders_per_market_;
-    uint32_t max_fills_per_market_;
-    uint32_t num_customers_;
+    int32_t num_markets_;
+    int32_t max_price_levels_;
+    int32_t max_orders_per_market_;
+    int32_t max_fills_per_market_;
+    int32_t num_customers_;
     
     // CUDA execution parameters
     int device_id_;              // CUDA device ID for this market instance
-    uint32_t threads_per_block_; // Number of threads per block for kernel launches
+    int32_t threads_per_block_; // Number of threads per block for kernel launches
 };
 
 // ================================================================================
@@ -366,18 +366,18 @@ private:
  * @param num_customers Number of customers per market
  */
 __global__ void add_orders_kernel(
-    const uint32_t* bid_px, const uint32_t* bid_sz,
-    const uint32_t* ask_px, const uint32_t* ask_sz,
-    const uint32_t* customer_ids,
-    uint32_t* bid_heads, uint32_t* bid_tails,
-    uint32_t* ask_heads, uint32_t* ask_tails,
-    uint32_t* order_prices, uint32_t* order_sizes,
-    uint32_t* order_customer_ids, uint32_t* order_tid,
-    bool* order_is_bid, uint32_t* order_next,
-    uint32_t* order_next_slots, int32_t* customer_portfolios,
-    uint32_t base_tid, uint32_t num_markets, 
-    uint32_t max_orders_per_market, uint32_t max_price_levels,
-    uint32_t num_customers
+    const int32_t* bid_px, const int32_t* bid_sz,
+    const int32_t* ask_px, const int32_t* ask_sz,
+    const int32_t* customer_ids,
+    int32_t* bid_heads, int32_t* bid_tails,
+    int32_t* ask_heads, int32_t* ask_tails,
+    int32_t* order_prices, int32_t* order_sizes,
+    int32_t* order_customer_ids, int32_t* order_tid,
+    bool* order_is_bid, int32_t* order_next,
+    int32_t* order_next_slots, int32_t* customer_portfolios,
+    int32_t base_tid, int32_t num_markets, 
+    int32_t max_orders_per_market, int32_t max_price_levels,
+    int32_t num_customers
 );
 
 /**
@@ -414,19 +414,19 @@ __global__ void add_orders_kernel(
  * @param num_customers Number of customers per market
  */
 __global__ void match_orders_kernel(
-    uint32_t* bid_heads, uint32_t* ask_heads,
-    uint32_t* bid_tails, uint32_t* ask_tails,
-    uint32_t* order_prices, uint32_t* order_sizes,
-    uint32_t* order_customer_ids, uint32_t* order_tid,
-    bool* order_is_bid, uint32_t* order_next,
-    uint32_t* fill_prices, uint32_t* fill_sizes,
-    uint32_t* fill_customer_ids, uint32_t* fill_quoter_ids,
-    bool* fill_is_sell_quote, uint32_t* fill_quote_sizes,
-    uint32_t* fill_tid, uint32_t* fill_quote_tid,
-    uint32_t* fill_counts, int32_t* customer_portfolios,
-    uint32_t num_markets, uint32_t max_orders_per_market,
-    uint32_t max_price_levels, uint32_t max_fills_per_market,
-    uint32_t num_customers
+    int32_t* bid_heads, int32_t* ask_heads,
+    int32_t* bid_tails, int32_t* ask_tails,
+    int32_t* order_prices, int32_t* order_sizes,
+    int32_t* order_customer_ids, int32_t* order_tid,
+    bool* order_is_bid, int32_t* order_next,
+    int32_t* fill_prices, int32_t* fill_sizes,
+    int32_t* fill_customer_ids, int32_t* fill_quoter_ids,
+    bool* fill_is_sell_quote, int32_t* fill_quote_sizes,
+    int32_t* fill_tid, int32_t* fill_quote_tid,
+    int32_t* fill_counts, int32_t* customer_portfolios,
+    int32_t num_markets, int32_t max_orders_per_market,
+    int32_t max_price_levels, int32_t max_fills_per_market,
+    int32_t num_customers
 );
 
 /**
@@ -448,12 +448,12 @@ __global__ void match_orders_kernel(
  * @param max_price_levels Maximum price levels
  */
 __global__ void get_bbo_kernel(
-    const uint32_t* bid_heads, const uint32_t* ask_heads,
-    const uint32_t* order_sizes, const uint32_t* order_prices,
-    uint32_t* best_bid_prices, uint32_t* best_bid_sizes,
-    uint32_t* best_ask_prices, uint32_t* best_ask_sizes,
-    uint32_t num_markets, uint32_t max_orders_per_market,
-    uint32_t max_price_levels
+    const int32_t* bid_heads, const int32_t* ask_heads,
+    const int32_t* order_sizes, const int32_t* order_prices,
+    int32_t* best_bid_prices, int32_t* best_bid_sizes,
+    int32_t* best_ask_prices, int32_t* best_ask_sizes,
+    int32_t num_markets, int32_t max_orders_per_market,
+    int32_t max_price_levels
 );
 
 }  // namespace order_matching
