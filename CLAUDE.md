@@ -144,7 +144,7 @@ After user feedback, removed all atomic operations from add_orders_kernel since 
 ## Technical Specifications
 
 ### Constants
-- `MAX_MARKETS`: 106,496 (maximum parallel markets)
+- `MAX_MARKETS`: ... (maximum parallel markets)
 - `PRICE_LEVELS`: 128 (price levels per market)
 - `MAX_ACTIVE_ORDERS_PER_MARKET`: 64
 - `MAX_ACTIVE_FILLS_PER_MARKET`: 1,024

@@ -260,13 +260,10 @@ int main(int argc, char* argv[]) {
     std::vector<int32_t> threads_per_block = {64, 128, 256, 512, 1024};
     std::vector<int32_t> num_blocks = {1, 64, 128, 256, 512, 1024};
     
-    // Generate all combinations that don't exceed MAX_MARKETS (106496)
+    // Generate all combinations that don't exceed MAX_MARKETS
     for (auto tpb : threads_per_block) {
         for (auto nb : num_blocks) {
-            int32_t total = tpb * nb;
-            if (total <= 106496) {  // MAX_MARKETS constraint
-                configs.push_back({tpb, nb});
-            }
+            configs.push_back({tpb, nb});
         }
     }
     

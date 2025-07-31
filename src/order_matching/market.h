@@ -53,7 +53,7 @@
 namespace astra {
 namespace order_matching {
 
-constexpr int32_t MAX_MARKETS = 106496;
+constexpr int32_t MAX_MARKETS = 2048 * 2048;
 constexpr int32_t PRICE_LEVELS = 128; 
 constexpr int32_t MAX_ACTIVE_ORDERS_PER_MARKET = 1024; 
 constexpr int32_t MAX_ACTIVE_FILLS_PER_MARKET = 1024; 

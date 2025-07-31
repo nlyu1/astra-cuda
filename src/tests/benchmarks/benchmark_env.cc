@@ -19,8 +19,9 @@ using namespace astra::high_low_trading;
 using namespace astra;
 
 struct BenchmarkConfig {
-    int num_envs;
+    int num_blocks;
     int threads_per_block;
+    int num_envs;  // num_blocks * threads_per_block
     int device_id;
 };
 
@@ -164,7 +165,7 @@ public:
             }
             
             // Get terminal rewards
-            hlt_state_->FillReturns(terminal_rewards_);
+            // hlt_state_->FillReturns(terminal_rewards_);
             
             // Optionally verify rewards are reasonable
             // auto terminal_sum = terminal_rewards_.sum().item<int>();
@@ -181,8 +182,12 @@ public:
         int total_frames = total_steps * num_envs_;
         double fps = total_frames / total_time_seconds;
         
+        // Compute num_blocks from num_envs and threads_per_block
+        int threads_per_block = hlt_game_->GetThreadsPerBlock();
+        int num_blocks = (num_envs_ + threads_per_block - 1) / threads_per_block;
+        
         return BenchmarkResult{
-            BenchmarkConfig{num_envs_, hlt_game_->GetThreadsPerBlock(), device_id_},
+            BenchmarkConfig{num_blocks, threads_per_block, num_envs_, device_id_},
             avg_step_time_ms,
             max_step_time_ms,
             total_time_seconds,
@@ -228,6 +233,7 @@ void print_results(const std::vector<BenchmarkResult>& results) {
     
     // Print header
     std::cout << std::setw(12) << "Envs"
+              << std::setw(12) << "Blocks"
               << std::setw(15) << "Threads/Block"
               << std::setw(10) << "Device"
               << std::setw(15) << "Avg Step(ms)"
@@ -236,16 +242,17 @@ void print_results(const std::vector<BenchmarkResult>& results) {
               << std::setw(15) << "FPS"
               << std::endl;
     
-    std::cout << std::string(100, '-') << std::endl;
+    std::cout << std::string(115, '-') << std::endl;
     
     // Print results
     for (const auto& result : results) {
         std::cout << std::setw(12) << result.config.num_envs
+                  << std::setw(12) << result.config.num_blocks
                   << std::setw(15) << result.config.threads_per_block
                   << std::setw(10) << result.config.device_id
-                  << std::setw(15) << result.avg_step_time_ms
-                  << std::setw(15) << result.max_step_time_ms
-                  << std::setw(15) << result.total_time_seconds
+                  << std::setw(15) << std::fixed << std::setprecision(3) << result.avg_step_time_ms
+                  << std::setw(15) << std::fixed << std::setprecision(3) << result.max_step_time_ms
+                  << std::setw(15) << std::fixed << std::setprecision(3) << result.total_time_seconds
                   << std::setw(15) << std::fixed << std::setprecision(0) << result.fps
                   << std::endl;
     }
@@ -275,20 +282,22 @@ int main(int argc, char** argv) {
     std::cout << std::endl;
     
     // Test configurations
-    std::vector<int> env_counts = {64, 128, 256};
-    std::vector<int> thread_counts = {256, 512, 1024};
+    std::vector<int> block_counts = {256, 512, 1024};
+    std::vector<int> thread_counts = {64, 128, 256};
     
     std::vector<BenchmarkResult> results;
     
-    const int num_episodes = 10;  // Number of episodes per configuration
+    const int num_episodes = 100;  // Number of episodes per configuration
     
     std::cout << "Running benchmarks with " << num_episodes << " episodes per configuration..." << std::endl;
     std::cout << std::endl;
     
-    for (int num_envs : env_counts) {
+    for (int num_blocks : block_counts) {
         for (int threads_per_block : thread_counts) {
-            std::cout << "Testing " << num_envs << " environments with " 
-                      << threads_per_block << " threads/block..." << std::flush;
+            int num_envs = num_blocks * threads_per_block;
+            std::cout << "Testing " << num_blocks << " blocks × " 
+                      << threads_per_block << " threads/block = "
+                      << num_envs << " environments..." << std::flush;
             
             // Create game parameters
             GameParameters params = {
@@ -333,8 +342,9 @@ int main(int argc, char** argv) {
     if (best_fps != results.end()) {
         std::cout << "Best FPS: " << std::fixed << std::setprecision(0) 
                   << best_fps->fps << " FPS (" 
-                  << best_fps->config.num_envs << " envs, " 
-                  << best_fps->config.threads_per_block << " threads/block)" << std::endl;
+                  << best_fps->config.num_blocks << " blocks × " 
+                  << best_fps->config.threads_per_block << " threads/block = "
+                  << best_fps->config.num_envs << " envs)" << std::endl;
                   
         std::cout << "Best config latency: Avg " << std::fixed << std::setprecision(3) 
                   << best_fps->avg_step_time_ms << "ms, Max " 
