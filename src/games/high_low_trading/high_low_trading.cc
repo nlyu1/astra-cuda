@@ -83,10 +83,19 @@ HighLowTradingState::HighLowTradingState(std::shared_ptr<const Game> game)
     player_permutation_ = torch::zeros({num_envs_, num_players_}, options_i32);
     inv_permutation_ = torch::zeros({num_envs_, num_players_}, options_i32);
     target_positions_ = torch::zeros({num_envs_, num_players_}, options_i32);
+    player_last_positions_ = torch::zeros({num_envs_, num_players_, 2}, options_i32);
     
     // Initialize tracking tensors for ExposeInfo
-    player_contract_over_time_ = torch::zeros({num_envs_, num_players_, steps_per_player_, 5}, options_i32);
-    market_contract_over_time_ = torch::zeros({num_envs_ * num_players_, 4}, options_i32); // best bid, best ask, last_price, volume
+    player_contract_over_time_ = torch::zeros({num_envs_, num_players_, steps_per_player_, 6}, options_i32);
+    market_contract_over_time_ = torch::zeros({num_envs_ * num_players_, 3}, options_i32); // best bid, best ask, last_price
+
+    // Initialize reward tensors
+    immediate_rewards_ = torch::zeros({num_envs_, num_players_}, options_i32);
+    rewards_since_last_action_ = torch::zeros({num_envs_, num_players_}, options_i32);
+    
+    // Initialize BBO and Fill batches
+    bbo_batch_ = market_.NewBBOBatch(); 
+    fill_batch_ = market_.NewFillBatch(); 
 }
 
 HighLowTradingState::HighLowTradingState(const HighLowTradingState& other)
@@ -101,9 +110,14 @@ HighLowTradingState::HighLowTradingState(const HighLowTradingState& other)
       player_permutation_(other.player_permutation_.clone()),
       inv_permutation_(other.inv_permutation_.clone()),
       target_positions_(other.target_positions_.clone()),
+      player_last_positions_(other.player_last_positions_.clone()),
       market_(other.market_),
       player_contract_over_time_(other.player_contract_over_time_.clone()),
-      market_contract_over_time_(other.market_contract_over_time_.clone()) {
+      market_contract_over_time_(other.market_contract_over_time_.clone()),
+      immediate_rewards_(other.immediate_rewards_.clone()),
+      rewards_since_last_action_(other.rewards_since_last_action_.clone()),
+      bbo_batch_(other.bbo_batch_),  
+      fill_batch_(other.fill_batch_) { 
 }
 
 Player HighLowTradingState::CurrentPlayer() const {
@@ -183,6 +197,11 @@ void HighLowTradingState::ApplyPermutation(torch::Tensor move) {
 void HighLowTradingState::ApplyCustomerSize(torch::Tensor move) {
   ASTRA_CHECK_EQ(move.dim(), 2);
   ASTRA_CHECK_EQ(move.size(1), num_players_ - 3);
+
+  // Assert that they are between 
+  auto abs_move = torch::abs(move); 
+  ASTRA_CHECK_LE(torch::max(abs_move).item<int>(), GetGame()->GetCustomerMaxSize()); 
+  ASTRA_CHECK_GT(torch::min(abs_move).item<int>(), 0); // Customers cannot have zero size
   
   // Customer roles start at index 3 (roles 0,1 are ValueCheaters, role 2 is HighLowCheater)
   // move contains target positions for customer roles [3, 4, ..., P-1]
@@ -220,63 +239,196 @@ void HighLowTradingState::DoApplyAction(torch::Tensor move) {
     ApplyPermutation(move);
   } else if (move_number == 3) {
     ApplyCustomerSize(move);
-  } else {
-    // We're in player trading mode 
-    AstraFatalError("Move not implemented"); 
+  } else { 
+    ApplyPlayerTrading(move); 
   }
+}
+
+void HighLowTradingState::ApplyPlayerTrading(torch::Tensor move) {
+  Player player = CurrentPlayer(); 
+  int trade_move_number = MoveNumber() - game_->MaxChanceNodesInHistory(); 
+  int player_move_number = trade_move_number % steps_per_player_; 
+  ASTRA_CHECK_GE(trade_move_number, 0); 
+  ASTRA_CHECK_LT(trade_move_number, steps_per_player_ * num_players_);
+  ASTRA_CHECK_EQ(move.size(1), 4); // bid_px, ask_px, bid_sz, ask_sz
+  
+  // Record last positions
+  market_.CopyCustomerPortfoliosTo(player_last_positions_); 
+  
+  // Extract columns from move tensor and make them contiguous
+  // Convert to uint32 as required by market_.AddTwoSidedQuotes
+  auto bid_prices = move.index({torch::indexing::Slice(), 0}).to(torch::kUInt32).contiguous();
+  auto ask_prices = move.index({torch::indexing::Slice(), 1}).to(torch::kUInt32).contiguous();
+  auto bid_sizes = move.index({torch::indexing::Slice(), 2}).to(torch::kUInt32).contiguous();
+  auto ask_sizes = move.index({torch::indexing::Slice(), 3}).to(torch::kUInt32).contiguous();
+  auto customer_ids = torch::ones({num_envs_}, torch::kUInt32).to(torch::Device(torch::kCUDA, device_id_)) * player;
+  
+  // Compute the fills 
+  market_.AddTwoSidedQuotes(
+    bid_prices, bid_sizes, ask_prices, ask_sizes, customer_ids, fill_batch_);
+  
+  // Flush current player's accumulated rewards since last action
+  rewards_since_last_action_.index({torch::indexing::Slice(), player}).zero_();
+
+  // Compute new immediate rewards
+  auto current_positions = market_.GetCustomerPortfolios(); 
+  market_.GetBBOs(bbo_batch_); 
+  bbo_batch_.UpdateLastPrices(fill_batch_); // Update last prices based on fills
+  auto cash_diff = current_positions.index({torch::indexing::Slice(), torch::indexing::Slice(), 1}) - 
+                   player_last_positions_.index({torch::indexing::Slice(), torch::indexing::Slice(), 1}); // [N, P]
+  // Update logging metrics for tracking market movement
+  player_contract_over_time_.index({torch::indexing::Slice(), player, player_move_number, torch::indexing::Slice(0, 4)}).copy_(move);
+  player_contract_over_time_.index({torch::indexing::Slice(), torch::indexing::Slice(), player_move_number, torch::indexing::Slice(4, torch::indexing::None)}).copy_(current_positions);
+  market_contract_over_time_.index({trade_move_number, 0}).copy_(bbo_batch_.best_bid_prices);
+  market_contract_over_time_.index({trade_move_number, 1}).copy_(bbo_batch_.best_ask_prices);
+  market_contract_over_time_.index({trade_move_number, 2}).copy_(bbo_batch_.last_prices);
+
+  // Compute how much closer we are towards the final target position
+  auto previous_positions = player_last_positions_.index({torch::indexing::Slice(), torch::indexing::Slice(), 0}); // [N, P]
+  auto current_positions_contracts = current_positions.index({torch::indexing::Slice(), torch::indexing::Slice(), 0}); // [N, P]
+  
+  auto previous_diff = torch::abs(previous_positions - target_positions_); // [N, P]
+  auto current_diff = torch::abs(current_positions_contracts - target_positions_); // [N, P]
+  auto is_customer = target_positions_ != 0; // [N, P]
+  
+  // Positive reward if current_diff <= previous_diff
+  immediate_rewards_ = is_customer * (previous_diff - current_diff) * GetGame()->GetMaxContractValue(); 
+  immediate_rewards_.add_(cash_diff); // Add immediate cash value (in-place)
+
+  if (IsTerminal()) {
+    // At termination, add contract settlement value
+    immediate_rewards_.addcmul_( // In-place multiply-add: += contracts * settlement_value
+      current_positions_contracts,
+      contract_values_.index({torch::indexing::Slice(), 2}).unsqueeze(-1)
+    );
+  }
+
+  // Update rewards since last action for all players
+  rewards_since_last_action_.add_(immediate_rewards_); // In-place add 
+}
+
+void HighLowTradingState::FillRewards(torch::Tensor reward_buffer) const {
+  ASTRA_CHECK_EQ(reward_buffer.dim(), 2); 
+  ASTRA_CHECK_EQ(reward_buffer.size(0), num_envs_); 
+  ASTRA_CHECK_EQ(reward_buffer.size(1), num_players_); 
+  reward_buffer.copy_(immediate_rewards_); 
+}
+
+void HighLowTradingState::FillRewardsSinceLastAction(
+    torch::Tensor reward_buffer, Player player_id) const {
+  ASTRA_CHECK_EQ(reward_buffer.dim(), 1); 
+  ASTRA_CHECK_EQ(reward_buffer.size(0), num_envs_); 
+  reward_buffer.copy_(rewards_since_last_action_.index({torch::indexing::Slice(), player_id})); 
+}
+
+// Calculate terminal returns as portfolio value minus customer penalties
+void HighLowTradingState::FillReturns(torch::Tensor returns_buffer) const {
+  ASTRA_CHECK_EQ(returns_buffer.dim(), 2); 
+  ASTRA_CHECK_EQ(returns_buffer.size(0), num_envs_); 
+  ASTRA_CHECK_EQ(returns_buffer.size(1), num_players_); 
+  
+  returns_buffer.zero_();
+  
+  // Get current portfolios and customer indicators
+  auto is_customer = target_positions_ != 0; // [N, P]
+  auto portfolios = market_.GetCustomerPortfolios(); // [N, P, 2]
+  
+  // Add portfolio value: cash + (contracts * settlement_value)
+  returns_buffer.add_(portfolios.index({torch::indexing::Slice(), torch::indexing::Slice(), 1}));
+  returns_buffer.addcmul_( // In-place multiply-add: returns += contracts * settlement_value
+    portfolios.index({torch::indexing::Slice(), torch::indexing::Slice(), 0}), // contracts
+    contract_values_.index({torch::indexing::Slice(), 2}).unsqueeze(-1) // settlement value [N, 1]
+  );
+  
+  // Subtract penalty for missed target positions (customers only)
+  auto position_diff = torch::abs(
+    portfolios.index({torch::indexing::Slice(), torch::indexing::Slice(), 0}) - target_positions_);
+  // returns += -is_customer * position_diff * max_value
+  returns_buffer.add_(
+    -is_customer * position_diff * GetGame()->GetMaxContractValue());
+}
+
+void HighLowTradingState::DoReset() {
+  contract_values_.zero_();
+  contract_high_settle_.zero_();
+  player_permutation_.zero_();
+  inv_permutation_.zero_();
+  target_positions_.zero_();
+  player_last_positions_.zero_();
+  player_contract_over_time_.zero_();
+  market_contract_over_time_.zero_();
+  immediate_rewards_.zero_();
+  rewards_since_last_action_.zero_();
+  market_.Reset();
+  bbo_batch_.Reset();
+  // fill_batch_.Reset(); No need to change fill_batch since there aren't any running stats. 
 }
 
 const HighLowTradingGame* HighLowTradingState::GetGame() const {
   return static_cast<const HighLowTradingGame*>(game_.get()); 
 }
 
-std::string HighLowTradingState::PublicInformationString() const {
-  std::ostringstream result;
-  // result << "********** Game Configuration **********\n";
-  // result << fmt::format("Steps per player: {}\n", GetGame()->GetStepsPerPlayer());
-  // result << fmt::format("Max contracts per trade: {}\n", GetGame()->GetMaxContractsPerTrade());
-  // result << fmt::format("Customer max size: {}\n", GetGame()->GetCustomerMaxSize());
-  // result << fmt::format("Max contract value: {}\n", GetGame()->GetMaxContractValue());
-  // result << fmt::format("Number of players: {}\n", GetGame()->GetNumPlayers());
-  // result << "****************************************\n\n";
-
-  // result << "********** Player Positions **********\n";
-  // for (int i = 0; i < NumPlayers(); ++i) {
-  //   result << fmt::format("Player {} position: {}\n", i, player_positions_[i].ToString());
-  // }
-  // result << "**************************************\n\n";
-  
-  // result << "********** Fills & Quotes **********\n";
-  // result << fmt::format("Number of fills: {}\n", order_fills_.size());
-  // for (auto fill : order_fills_) {
-  //   result << fmt::format("Order fill: {}\n", fill.ToString());
-  // }
-  // for (auto quote : player_quotes_) {
-  //   result << fmt::format("Player {} quote: {}\n", quote.first, quote.second.ToString());
-  // }
-  // result << "***********************************\n\n";
-
-  // result << "********** Current Market **********\n";
-  // result << fmt::format("{}\n", market_.ToString());
-  return result.str();
-}
-
 std::string HighLowTradingState::ToString(uint32_t index) const {
   std::ostringstream result;
-  // result << "********** Game setup **********\n";
-  // result << fmt::format("Contract values: {}, {}\n", contract_values_[0].contract_value_, contract_values_[1].contract_value_);
-  // result << fmt::format("Contract high settle: {}\n", contract_high_settle_.is_high_ ? "High" : "Low");
-  // result << fmt::format("Player permutation: {}\n", player_permutation_.ToString());
-  // for (int i = 0; i < NumPlayers(); ++i) {
-  //   auto target_position = player_target_positions_[i];
-  //   if (target_position == 0) {
-  //     result << fmt::format("Player {} target position: No requirement\n", i);
-  //   } else {
-  //     result << fmt::format("Player {} target position: {}\n", i, target_position);
-  //   }
-  // }
-  // result << "********************************\n\n";
-  // result << PublicInformationString();
+  result << "********** Game setup **********\n";
+  
+  // Get contract values from tensor
+  if (MoveNumber() >= 1) {
+    auto contract_values_cpu = contract_values_.cpu();
+    auto contract_values_accessor = contract_values_cpu.accessor<int32_t, 2>();
+    result << fmt::format("Contract values: {}, {}\n", 
+                         contract_values_accessor[index][0], 
+                         contract_values_accessor[index][1]);
+  }
+  
+  // Get high/low settlement choice
+  if (MoveNumber() >= 2) {
+    auto contract_high_settle_cpu = contract_high_settle_.cpu();
+    auto contract_high_settle_accessor = contract_high_settle_cpu.accessor<bool, 1>();
+    result << fmt::format("Contract high settle: {}\n", 
+                         contract_high_settle_accessor[index] ? "High" : "Low");
+  }
+  
+  // Get player permutation
+  if (MoveNumber() >= 3) {
+    auto player_permutation_cpu = player_permutation_.cpu();
+    auto player_permutation_accessor = player_permutation_cpu.accessor<int32_t, 2>();
+    result << "Player permutation: Player roles: ";
+    for (int i = 0; i < num_players_; ++i) {
+      int role = player_permutation_accessor[index][i];
+      if (role == 0 || role == 1) {
+        result << fmt::format("P{}=ValueCheater, ", i);
+      } else if (role == 2) {
+        result << fmt::format("P{}=HighLowCheater, ", i);
+      } else {
+        result << fmt::format("P{}=Customer, ", i);
+      }
+    }
+    result.seekp(-2, std::ios_base::end); // Remove trailing ", "
+    result << "\n";
+  }
+  
+  // Get target positions
+  if (MoveNumber() >= 4) {
+    auto target_positions_cpu = target_positions_.cpu();
+    auto target_positions_accessor = target_positions_cpu.accessor<int32_t, 2>();
+    for (int i = 0; i < num_players_; ++i) {
+      int target_position = target_positions_accessor[index][i];
+      if (target_position == 0) {
+        result << fmt::format("Player {} target position: No requirement\n", i);
+      } else {
+        result << fmt::format("Player {} target position: {}\n", i, target_position);
+      }
+    }
+  }
+  
+  result << "********************************\n\n";
+  
+  // Add public information if we're past the chance moves
+  if (MoveNumber() >= game_->MaxChanceNodesInHistory()) {
+    result << PublicInformationString(index);
+  }
+  
   return result.str();
 }
 
@@ -290,22 +442,6 @@ torch::Tensor HighLowTradingState::GetContractValue() const {
   return contract_values_.index({torch::indexing::Slice(), 2}); 
 }
 
-// We model instantaneous reward as (portfolio value at terminal timestep)
-// To provide more granular rewards, each contract fill movement in the direction 
-// of the target position is rewarded with "max_contract_value" reward. 
-// Harmful moves are penalized
-void HighLowTradingState::FillRewards(torch::Tensor reward_buffer) const {
-  AstraFatalError("Not implemented"); 
-}
-
-// Returns is modeled as (customer penalty) + portfolio value
-void HighLowTradingState::FillReturns(torch::Tensor returns_buffer) const {
-  AstraFatalError("Not implemented"); 
-}
-
-void HighLowTradingState::FillRewardsSinceLastAction(torch::Tensor reward_buffer, Player player_id) const {
-  AstraFatalError("Not implemented"); 
-}
 
 ExposeInfo HighLowTradingState::expose_info() const {
   if (!IsTerminal()) {
@@ -463,51 +599,60 @@ std::string HighLowTradingState::InformationStateString(Player player, uint32_t 
   
   std::ostringstream result;
   
-  // // Add player's role information
-  // result << "********** Private Information **********\n";
-
+  // Add player's role information
+  result << "********** Private Information **********\n";
   
-  // // Check if we're past the permutation phase
-  // if (MoveNumber() >= GetGame()->MaxChanceNodesInHistory()) {
-  //   int perm_id = player_permutation_.permutation_[player]; 
-  //   std::string role_name;
-
-  //   if (perm_id == 0 || perm_id == 1) {
-  //     role_name = "ValueCheater";
-  //   } else if (perm_id == 2) {
-  //     role_name = "HighLowCheater";
-  //   } else {
-  //     role_name = "Customer";
-  //   }
-  //   result << fmt::format("My role: {}\n", role_name);
+  // Check if we're past the permutation phase
+  if (MoveNumber() >= GetGame()->MaxChanceNodesInHistory()) {
+    // Get player's role from permutation
+    auto player_permutation_cpu = player_permutation_.cpu();
+    auto player_permutation_accessor = player_permutation_cpu.accessor<int32_t, 2>();
+    int perm_id = player_permutation_accessor[index][player];
     
-  //   // Add private information based on role
-  //   if (perm_id == 0 || perm_id == 1) {
-  //       // ValueCheaters know the contract values
-  //       result << fmt::format("Candidate contract value: {}\n",
-  //                            contract_values_[perm_id].contract_value_);
-  //   } else if (perm_id == 2) {
-  //       // HighLowCheaters know which settlement (high or low) will be chosen
-  //       result << fmt::format("Settlement will be: {}\n",
-  //                            contract_high_settle_.is_high_ ? "High" : "Low");
-  //   } else {
-  //       // Customers know their target position
-  //       auto target_position = player_target_positions_[player];
-  //       if (target_position != 0) {
-  //         result << fmt::format("My target position: {}\n", target_position);
-  //       } else {
-  //         result << "Not supposed to happen. Customer target position should not be 0 \n"; 
-  //         AstraFatalError("Not supposed to happen. Customer roles should be assigned"); 
-  //       }
-  //   }
-  //   // Start with public information that all players can see
-  //   result << PublicInformationString();
+    std::string role_name;
+    if (perm_id == 0 || perm_id == 1) {
+      role_name = "ValueCheater";
+    } else if (perm_id == 2) {
+      role_name = "HighLowCheater";
+    } else {
+      role_name = "Customer";
+    }
+    result << fmt::format("My role: {}\n", role_name);
     
-  // } else {
-  //   result << "Private info pending...\n";
-  // }
-  
-  result << "***************************\n";
+    // Add private information based on role
+    if (perm_id == 0 || perm_id == 1) {
+      // ValueCheaters know one of the contract values
+      auto contract_values_cpu = contract_values_.cpu();
+      auto contract_values_accessor = contract_values_cpu.accessor<int32_t, 2>();
+      result << fmt::format("Candidate contract value: {}\n",
+                           contract_values_accessor[index][perm_id]);
+    } else if (perm_id == 2) {
+      // HighLowCheaters know which settlement (high or low) will be chosen
+      auto contract_high_settle_cpu = contract_high_settle_.cpu();
+      auto contract_high_settle_accessor = contract_high_settle_cpu.accessor<bool, 1>();
+      result << fmt::format("Settlement will be: {}\n",
+                           contract_high_settle_accessor[index] ? "High" : "Low");
+    } else {
+      // Customers know their target position
+      auto target_positions_cpu = target_positions_.cpu();
+      auto target_positions_accessor = target_positions_cpu.accessor<int32_t, 2>();
+      int target_position = target_positions_accessor[index][player];
+      if (target_position != 0) {
+        result << fmt::format("My target position: {}\n", target_position);
+      } else {
+        result << "Not supposed to happen. Customer target position should not be 0\n";
+        AstraFatalError("Not supposed to happen. Customer roles should be assigned");
+      }
+    }
+    result << "******************************************\n\n";
+    
+    // Add public information that all players can see
+    result << PublicInformationString(index);
+    
+  } else {
+    result << "Private info pending...\n";
+    result << "***************************\n";
+  }
   
   return result.str();
 }
@@ -540,6 +685,126 @@ HighLowTradingGame::HighLowTradingGame(const GameParameters& params)
 
 std::unique_ptr<State> HighLowTradingGame::NewInitialState() const {
   return std::unique_ptr<State>(new HighLowTradingState(shared_from_this()));
+}
+
+std::string HighLowTradingState::PublicInformationString(uint32_t index) const {
+  std::ostringstream result;
+  result << "********** Game Configuration **********\n";
+  result << fmt::format("Environment: {} / {}\n", index, num_envs_);
+  result << fmt::format("Steps per player: {}\n", steps_per_player_);
+  result << fmt::format("Max contracts per trade: {}\n", GetGame()->GetMaxContractsPerTrade());
+  result << fmt::format("Customer max size: {}\n", GetGame()->GetCustomerMaxSize());
+  result << fmt::format("Max contract value: {}\n", GetGame()->GetMaxContractValue()); 
+  result << fmt::format("Number of players: {}\n", num_players_);
+  result << "****************************************\n\n";
+
+  result << "********** Player Positions **********\n";
+  // Get current positions from market
+  auto portfolios = market_.GetCustomerPortfolios(); // [N, P, 2]
+  auto portfolios_cpu = portfolios.cpu();
+  auto portfolios_accessor = portfolios_cpu.accessor<int32_t, 3>();
+  
+  for (int i = 0; i < num_players_; ++i) {
+    int contracts = portfolios_accessor[index][i][0];
+    int cash = portfolios_accessor[index][i][1];
+    result << fmt::format("Player {} position: [{} contracts, {} cash]\n", i, contracts, cash);
+  }
+  result << "**************************************\n\n";
+  
+  result << "********** Quotes & Market Movement **********\n";
+  // Get fills from fill_batch_
+  if (fill_batch_.fill_counts.defined()) {
+    auto fill_counts_cpu = fill_batch_.fill_counts.cpu();
+    auto fill_counts_accessor = fill_counts_cpu.accessor<uint32_t, 1>();
+    uint32_t num_fills_for_env = fill_counts_accessor[index];
+    
+    result << fmt::format("Number of fills: {}\n", num_fills_for_env);
+    
+    if (num_fills_for_env > 0) {
+      // Access fill data - these are 2D tensors [num_markets, max_fills]
+      auto fill_prices_cpu = fill_batch_.fill_prices.cpu();
+      auto fill_sizes_cpu = fill_batch_.fill_sizes.cpu();
+      auto fill_customer_ids_cpu = fill_batch_.fill_customer_ids.cpu();
+      auto fill_quoter_ids_cpu = fill_batch_.fill_quoter_ids.cpu();
+      auto fill_is_sell_quote_cpu = fill_batch_.fill_is_sell_quote.cpu();
+      auto fill_quote_sizes_cpu = fill_batch_.fill_quote_sizes.cpu();
+      auto fill_tid_cpu = fill_batch_.fill_tid.cpu();
+      auto fill_quote_tid_cpu = fill_batch_.fill_quote_tid.cpu();
+      
+      auto fill_prices_accessor = fill_prices_cpu.accessor<uint32_t, 2>();
+      auto fill_sizes_accessor = fill_sizes_cpu.accessor<uint32_t, 2>();
+      auto fill_customer_ids_accessor = fill_customer_ids_cpu.accessor<uint32_t, 2>();
+      auto fill_quoter_ids_accessor = fill_quoter_ids_cpu.accessor<uint32_t, 2>();
+      auto fill_is_sell_quote_accessor = fill_is_sell_quote_cpu.accessor<bool, 2>();
+      auto fill_quote_sizes_accessor = fill_quote_sizes_cpu.accessor<uint32_t, 2>();
+      auto fill_tid_accessor = fill_tid_cpu.accessor<uint32_t, 2>();
+      auto fill_quote_tid_accessor = fill_quote_tid_cpu.accessor<uint32_t, 2>();
+      
+      // Iterate through fills for this environment
+      for (uint32_t i = 0; i < num_fills_for_env; ++i) {
+        result << fmt::format(
+          "Order fill: id={} {} {} contracts at px={} on t={}. Quote: id={} {} sz={}, submitted t={}\n",
+          fill_customer_ids_accessor[index][i],
+          fill_is_sell_quote_accessor[index][i] ? "bought" : "sold",
+          fill_sizes_accessor[index][i],
+          fill_prices_accessor[index][i],
+          fill_tid_accessor[index][i],
+          fill_quoter_ids_accessor[index][i],
+          fill_is_sell_quote_accessor[index][i] ? "sale" : "bid",
+          fill_quote_sizes_accessor[index][i],
+          fill_quote_tid_accessor[index][i]
+        );
+      }
+    }
+  } else {
+    result << "Number of fills: 0\n";
+  }
+  
+  // Print historical quotes from player_contract_over_time_
+  int current_trade_move = std::max(0, MoveNumber() - game_->MaxChanceNodesInHistory());
+  int current_round = current_trade_move / num_players_;
+  int player_in_round = current_trade_move % num_players_;
+  
+  auto player_contract_cpu = player_contract_over_time_.cpu();
+  auto player_contract_accessor = player_contract_cpu.accessor<int32_t, 4>();
+  
+  for (int round = 0; round <= current_round && round < steps_per_player_; ++round) {
+    int max_player = (round < current_round) ? num_players_ : player_in_round;
+    for (int p = 0; p < max_player; ++p) {
+      int bid_px = player_contract_accessor[index][p][round][0];
+      int ask_px = player_contract_accessor[index][p][round][1];
+      int bid_sz = player_contract_accessor[index][p][round][2];
+      int ask_sz = player_contract_accessor[index][p][round][3];
+      
+      if (bid_px > 0 || ask_px > 0) {  // Only print if quote was actually placed
+        result << fmt::format("Player {} quote: {} @ {} [{} x {}]\n", 
+                            p, bid_px, ask_px, bid_sz, ask_sz);
+      }
+    }
+  }
+  
+  // Print market movement over time
+  result << "\n--- Market Movement ---\n";
+  auto market_contract_cpu = market_contract_over_time_.cpu();
+  auto market_contract_accessor = market_contract_cpu.accessor<int32_t, 2>();
+  
+  for (int t = 0; t < current_trade_move && t < (num_players_ * steps_per_player_); ++t) {
+    uint32_t best_bid = static_cast<uint32_t>(market_contract_accessor[t][0]);
+    uint32_t best_ask = static_cast<uint32_t>(market_contract_accessor[t][1]);
+    uint32_t last_price = static_cast<uint32_t>(market_contract_accessor[t][2]);
+    
+    result << fmt::format("Time {}: Bid: {} @ Ask: {}{}\n", 
+                         t,
+                         best_bid == order_matching::NULL_INDEX ? "none" : std::to_string(best_bid),
+                         best_ask == order_matching::NULL_INDEX ? "none" : std::to_string(best_ask),
+                         last_price != order_matching::NULL_INDEX ? fmt::format(", Last: {}", last_price) : "");
+  }
+  
+  result << "***********************************\n\n";
+
+  result << "********** Current Market **********\n";
+  result << market_.ToString(index);
+  return result.str();
 }
 
 }  // namespace high_low_trading

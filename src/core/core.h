@@ -425,6 +425,11 @@ class State {
   // Decision. See StateType definition for definitions of the different types.
   StateType GetType() const;
 
+  // Implement by derived classes. 
+  virtual void DoReset() { AstraFatalError("DoReset is not implemented."); }
+
+  void Reset() { move_number_ = 0; DoReset(); }
+
  protected:
   // See ApplyAction.
   virtual void DoApplyAction(torch::Tensor action_id) {

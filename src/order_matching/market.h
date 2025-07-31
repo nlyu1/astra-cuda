@@ -60,6 +60,35 @@ constexpr uint32_t MAX_ACTIVE_FILLS_PER_MARKET = 1024;
 constexpr uint32_t NULL_INDEX = 0xFFFFFFFF;
 constexpr uint32_t MAX_CUSTOMERS = 1024; 
 
+// Structure for returning fill information
+class FillBatch {
+    public:
+        torch::Tensor fill_prices;        // [num_markets, max_fills] uint32_t - execution price
+        torch::Tensor fill_sizes;         // [num_markets, max_fills] uint32_t - fill size
+        torch::Tensor fill_customer_ids;  // [num_markets, max_fills] uint32_t - taker customer ID
+        torch::Tensor fill_quoter_ids;    // [num_markets, max_fills] uint32_t - quoter customer ID
+        torch::Tensor fill_is_sell_quote; // [num_markets, max_fills] bool - true if sell quote, false if buy quote
+        torch::Tensor fill_quote_sizes;   // [num_markets, max_fills] uint32_t - size of the quote order
+        torch::Tensor fill_tid;           // [num_markets, max_fills] uint32_t - time ID of the taker order
+        torch::Tensor fill_quote_tid;     // [num_markets, max_fills] uint32_t - time ID of the quote order
+        torch::Tensor fill_counts;        // [num_markets] uint32_t - number of fills per market
+        
+        // Default constructor
+        FillBatch() = default;
+        
+        // Copy constructor that clones all tensors
+        FillBatch(const FillBatch& other)
+            : fill_prices(other.fill_prices.clone()),
+              fill_sizes(other.fill_sizes.clone()),
+              fill_customer_ids(other.fill_customer_ids.clone()),
+              fill_quoter_ids(other.fill_quoter_ids.clone()),
+              fill_is_sell_quote(other.fill_is_sell_quote.clone()),
+              fill_quote_sizes(other.fill_quote_sizes.clone()),
+              fill_tid(other.fill_tid.clone()),
+              fill_quote_tid(other.fill_quote_tid.clone()),
+              fill_counts(other.fill_counts.clone()) {}
+}; 
+
 // Structure for returning best bid/offer information
 class BBOBatch {
 public:
@@ -67,21 +96,25 @@ public:
     torch::Tensor best_bid_sizes;   // [num_markets] uint32_t
     torch::Tensor best_ask_prices;  // [num_markets] uint32_t
     torch::Tensor best_ask_sizes;   // [num_markets] uint32_t
-};
+    torch::Tensor last_prices;      // [num_markets] uint32_t
+    
+    // Default constructor. 
+    BBOBatch() = default;
+    
+    // Copy constructor that clones all tensors
+    BBOBatch(const BBOBatch& other) 
+        : best_bid_prices(other.best_bid_prices.clone()),
+          best_bid_sizes(other.best_bid_sizes.clone()),
+          best_ask_prices(other.best_ask_prices.clone()),
+          best_ask_sizes(other.best_ask_sizes.clone()),
+          last_prices(other.last_prices.clone()) {}
 
-// Structure for returning fill information
-class FillBatch {
-public:
-    torch::Tensor fill_prices;        // [num_markets, max_fills] uint32_t - execution price
-    torch::Tensor fill_sizes;         // [num_markets, max_fills] uint32_t - fill size
-    torch::Tensor fill_customer_ids;  // [num_markets, max_fills] uint32_t - taker customer ID
-    torch::Tensor fill_quoter_ids;    // [num_markets, max_fills] uint32_t - quoter customer ID
-    torch::Tensor fill_is_sell_quote; // [num_markets, max_fills] bool - true if sell quote, false if buy quote
-    torch::Tensor fill_quote_sizes;   // [num_markets, max_fills] uint32_t - size of the quote order
-    torch::Tensor fill_tid;           // [num_markets, max_fills] uint32_t - time ID of the taker order
-    torch::Tensor fill_quote_tid;     // [num_markets, max_fills] uint32_t - time ID of the quote order
-    torch::Tensor fill_counts;        // [num_markets] uint32_t - number of fills per market
-}; 
+    void Reset();
+
+    // Update last prices based on fills. 
+    // For each market, if fill_counts > 0, update on last fill price. Otherwise carry over last last_price
+    void UpdateLastPrices(FillBatch& fills); 
+};
 
 class VecMarket {
 public:
@@ -202,6 +235,22 @@ public:
     std::string ToString(uint32_t market_id) const;
     
     /**
+     * @brief Resets all market state to initial empty state
+     * 
+     * Clears all order books, resets customer portfolios to zero, and resets
+     * the global TID counter. This method does not deallocate or reallocate
+     * any tensors - it only resets their values. This is useful for reusing
+     * the same market instance across multiple simulations.
+     * 
+     * After calling Reset():
+     * - All order books are empty
+     * - All customer portfolios are zero
+     * - Order slot counters are reset to 0
+     * - Global TID counter is reset to 0
+     */
+    void Reset();
+    
+    /**
      * @brief Returns a read-only view of customer portfolios
      * 
      * Returns the customer portfolio tensor which tracks the number of contracts
@@ -212,7 +261,18 @@ public:
      * 
      * @return const reference to customer portfolios tensor
      */
-    const torch::Tensor& GetCustomerPortfolios() const { return customer_portfolios_; } 
+    void CopyCustomerPortfoliosTo(torch::Tensor buffer) const { 
+        // Check that shapes are equal 
+        ASTRA_CHECK_EQ(buffer.dim(), 3); 
+        ASTRA_CHECK_EQ(buffer.size(0), num_markets_); 
+        ASTRA_CHECK_EQ(buffer.size(1), num_customers_); 
+        ASTRA_CHECK_EQ(buffer.size(2), 2); 
+        buffer.copy_(customer_portfolios_, /*non_blocking=*/false); 
+    } 
+
+    const torch::Tensor& GetCustomerPortfolios() const { 
+        return customer_portfolios_; 
+    } 
     
 private:
     /**

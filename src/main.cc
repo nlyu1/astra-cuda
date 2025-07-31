@@ -12,158 +12,189 @@ using namespace astra;
 using namespace astra::high_low_trading;
 
 int main() {
-    // Register all available games
-    RegisterGames();
-    
-    // Verify registration
-    std::cout << "Number of registered games: " << GameRegistrar::RegisteredNames().size() << std::endl;
-    if (!GameRegistrar::RegisteredNames().empty()) {
-        std::cout << "First registered game: " << GameRegistrar::RegisteredNames()[0] << std::endl;
-    }
-    
-    // Set up game parameters
-    int steps_per_player = 3;
-    int max_contracts_per_trade = 3;
-    int customer_max_size = 5;
-    int max_contract_value = 30;
-    int num_players = 5;
-    int num_markets = 1;
-    int threads_per_block = 128;
-    int device_id = 0;
-    
-    // Create game parameters
-    GameParameters params = {
-        {"steps_per_player", GameParameter(steps_per_player)},
-        {"max_contracts_per_trade", GameParameter(max_contracts_per_trade)},
-        {"customer_max_size", GameParameter(customer_max_size)},
-        {"max_contract_value", GameParameter(max_contract_value)},
-        {"players", GameParameter(num_players)},
-        {"num_markets", GameParameter(num_markets)},
-        {"threads_per_block", GameParameter(threads_per_block)},
-        {"device_id", GameParameter(device_id)}
-    };
-    
-    std::cout << "\nCreating HighLowTrading game with parameters:" << std::endl;
-    std::cout << "- Steps per player: " << steps_per_player << std::endl;
-    std::cout << "- Max contracts per trade: " << max_contracts_per_trade << std::endl;
-    std::cout << "- Customer max size: " << customer_max_size << std::endl;
-    std::cout << "- Max contract value: " << max_contract_value << std::endl;
-    std::cout << "- Players: " << num_players << std::endl;
-    std::cout << "- Number of markets: " << num_markets << std::endl;
-    std::cout << "- Threads per block: " << threads_per_block << std::endl;
-    std::cout << "- Device ID: " << device_id << std::endl;
-    
-    // Create game using factory method
-    auto game = Factory(params);
-    
-    // Create initial state
-    auto state = game->NewInitialState();
-    
-    std::cout << "\nGame created successfully!" << std::endl;
-    std::cout << "Initial state created." << std::endl;
-    std::cout << "Current player: " << state->CurrentPlayer() << std::endl;
-    std::cout << "Is terminal: " << (state->IsTerminal() ? "Yes" : "No") << std::endl;
-    std::cout << "Move number: " << state->MoveNumber() << std::endl;
-    
-    // Cast to HighLowTradingState to access game-specific methods
-    auto* trading_state = static_cast<HighLowTradingState*>(state.get());
-    std::cout << "\nInitial state string (index 0):" << std::endl;
-    std::cout << trading_state->ToString(0) << std::endl;
-    
-    // Fix random seed for reproducibility
-    std::mt19937 rng(42);
-    
-    // Configure tensor options for the specified device
-    auto device = torch::Device(torch::kCUDA, device_id);
-    auto options = torch::TensorOptions().device(device);
-    
-    std::cout << "\n========== Applying Chance Actions ==========\n" << std::endl;
-    
-    // Action 1: Set two candidate contract values [1, max_contract_value]
-    std::uniform_int_distribution<int> contract_dist(1, max_contract_value);
-    int value1 = contract_dist(rng);
-    int value2 = contract_dist(rng);
-    torch::Tensor contract_values = torch::tensor({{value1, value2}}, options.dtype(torch::kInt32));
-    
-    std::cout << "Move 0 - Contract values: [" << value1 << ", " << value2 << "]" << std::endl;
-    state->ApplyAction(contract_values);
-    std::cout << "Current player after move 0: " << state->CurrentPlayer() << std::endl;
-    
-    // Action 2: Determine high/low settlement (0 = low, 1 = high)
-    std::uniform_int_distribution<int> high_low_dist(0, 1);
-    int high_low = high_low_dist(rng);
-    torch::Tensor high_low_choice = torch::tensor({high_low}, options.dtype(torch::kInt32));
-    
-    std::cout << "\nMove 1 - High/Low choice: " << (high_low ? "High" : "Low") << std::endl;
-    state->ApplyAction(high_low_choice);
-    std::cout << "Current player after move 1: " << state->CurrentPlayer() << std::endl;
-    
-    // Print settlement value
-    auto settlement_value = trading_state->GetContractValue();
-    std::cout << "Settlement value: " << settlement_value.item<int>() << std::endl;
-    
-    // Action 3: Player role permutation
-    std::vector<int> permutation(num_players);
-    std::iota(permutation.begin(), permutation.end(), 0); // Fill with 0, 1, 2, ..., num_players-1
-    std::shuffle(permutation.begin(), permutation.end(), rng);
-    torch::Tensor perm_tensor = torch::from_blob(permutation.data(), {1, num_players}, torch::kInt32).to(device).clone();
-    
-    std::cout << "\nMove 2 - Player permutation: [";
-    for (int i = 0; i < num_players; ++i) {
-        std::cout << permutation[i];
-        if (i < num_players - 1) std::cout << ", ";
-    }
-    std::cout << "]" << std::endl;
-    
-    // Explain role assignments
-    std::cout << "Role assignments:" << std::endl;
-    for (int player = 0; player < num_players; ++player) {
-        int role = permutation[player];
-        std::cout << "  Player " << player << " -> Role " << role << " (";
-        if (role == 0 || role == 1) {
-            std::cout << "ValueCheater - knows value " << (role == 0 ? value1 : value2);
-        } else if (role == 2) {
-            std::cout << "HighLowCheater - knows settlement is " << (high_low ? "High" : "Low");
-        } else {
-            std::cout << "Customer";
+  // Register all available games
+  RegisterGames();
+  
+  // Game parameters for 2-round, 4-player game
+  GameParameters params;
+  params["steps_per_player"] = GameParameter(2);
+  params["max_contracts_per_trade"] = GameParameter(5);
+  params["customer_max_size"] = GameParameter(5);
+  params["max_contract_value"] = GameParameter(30);
+  params["players"] = GameParameter(4);
+  params["num_markets"] = GameParameter(128);  // We'll use environment 32
+  params["threads_per_block"] = GameParameter(128);
+  params["device_id"] = GameParameter(0);
+  
+  // Create the game and initial state
+  auto game = Factory(params);
+  auto state = game->NewInitialState();
+  
+  const uint32_t ENV_INDEX = 32;  // Focus on environment 32
+  const int num_envs = 128;
+  
+  // Helper to create 2D tensor for multi-column actions
+  auto make_2d_tensor = [&](const std::vector<std::vector<int>>& values, bool use_uint32 = false) {
+    int rows = values.size();
+    int cols = values[0].size();
+    torch::Tensor tensor;
+    if (use_uint32) {
+      tensor = torch::zeros({rows, cols}, torch::kUInt32);
+      auto accessor = tensor.accessor<uint32_t, 2>();
+      for (int i = 0; i < rows; ++i) {
+        for (int j = 0; j < cols; ++j) {
+          accessor[i][j] = static_cast<uint32_t>(values[i][j]);
         }
-        std::cout << ")" << std::endl;
+      }
+    } else {
+      tensor = torch::zeros({rows, cols}, torch::kInt32);
+      auto accessor = tensor.accessor<int32_t, 2>();
+      for (int i = 0; i < rows; ++i) {
+        for (int j = 0; j < cols; ++j) {
+          accessor[i][j] = values[i][j];
+        }
+      }
     }
-    
-    state->ApplyAction(perm_tensor);
-    std::cout << "Current player after move 2: " << state->CurrentPlayer() << std::endl;
-    
-    // Action 4: Customer target positions (for roles 3, 4, ..., num_players-1)
-    int num_customers = num_players - 3;
-    std::vector<int> target_positions(num_customers);
-    std::uniform_int_distribution<int> target_dist(1, customer_max_size);
-    for (int i = 0; i < num_customers; ++i) {
-        target_positions[i] = target_dist(rng);
+    return tensor.to(torch::Device(torch::kCUDA, 0));
+  };
+  
+  // Helper to create 1D tensor for single-column actions
+  auto make_1d_tensor = [&](const std::vector<int>& values) {
+    torch::Tensor tensor = torch::zeros({static_cast<int>(values.size())}, torch::kInt32);
+    auto accessor = tensor.accessor<int32_t, 1>();
+    for (int i = 0; i < values.size(); ++i) {
+      accessor[i] = values[i];
     }
-    torch::Tensor targets_tensor = torch::from_blob(target_positions.data(), {1, num_customers}, torch::kInt32).to(device).clone();
-    
-    std::cout << "\nMove 3 - Customer target positions: [";
-    for (int i = 0; i < num_customers; ++i) {
-        std::cout << target_positions[i];
-        if (i < num_customers - 1) std::cout << ", ";
+    return tensor.to(torch::Device(torch::kCUDA, 0));
+  };
+  
+  // Chance phase 1: Set candidate contract values
+  std::cout << "\n=== CHANCE PHASE 1: Setting candidate contract values ===\n";
+  std::vector<std::vector<int>> contract_values(num_envs, std::vector<int>(2));
+  // Set specific values for environment 32
+  contract_values[ENV_INDEX][0] = 10;  // First candidate value
+  contract_values[ENV_INDEX][1] = 25;  // Second candidate value
+  // Random values for other environments
+  std::mt19937 rng(42);
+  std::uniform_int_distribution<int> value_dist(1, 30);
+  for (int i = 0; i < num_envs; ++i) {
+    if (i != ENV_INDEX) {
+      contract_values[i][0] = value_dist(rng);
+      contract_values[i][1] = value_dist(rng);
     }
-    std::cout << "]" << std::endl;
-    
-    // Show which players have target positions
-    std::cout << "Target position assignments:" << std::endl;
-    for (int role = 3; role < num_players; ++role) {
-        // Find which player has this customer role
-        auto it = std::find(permutation.begin(), permutation.end(), role);
-        int player = std::distance(permutation.begin(), it);
-        std::cout << "  Player " << player << " (Customer role " << role << ") -> Target: " 
-                  << target_positions[role - 3] << " contracts" << std::endl;
+  }
+  state->ApplyAction(make_2d_tensor(contract_values));
+  
+  // Chance phase 2: High/Low settlement choice
+  std::cout << "\n=== CHANCE PHASE 2: High/Low settlement ===\n";
+  std::vector<int> high_low(num_envs);
+  high_low[ENV_INDEX] = 1;  // 1 = High (will use 25)
+  std::uniform_int_distribution<int> binary_dist(0, 1);
+  for (int i = 0; i < num_envs; ++i) {
+    if (i != ENV_INDEX) {
+      high_low[i] = binary_dist(rng);
     }
+  }
+  state->ApplyAction(make_1d_tensor(high_low));
+  
+  // Chance phase 3: Player permutation
+  std::cout << "\n=== CHANCE PHASE 3: Player role permutation ===\n";
+  std::vector<std::vector<int>> permutation(num_envs, std::vector<int>(4));
+  // For environment 32: P0=ValueCheater(0), P1=ValueCheater(1), P2=HighLowCheater(2), P3=Customer(3)
+  permutation[ENV_INDEX] = {0, 1, 2, 3};
+  for (int i = 0; i < num_envs; ++i) {
+    if (i != ENV_INDEX) {
+      permutation[i] = {0, 1, 2, 3};
+      std::shuffle(permutation[i].begin(), permutation[i].end(), rng);
+    }
+  }
+  state->ApplyAction(make_2d_tensor(permutation));
+  
+  // Chance phase 4: Customer target sizes (only 1 customer)
+  std::cout << "\n=== CHANCE PHASE 4: Customer target sizes ===\n";
+  std::vector<std::vector<int>> customer_sizes(num_envs, std::vector<int>(1));
+  customer_sizes[ENV_INDEX][0] = 3;  // Customer (Player 3) wants 3 contracts
+  std::uniform_int_distribution<int> size_dist(1, 5);
+  for (int i = 0; i < num_envs; ++i) {
+    if (i != ENV_INDEX) {
+      customer_sizes[i][0] = size_dist(rng);
+    }
+  }
+  state->ApplyAction(make_2d_tensor(customer_sizes));
+  
+  // Cast to access game-specific methods
+  auto* trading_state = static_cast<HighLowTradingState*>(state.get());
+  
+  // Print initial game state
+  std::cout << "\n=== INITIAL GAME STATE ===\n";
+  std::cout << trading_state->ToString(ENV_INDEX);
+  
+  // Trading phase - 2 rounds of 4 players each
+  torch::Tensor rewards_buffer = torch::zeros({num_envs, 4}, torch::kInt32);
+  torch::Tensor player_rewards_buffer = torch::zeros({num_envs}, torch::kInt32);
+  
+  for (int round = 0; round < 2; ++round) {
+    std::cout << "\n=== ROUND " << (round + 1) << " ===\n";
     
-    state->ApplyAction(targets_tensor);
-    std::cout << "\nCurrent player after move 3: " << state->CurrentPlayer() << std::endl;
-    std::cout << "Move number: " << state->MoveNumber() << std::endl;
-    std::cout << "Max chance nodes in history: " << game->MaxChanceNodesInHistory() << std::endl;
-    std::cout << "\nAll chance actions completed. Game is now in trading phase." << std::endl;
-    
-    return 0;
+    for (int player = 0; player < 4; ++player) {
+      std::cout << "\n--- Player " << player << "'s turn ---\n";
+      
+      // Print player's information state
+      std::cout << trading_state->InformationStateString(player, ENV_INDEX);
+      
+      // Prompt for action
+      std::cout << "\nEnter quote for Player " << player << " (bid_price ask_price bid_size ask_size): ";
+      int bid_px, ask_px, bid_sz, ask_sz;
+      std::cin >> bid_px >> ask_px >> bid_sz >> ask_sz;
+      
+      // Create action tensor for all environments
+      std::vector<std::vector<int>> quotes(num_envs, std::vector<int>(4, 0));
+      quotes[ENV_INDEX] = {bid_px, ask_px, bid_sz, ask_sz};
+      
+      // Apply the action - use uint32 for trading actions
+      state->ApplyAction(make_2d_tensor(quotes, true));
+      
+      // Get immediate rewards
+      trading_state->FillRewards(rewards_buffer);
+      auto rewards_cpu = rewards_buffer.cpu();
+      auto rewards_accessor = rewards_cpu.accessor<int32_t, 2>();
+      
+      // Get cumulative rewards since last action for current player
+      trading_state->FillRewardsSinceLastAction(player_rewards_buffer, player);
+      auto player_rewards_cpu = player_rewards_buffer.cpu();
+      auto player_rewards_accessor = player_rewards_cpu.accessor<int32_t, 1>();
+      
+      // Print rewards
+      std::cout << "\nImmediate rewards: ";
+      for (int p = 0; p < 4; ++p) {
+        std::cout << "P" << p << "=" << rewards_accessor[ENV_INDEX][p];
+        if (p < 3) std::cout << ", ";
+      }
+      std::cout << "\n";
+      
+      std::cout << "Cumulative reward since Player " << player 
+                << "'s last move: " << player_rewards_accessor[ENV_INDEX] << "\n";
+      
+      // Print updated game state
+      std::cout << "\n" << trading_state->ToString(ENV_INDEX);
+    }
+  }
+  
+  // Game is now terminal - print final results
+  std::cout << "\n=== GAME OVER ===\n";
+  std::cout << "\nFinal State:\n";
+  std::cout << trading_state->ToString(ENV_INDEX);
+  
+  // Get and print final returns
+  torch::Tensor returns_buffer = torch::zeros({num_envs, 4}, torch::kInt32);
+  trading_state->FillReturns(returns_buffer);
+  auto returns_cpu = returns_buffer.cpu();
+  auto returns_accessor = returns_cpu.accessor<int32_t, 2>();
+  
+  std::cout << "\nFinal Returns:\n";
+  for (int p = 0; p < 4; ++p) {
+    std::cout << "Player " << p << ": " << returns_accessor[ENV_INDEX][p] << "\n";
+  }
+  
+  return 0;
 }

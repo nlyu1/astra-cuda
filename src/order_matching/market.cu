@@ -429,6 +429,8 @@ BBOBatch VecMarket::NewBBOBatch() const
     batch.best_bid_sizes = torch::zeros({num_markets_}, options_u32);
     batch.best_ask_prices = torch::zeros({num_markets_}, options_u32);
     batch.best_ask_sizes = torch::zeros({num_markets_}, options_u32);
+    // Initialize last_prices with NULL_INDEX to indicate no trades yet
+    batch.last_prices = torch::full({num_markets_}, NULL_INDEX, options_u32);
     
     return batch;
 }
@@ -657,6 +659,95 @@ std::string VecMarket::ToString(uint32_t market_id) const
     ss << "#############################";
     
     return ss.str();
+}
+
+void VecMarket::Reset()
+{
+    // Reset all price level linked lists to NULL_INDEX
+    bid_heads_.fill_(NULL_INDEX);
+    ask_heads_.fill_(NULL_INDEX);
+    bid_tails_.fill_(NULL_INDEX);
+    ask_tails_.fill_(NULL_INDEX);
+    
+    // Reset order pool - no need to clear individual orders as they're invalidated by the linked lists
+    // But we should reset the next pointers to NULL_INDEX for safety
+    order_next_.fill_(NULL_INDEX);
+    
+    // Reset market state
+    order_next_slots_.zero_();  // Reset slot counters to 0
+    fill_counts_.zero_();        // Reset fill counts to 0
+    
+    // Reset customer portfolios to zero
+    customer_portfolios_.zero_();
+    
+    // Reset the global TID counter
+    global_tid_counter_ = 0;
+}
+
+// ================================================================================
+// BBOBatch IMPLEMENTATION
+// ================================================================================
+
+// CUDA kernel to update last prices based on fills
+__global__ void update_last_prices_kernel(
+    uint32_t* last_prices,
+    const uint32_t* fill_counts,
+    const uint32_t* fill_prices,
+    uint32_t num_markets,
+    uint32_t max_fills_per_market)
+{
+    uint32_t market_id = blockIdx.x * blockDim.x + threadIdx.x;
+    if (market_id >= num_markets) return;
+    
+    uint32_t fill_count = fill_counts[market_id];
+    
+    // If there were fills, update last price to the last fill's price
+    if (fill_count > 0) {
+        uint32_t last_fill_idx = fill_count - 1;
+        uint32_t price_idx = market_id * max_fills_per_market + last_fill_idx;
+        last_prices[market_id] = fill_prices[price_idx];
+    }
+    // Otherwise, last_prices[market_id] remains unchanged
+}
+
+void BBOBatch::Reset() 
+{
+    // Reset all BBO data to zeros
+    best_bid_prices.zero_();
+    best_bid_sizes.zero_();
+    best_ask_prices.zero_();
+    best_ask_sizes.zero_();
+    // Reset last_prices to NULL_INDEX to indicate no trades
+    last_prices.fill_(NULL_INDEX);
+}
+
+void BBOBatch::UpdateLastPrices(FillBatch& fills)
+{
+    // Ensure tensors are on the same device
+    ASTRA_CHECK_EQ(fills.fill_counts.device(), last_prices.device());
+    ASTRA_CHECK_EQ(fills.fill_prices.device(), last_prices.device());
+    
+    // Get dimensions
+    uint32_t num_markets = fills.fill_counts.size(0);
+    uint32_t max_fills = fills.fill_prices.size(1);
+    
+    // Launch kernel with 64 threads per block as requested
+    uint32_t threads_per_block = 64;
+    uint32_t num_blocks = (num_markets + threads_per_block - 1) / threads_per_block;
+    
+    update_last_prices_kernel<<<num_blocks, threads_per_block>>>(
+        last_prices.data_ptr<uint32_t>(),
+        fills.fill_counts.data_ptr<uint32_t>(),
+        fills.fill_prices.data_ptr<uint32_t>(),
+        num_markets,
+        max_fills
+    );
+    
+    // Check for kernel errors
+    cudaError_t error = cudaGetLastError();
+    if (error != cudaSuccess) {
+        AstraFatalError(std::string("CUDA error in UpdateLastPrices: ") + cudaGetErrorString(error));
+    }
 }
 
 }  // namespace order_matching

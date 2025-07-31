@@ -181,11 +181,29 @@ class HighLowTradingState : public State {
    
  protected:
   void DoApplyAction(torch::Tensor move) override;
+  
+  /**
+   * @brief Resets the game state to initial conditions
+   * 
+   * Called by the public Reset() method after move_number_ is reset to 0.
+   * This method resets all game-specific state including:
+   * - All chance outcome tensors (contract values, high/low settlement, permutations)
+   * - Player target positions
+   * - Player last positions
+   * - Tracking tensors for expose_info
+   * - The underlying market (clears all orders and portfolios)
+   * 
+   * After calling DoReset(), the state is ready for a new game simulation
+   * without needing to allocate new memory.
+   */
+  void DoReset() override;
+  
   // Helper values to handle different kinds of actions 
   void ApplyCandidateValues(torch::Tensor move);
   void ApplyHighLowSettle(torch::Tensor move);
   void ApplyPermutation(torch::Tensor move);
   void ApplyCustomerSize(torch::Tensor move);
+  void ApplyPlayerTrading(torch::Tensor move);
   const HighLowTradingGame* GetGame() const;
 
  private:
@@ -193,7 +211,7 @@ class HighLowTradingState : public State {
   int num_players_;
   int steps_per_player_;
   int device_id_; 
-  std::string PublicInformationString() const; 
+  std::string PublicInformationString(uint32_t index) const; 
   /* N = num_envs, P=num_players, T=rounds_per_player */
   torch::Tensor contract_values_; // [N, 3] denoting 2 candidate values and settlement value. Int
   torch::Tensor contract_high_settle_; // [N] bool 
@@ -201,12 +219,20 @@ class HighLowTradingState : public State {
   torch::Tensor player_permutation_; // [N, P]
   torch::Tensor inv_permutation_; // [N, P]
   torch::Tensor target_positions_; // [N, P]
+  torch::Tensor player_last_positions_; // [N, P, 2]; player's positions prior to last move (by any player)
+
+  torch::Tensor immediate_rewards_; // [N, P]. Reward resulting from last action by any player
+  torch::Tensor rewards_since_last_action_; // [N, P]. Reward since last action by self; includes immediate_rewards_ at all times
 
   order_matching::VecMarket market_; 
 
   // Purely for ExposeInfo uses
-  torch::Tensor player_contract_over_time_; // [N, P, T, 5] int standing for (bid_px, ask_px, bid_sz, ask_sz, contract_position)
-  torch::Tensor market_contract_over_time_; // [N*P, 2+1+1] int (best bid px, best ask px, last_price, volume)
+  torch::Tensor player_contract_over_time_; // [N, P, T, 6] int standing for (bid_px, ask_px, bid_sz, ask_sz, contract_position, cash_position)
+  torch::Tensor market_contract_over_time_; // [N*P, 2+1] int (best bid px, best ask px, last_price)
+
+  // See `market.h` 
+  order_matching::BBOBatch bbo_batch_; 
+  order_matching::FillBatch fill_batch_; 
 };
 
 class HighLowTradingGame : public Game {

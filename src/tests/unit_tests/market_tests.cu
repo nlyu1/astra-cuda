@@ -553,6 +553,258 @@ void TestExecutionPrice() {
     cout << "✅ Execution price test PASSED" << endl;
 }
 
+// Test 10: Last Price Tracking
+void TestLastPriceTracking() {
+    cout << "\n=== Test 10: Last Price Tracking ===" << endl;
+    
+    const uint32_t num_markets = 3;
+    VecMarket market(num_markets, 128, 1024, 512);
+    auto fills = market.NewFillBatch();
+    auto bbo = market.NewBBOBatch();
+    
+    // Initial state - no trades yet
+    market.GetBBOs(bbo);
+    auto last_prices = bbo.last_prices.cpu();
+    for (uint32_t i = 0; i < num_markets; ++i) {
+        assert(tensor_item_u32(last_prices[i]) == NULL_INDEX);
+    }
+    cout << "✓ Initial last prices are NULL_INDEX" << endl;
+    
+    // Execute trades at different prices in each market
+    cout << "\nExecuting trades in all markets:" << endl;
+    torch::Tensor bid_prices = torch::tensor({50, 60, 70}, torch::kUInt32);
+    torch::Tensor bid_sizes = torch::tensor({100, 200, 300}, torch::kUInt32);
+    torch::Tensor ask_prices = torch::tensor({50, 60, 70}, torch::kUInt32);
+    torch::Tensor ask_sizes = torch::tensor({50, 100, 150}, torch::kUInt32);
+    torch::Tensor customer_ids = torch::zeros({num_markets}, torch::kUInt32);
+    
+    market.AddTwoSidedQuotes(bid_prices, bid_sizes, ask_prices, ask_sizes, customer_ids, fills);
+    
+    // Update last prices based on fills
+    bbo.UpdateLastPrices(fills);
+    last_prices = bbo.last_prices.cpu();
+    
+    // Verify last prices match execution prices
+    assert(tensor_item_u32(last_prices[0]) == 50);
+    assert(tensor_item_u32(last_prices[1]) == 60);
+    assert(tensor_item_u32(last_prices[2]) == 70);
+    cout << "✓ Last prices updated correctly: [50, 60, 70]" << endl;
+    
+    // Execute more trades, but only in market 1
+    cout << "\nExecuting additional trade only in market 1:" << endl;
+    bid_prices = torch::tensor({0, 65, 0}, torch::kUInt32);
+    bid_sizes = torch::tensor({0, 50, 0}, torch::kUInt32);
+    ask_prices = torch::tensor({0, 65, 0}, torch::kUInt32);
+    ask_sizes = torch::tensor({0, 25, 0}, torch::kUInt32);
+    customer_ids = torch::ones({num_markets}, torch::kUInt32);
+    
+    market.AddTwoSidedQuotes(bid_prices, bid_sizes, ask_prices, ask_sizes, customer_ids, fills);
+    bbo.UpdateLastPrices(fills);
+    last_prices = bbo.last_prices.cpu();
+    
+    // Markets 0 and 2 should keep their last prices, market 1 should update
+    assert(tensor_item_u32(last_prices[0]) == 50);  // Unchanged
+    assert(tensor_item_u32(last_prices[1]) == 65);  // Updated
+    assert(tensor_item_u32(last_prices[2]) == 70);  // Unchanged
+    cout << "✓ Last prices correctly preserved/updated: [50, 65, 70]" << endl;
+    
+    cout << "✅ Last price tracking test PASSED" << endl;
+}
+
+// Test 11: Last Price with Multiple Fills
+void TestLastPriceMultipleFills() {
+    cout << "\n=== Test 11: Last Price with Multiple Fills ===" << endl;
+    
+    const uint32_t num_markets = 1;
+    VecMarket market(num_markets, 128, 1024, 512);
+    auto fills = market.NewFillBatch();
+    auto bbo = market.NewBBOBatch();
+    
+    // Add multiple orders at different prices
+    cout << "Adding 3 buy orders at different prices:" << endl;
+    for (uint32_t i = 0; i < 3; ++i) {
+        torch::Tensor bid_prices = torch::full({1}, 50 + i * 5, torch::kUInt32);  // 50, 55, 60
+        torch::Tensor bid_sizes = torch::full({1}, 100, torch::kUInt32);
+        torch::Tensor ask_prices = torch::zeros({1}, torch::kUInt32);
+        torch::Tensor ask_sizes = torch::zeros({1}, torch::kUInt32);
+        torch::Tensor customer_ids = torch::full({1}, i, torch::kUInt32);
+        
+        market.AddTwoSidedQuotes(bid_prices, bid_sizes, ask_prices, ask_sizes, customer_ids, fills);
+        cout << "  Added buy order at price " << 50 + i * 5 << endl;
+    }
+    
+    // Add a large sell order that matches all buys
+    cout << "\nAdding sell order at price 50 to match all buys:" << endl;
+    torch::Tensor bid_prices = torch::zeros({1}, torch::kUInt32);
+    torch::Tensor bid_sizes = torch::zeros({1}, torch::kUInt32);
+    torch::Tensor ask_prices = torch::full({1}, 50, torch::kUInt32);
+    torch::Tensor ask_sizes = torch::full({1}, 300, torch::kUInt32);
+    torch::Tensor customer_ids = torch::full({1}, 3, torch::kUInt32);
+    
+    market.AddTwoSidedQuotes(bid_prices, bid_sizes, ask_prices, ask_sizes, customer_ids, fills);
+    
+    // Check that we got multiple fills
+    auto fill_counts = fills.fill_counts.cpu();
+    uint32_t num_fills = tensor_item_u32(fill_counts[0]);
+    cout << "Number of fills: " << num_fills << endl;
+    assert(num_fills == 3);
+    
+    // Update last prices
+    bbo.UpdateLastPrices(fills);
+    auto last_prices = bbo.last_prices.cpu();
+    
+    // Last price should be from the last fill (lowest bid at 50)
+    auto fill_prices = fills.fill_prices.cpu();
+    auto prices_acc = fill_prices.accessor<uint32_t, 2>();
+    uint32_t last_fill_price = prices_acc[0][num_fills - 1];
+    
+    assert(tensor_item_u32(last_prices[0]) == last_fill_price);
+    cout << "✓ Last price correctly set to last fill price: " << last_fill_price << endl;
+    
+    cout << "✅ Last price with multiple fills test PASSED" << endl;
+}
+
+// Test 12: Reset and Last Price Interaction
+void TestResetAndLastPrice() {
+    cout << "\n=== Test 12: Reset and Last Price Interaction ===" << endl;
+    
+    const uint32_t num_markets = 2;
+    VecMarket market(num_markets, 128, 1024, 512);
+    auto fills = market.NewFillBatch();
+    auto bbo = market.NewBBOBatch();
+    
+    // Execute some trades
+    cout << "Executing initial trades:" << endl;
+    torch::Tensor bid_prices = torch::tensor({45, 55}, torch::kUInt32);
+    torch::Tensor bid_sizes = torch::tensor({100, 200}, torch::kUInt32);
+    torch::Tensor ask_prices = torch::tensor({45, 55}, torch::kUInt32);
+    torch::Tensor ask_sizes = torch::tensor({100, 200}, torch::kUInt32);
+    torch::Tensor customer_ids = torch::zeros({num_markets}, torch::kUInt32);
+    
+    market.AddTwoSidedQuotes(bid_prices, bid_sizes, ask_prices, ask_sizes, customer_ids, fills);
+    bbo.UpdateLastPrices(fills);
+    
+    // Verify trades happened and last prices are set
+    auto last_prices = bbo.last_prices.cpu();
+    assert(tensor_item_u32(last_prices[0]) == 45);
+    assert(tensor_item_u32(last_prices[1]) == 55);
+    cout << "✓ Initial last prices: [45, 55]" << endl;
+    
+    // Reset market
+    cout << "\nResetting market..." << endl;
+    market.Reset();
+    
+    // BBOBatch still has old last prices
+    last_prices = bbo.last_prices.cpu();
+    assert(tensor_item_u32(last_prices[0]) == 45);
+    assert(tensor_item_u32(last_prices[1]) == 55);
+    cout << "✓ BBOBatch retains last prices after market reset" << endl;
+    
+    // Add new orders that don't cross (no fills)
+    cout << "\nAdding non-crossing orders:" << endl;
+    bid_prices = torch::tensor({30, 40}, torch::kUInt32);
+    bid_sizes = torch::tensor({50, 100}, torch::kUInt32);
+    ask_prices = torch::tensor({35, 45}, torch::kUInt32);
+    ask_sizes = torch::tensor({50, 100}, torch::kUInt32);
+    customer_ids = torch::zeros({num_markets}, torch::kUInt32);
+    
+    market.AddTwoSidedQuotes(bid_prices, bid_sizes, ask_prices, ask_sizes, customer_ids, fills);
+    bbo.UpdateLastPrices(fills);
+    
+    // Last prices should remain unchanged (no new fills)
+    last_prices = bbo.last_prices.cpu();
+    assert(tensor_item_u32(last_prices[0]) == 45);
+    assert(tensor_item_u32(last_prices[1]) == 55);
+    cout << "✓ Last prices unchanged after no fills: [45, 55]" << endl;
+    
+    // Reset BBOBatch
+    cout << "\nResetting BBOBatch..." << endl;
+    bbo.Reset();
+    last_prices = bbo.last_prices.cpu();
+    assert(tensor_item_u32(last_prices[0]) == NULL_INDEX);
+    assert(tensor_item_u32(last_prices[1]) == NULL_INDEX);
+    cout << "✓ BBOBatch reset clears last prices to NULL_INDEX" << endl;
+    
+    // Execute new trades
+    cout << "\nExecuting new trades after reset:" << endl;
+    bid_prices = torch::tensor({40, 50}, torch::kUInt32);
+    bid_sizes = torch::tensor({75, 125}, torch::kUInt32);
+    ask_prices = torch::tensor({35, 45}, torch::kUInt32);
+    ask_sizes = torch::tensor({75, 125}, torch::kUInt32);
+    customer_ids = torch::ones({num_markets}, torch::kUInt32);
+    
+    market.AddTwoSidedQuotes(bid_prices, bid_sizes, ask_prices, ask_sizes, customer_ids, fills);
+    bbo.UpdateLastPrices(fills);
+    
+    // New last prices should be from new trades
+    last_prices = bbo.last_prices.cpu();
+    assert(tensor_item_u32(last_prices[0]) == 40);  // Bid was resting
+    assert(tensor_item_u32(last_prices[1]) == 50);  // Bid was resting
+    cout << "✓ New last prices after reset: [40, 50]" << endl;
+    
+    cout << "✅ Reset and last price interaction test PASSED" << endl;
+}
+
+// Test 13: Last Price Persistence Across BBOBatch Instances
+void TestLastPricePersistence() {
+    cout << "\n=== Test 13: Last Price Persistence Across BBOBatch Instances ===" << endl;
+    
+    const uint32_t num_markets = 2;
+    VecMarket market(num_markets, 128, 1024, 512);
+    auto fills = market.NewFillBatch();
+    
+    // Create first BBOBatch and execute trades
+    auto bbo1 = market.NewBBOBatch();
+    cout << "Creating first BBOBatch and executing trades..." << endl;
+    
+    torch::Tensor bid_prices = torch::tensor({100, 200}, torch::kUInt32);
+    torch::Tensor bid_sizes = torch::tensor({50, 100}, torch::kUInt32);
+    torch::Tensor ask_prices = torch::tensor({100, 200}, torch::kUInt32);
+    torch::Tensor ask_sizes = torch::tensor({50, 100}, torch::kUInt32);
+    torch::Tensor customer_ids = torch::zeros({num_markets}, torch::kUInt32);
+    
+    market.AddTwoSidedQuotes(bid_prices, bid_sizes, ask_prices, ask_sizes, customer_ids, fills);
+    bbo1.UpdateLastPrices(fills);
+    
+    auto last_prices1 = bbo1.last_prices.cpu();
+    assert(tensor_item_u32(last_prices1[0]) == 100);
+    assert(tensor_item_u32(last_prices1[1]) == 200);
+    cout << "✓ BBOBatch 1 last prices: [100, 200]" << endl;
+    
+    // Create second BBOBatch - should start fresh
+    auto bbo2 = market.NewBBOBatch();
+    auto last_prices2 = bbo2.last_prices.cpu();
+    assert(tensor_item_u32(last_prices2[0]) == NULL_INDEX);
+    assert(tensor_item_u32(last_prices2[1]) == NULL_INDEX);
+    cout << "✓ BBOBatch 2 starts with NULL_INDEX last prices" << endl;
+    
+    // Execute more trades and update only bbo2
+    cout << "\nExecuting more trades and updating only BBOBatch 2..." << endl;
+    bid_prices = torch::tensor({110, 210}, torch::kUInt32);
+    bid_sizes = torch::tensor({25, 50}, torch::kUInt32);
+    ask_prices = torch::tensor({110, 210}, torch::kUInt32);
+    ask_sizes = torch::tensor({25, 50}, torch::kUInt32);
+    customer_ids = torch::ones({num_markets}, torch::kUInt32);
+    
+    market.AddTwoSidedQuotes(bid_prices, bid_sizes, ask_prices, ask_sizes, customer_ids, fills);
+    bbo2.UpdateLastPrices(fills);
+    
+    // Check that bbo1 is unchanged and bbo2 is updated
+    last_prices1 = bbo1.last_prices.cpu();
+    last_prices2 = bbo2.last_prices.cpu();
+    
+    assert(tensor_item_u32(last_prices1[0]) == 100);  // Unchanged
+    assert(tensor_item_u32(last_prices1[1]) == 200);  // Unchanged
+    assert(tensor_item_u32(last_prices2[0]) == 110);  // Updated
+    assert(tensor_item_u32(last_prices2[1]) == 210);  // Updated
+    
+    cout << "✓ BBOBatch 1 unchanged: [100, 200]" << endl;
+    cout << "✓ BBOBatch 2 updated: [110, 210]" << endl;
+    cout << "✓ BBOBatch instances are independent" << endl;
+    
+    cout << "✅ Last price persistence test PASSED" << endl;
+}
+
 int main() {
     cout << "========================================" << endl;
     cout << "GPU Astra Market Implementation Tests" << endl;
@@ -568,6 +820,10 @@ int main() {
         TestCrossMarketFillCounts();
         TestPriceCrossingLogic();
         TestExecutionPrice();
+        TestLastPriceTracking();
+        TestLastPriceMultipleFills();
+        TestResetAndLastPrice();
+        TestLastPricePersistence();
         
         cout << "\n========================================" << endl;
         cout << "✅ ALL TESTS PASSED!" << endl;
