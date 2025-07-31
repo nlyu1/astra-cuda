@@ -364,7 +364,7 @@ void HighLowTradingState::DoReset() {
   rewards_since_last_action_.zero_();
   market_.Reset();
   bbo_batch_.Reset();
-  // fill_batch_.Reset(); No need to change fill_batch since there aren't any running stats. 
+  fill_batch_.Reset(); 
 }
 
 const HighLowTradingGame* HighLowTradingState::GetGame() const {

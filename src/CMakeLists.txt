@@ -162,6 +162,11 @@ set_property(TARGET main PROPERTY CXX_STANDARD 20)
 set_property(TARGET main PROPERTY INTERPROCEDURAL_OPTIMIZATION FALSE) # Disable LTO for main to avoid linking issues
 target_link_libraries(main ${ASTRA_OBJECTS})
 
+add_executable(debug_probe debug_probe.cc)
+set_property(TARGET debug_probe PROPERTY CXX_STANDARD 20)
+set_property(TARGET debug_probe PROPERTY INTERPROCEDURAL_OPTIMIZATION FALSE) # Disable LTO for main to avoid linking issues
+target_link_libraries(debug_probe ${ASTRA_OBJECTS})
+
 # building tests
 enable_testing()
 add_subdirectory(tests)

@@ -6,7 +6,7 @@
 #include <torch/torch.h>
 #include "core.h"
 #include "registration.h"
-#include "games/high_low_trading/high_low_trading.h"
+#include "high_low_trading/high_low_trading.h"
 
 using namespace astra;
 using namespace astra::high_low_trading;

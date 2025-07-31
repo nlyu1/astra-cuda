@@ -127,6 +127,7 @@ public:
         
         for (int episode = 0; episode < num_episodes; ++episode) {
             state_->Reset();
+            std::cout << "Episode " << episode << std::endl;
             
             while (!state_->IsTerminal()) {
                 int move_number = state_->MoveNumber();
@@ -287,7 +288,7 @@ int main(int argc, char** argv) {
     
     std::vector<BenchmarkResult> results;
     
-    const int num_episodes = 100;  // Number of episodes per configuration
+    const int num_episodes = 20;  // Number of episodes per configuration
     
     std::cout << "Running benchmarks with " << num_episodes << " episodes per configuration..." << std::endl;
     std::cout << std::endl;

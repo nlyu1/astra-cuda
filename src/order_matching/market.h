@@ -87,6 +87,8 @@ class FillBatch {
               fill_tid(other.fill_tid.clone()),
               fill_quote_tid(other.fill_quote_tid.clone()),
               fill_counts(other.fill_counts.clone()) {}
+
+        void Reset(); 
 }; 
 
 // Structure for returning best bid/offer information
