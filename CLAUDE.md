@@ -2,7 +2,11 @@
 - See @usage.md for how to build the project
 
 ## Project Overview
-This project implements a vectorized CUDA-based order matching system for running parallel, independent double-auction markets on GPU.
+ASTRA is a GPU-accelerated multi-agent trading environment system that implements:
+- Vectorized CUDA-based order matching for parallel double-auction markets
+- Multi-agent trading games with imperfect information and strategic gameplay
+- Python bindings for seamless integration with deep learning frameworks
+- High-performance simulation of thousands of simultaneous trading environments
 
 ## Build System
 - **Build Tool**: CMake with CUDA support
@@ -18,18 +22,31 @@ This project implements a vectorized CUDA-based order matching system for runnin
 
 ## Project Structure
 ```
-gpu_astra/
+astra-cuda/
 ├── src/
-│   ├── CMakeLists.txt          # Main build configuration
-│   ├── order_matching/
-│   │   ├── CMakeLists.txt      # Order matching module build
-│   │   ├── market.h            # New vectorized CUDA market header
-│   │   ├── market.cc           # (To be implemented) CUDA market implementation
-│   │   ├── market_.h           # Legacy reference implementation header
-│   │   └── market_.cc          # Legacy reference implementation
-│   └── utils/
-│       └── astra_utils.h       # Utility functions and error checking
-└── build/                      # Build output directory
+│   ├── CMakeLists.txt              # Main build configuration
+│   ├── core/                       # Core game framework
+│   │   ├── core.h                  # Game/State base classes
+│   │   ├── core.cc                 # Game registration system
+│   │   └── README.md               # Core module documentation
+│   ├── games/                      # Game implementations
+│   │   └── high_low_trading/       # High-Low Trading game
+│   │       ├── high_low_trading.h  # Game definition
+│   │       └── high_low_trading.cc # Game implementation
+│   ├── order_matching/             # CUDA market engine
+│   │   ├── market.h                # Vectorized CUDA market interface
+│   │   └── market.cu               # CUDA kernel implementations
+│   ├── pybind/                     # Python bindings
+│   │   ├── bindings.cc             # Main module definition
+│   │   ├── core/                   # Core framework bindings
+│   │   └── order_matching/         # Market engine bindings
+│   ├── tests/                      # Test suite
+│   │   ├── benchmarks/             # Performance benchmarks
+│   │   ├── integration/            # Python integration tests
+│   │   └── unit_tests/             # C++ unit tests
+│   └── utils/                      # Utilities
+│       └── astra_utils.h           # Error handling and helpers
+└── build/                          # Build output directory
 ```
 
 ## Key Design Decisions
@@ -66,6 +83,10 @@ gpu_astra/
   - `get_bbo_kernel`: Extracts best bid/offer information
 - [x] Implemented VecMarket member functions (constructor, destructor, AddTwoSidedQuotes, MatchAllMarkets, GetBBOs)
 - [x] Updated CMakeLists.txt to compile CUDA implementation
+- [x] Implemented core game framework (Game/State base classes)
+- [x] Created High Low Trading game implementation
+- [x] Added Python bindings for entire system
+- [x] Created comprehensive test suite and benchmarks
 
 ### Implementation Details
 
@@ -132,14 +153,74 @@ gpu_astra/
 #### Removed Unnecessary Atomics:
 After user feedback, removed all atomic operations from add_orders_kernel since markets are independent and each thread handles exactly one market. TID is now a read-only value passed to the kernel, with the global counter maintained on the host and incremented after kernel completion.
 
+### Game Implementations
+
+#### High Low Trading Game
+A multi-agent trading game with imperfect information where players trade contracts with asymmetric information:
+- **Players**: 4-10 agents with different roles (ValueCheaters, HighLowCheater, Customers)
+- **Information Asymmetry**: Different players know different aspects of the contract value
+- **Market Mechanism**: Continuous double auction via CUDA market engine
+- **Objective**: Maximize profit while meeting position requirements (for customers)
+- **Features**:
+  - Vectorized across thousands of parallel game instances
+  - PyTorch tensor interface for RL training
+  - Configurable game parameters
+  - Detailed observation/information state tensors
+
+### Python Bindings
+
+The project provides comprehensive Python bindings via pybind11:
+
+```python
+import astra_cuda
+
+# Register all available games
+astra_cuda.register_games()
+
+# Create a game instance with custom parameters
+game = astra_cuda.load_game("high_low_trading", {
+    "players": 5,
+    "num_markets": 32768,
+    "device_id": 0,
+    "threads_per_block": 256
+})
+
+# Initialize state
+state = game.new_initial_state()
+
+# Game loop
+while not state.is_terminal():
+    # Get observations
+    obs = torch.zeros(game.observation_tensor_shape(), device='cuda:0')
+    state.fill_observation_tensor(obs)
+    
+    # Apply action (from your policy)
+    action = policy(obs)  # Your RL policy
+    state.apply_action(action)
+    
+    # Get rewards
+    rewards = torch.zeros((num_markets, num_players), device='cuda:0')
+    state.fill_rewards(rewards)
+```
+
+### Performance Benchmarks
+
+On NVIDIA RTX 5090:
+- **Peak Throughput**: 164M+ FPS with 262,144 parallel environments
+- **Optimal Config**: 1024 blocks × 256 threads/block
+- **Step Latency**: ~1.55ms average
+
+On NVIDIA RTX 4060 Ti:
+- **Peak Throughput**: 39M+ FPS with 131,072 parallel environments
+- **Optimal Config**: 512 blocks × 256 threads/block
+- **Step Latency**: ~3.21ms average
+
 ### Next Steps
-1. Create unit tests for verification
-2. Test the implementation with sample data
-3. Benchmark performance vs legacy implementation
-4. Optimize kernel performance if needed
-5. Add error handling and edge case validation
-6. Create comprehensive unit tests comparing CUDA vs legacy implementation
-7. Profile and optimize kernel performance
+1. Implement additional trading games and market mechanisms
+2. Add more sophisticated order types (limit orders with time-in-force, etc.)
+3. Integrate with popular RL frameworks (RLlib, Stable-Baselines3)
+4. Optimize memory usage for even larger batch sizes
+5. Add distributed training support across multiple GPUs
 
 ## Technical Specifications
 
