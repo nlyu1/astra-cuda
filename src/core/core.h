@@ -155,11 +155,7 @@ struct GameInfo {
 };
 
 // Python exposable information 
-using ExposeValue = std::variant<
-    int, float, std::string, torch::Tensor, 
-    std::vector<int>, std::vector<float>, std::vector<std::string>, 
-    std::vector<std::vector<int>>, std::vector<std::vector<float>>, std::vector<std::vector<std::string>>>;
-using ExposeInfo = std::unordered_map<std::string, ExposeValue>;
+using ExposeInfo = std::unordered_map<std::string, torch::Tensor>;
 
 std::ostream& operator<<(std::ostream& os, const StateType& type);
 std::ostream& operator<<(std::ostream& stream, GameType::Dynamics value); // check 
