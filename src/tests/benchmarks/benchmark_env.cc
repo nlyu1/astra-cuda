@@ -119,6 +119,9 @@ public:
         else return trading_action_;
     }
     
+    torch::Tensor observation_buffer_ = torch::zeros(
+        hlt_game_->ObservationTensorShape(), torch::TensorOptions().dtype(torch::kFloat32).device(device_));
+    
     BenchmarkResult RunBenchmark(int num_episodes) {
         auto start_time = std::chrono::high_resolution_clock::now();
         double max_step_time_ms = 0.0;
@@ -141,6 +144,7 @@ public:
                 state_->ApplyAction(action);
                 
                 // Fill immediate rewards after each step
+                state_->FillObservationTensor(observation_buffer_);
                 hlt_state_->FillRewards(immediate_rewards_);
                 
                 // If it's a player action, also get cumulative rewards since last action

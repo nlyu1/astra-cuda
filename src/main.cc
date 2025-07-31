@@ -120,8 +120,8 @@ int main() {
   std::cout << trading_state->ToString(ENV_INDEX);
   
   // Trading phase - 2 rounds of 4 players each
-  torch::Tensor rewards_buffer = torch::zeros({num_envs, 4}, torch::kInt32);
-  torch::Tensor player_rewards_buffer = torch::zeros({num_envs}, torch::kInt32);
+  torch::Tensor rewards_buffer = torch::zeros({num_envs, 4}, torch::kInt32).to(torch::Device(torch::kCUDA, 0));
+  torch::Tensor player_rewards_buffer = torch::zeros({num_envs}, torch::kInt32).to(torch::Device(torch::kCUDA, 0));
   
   for (int round = 0; round < 2; ++round) {
     std::cout << "\n=== ROUND " << (round + 1) << " ===\n";
@@ -141,6 +141,18 @@ int main() {
       std::vector<std::vector<int>> quotes(num_envs, std::vector<int>(4, 0));
       quotes[ENV_INDEX] = {bid_px, ask_px, bid_sz, ask_sz};
       
+      // Generate valid random quotes for other environments
+      std::uniform_int_distribution<int> price_dist(1, 30);
+      std::uniform_int_distribution<int> size_dist(0, 5);
+      for (int i = 0; i < num_envs; ++i) {
+        if (i != ENV_INDEX) {
+          quotes[i][0] = price_dist(rng);  // bid_price
+          quotes[i][1] = price_dist(rng);  // ask_price
+          quotes[i][2] = size_dist(rng);   // bid_size
+          quotes[i][3] = size_dist(rng);   // ask_size
+        }
+      }
+      
       // Apply the action - use uint32 for trading actions
       state->ApplyAction(make_2d_tensor(quotes));
       
@@ -149,21 +161,23 @@ int main() {
       auto rewards_cpu = rewards_buffer.cpu();
       auto rewards_accessor = rewards_cpu.accessor<int32_t, 2>();
       
-      // Get cumulative rewards since last action for current player
-      trading_state->FillRewardsSinceLastAction(player_rewards_buffer, player);
-      auto player_rewards_cpu = player_rewards_buffer.cpu();
-      auto player_rewards_accessor = player_rewards_cpu.accessor<int32_t, 1>();
-      
-      // Print rewards
-      std::cout << "\nImmediate rewards: ";
+      // Get cumulative rewards since last action for ALL players
+      std::cout << "\nImmediate rewards from this action:\n";
       for (int p = 0; p < 4; ++p) {
-        std::cout << "P" << p << "=" << rewards_accessor[ENV_INDEX][p];
-        if (p < 3) std::cout << ", ";
+        std::cout << "  Player " << p << ": " << rewards_accessor[ENV_INDEX][p] << "\n";
       }
-      std::cout << "\n";
       
-      std::cout << "Cumulative reward since Player " << player 
-                << "'s last move: " << player_rewards_accessor[ENV_INDEX] << "\n";
+      std::cout << "\nCumulative rewards since each player's last action:\n";
+      for (int p = 0; p < 4; ++p) {
+        trading_state->FillRewardsSinceLastAction(player_rewards_buffer, p);
+        auto player_rewards_cpu = player_rewards_buffer.cpu();
+        auto player_rewards_accessor = player_rewards_cpu.accessor<int32_t, 1>();
+        std::cout << "  Player " << p << ": " << player_rewards_accessor[ENV_INDEX];
+        if (p == player) {
+          std::cout << " (current player)";
+        }
+        std::cout << "\n";
+      }
       
       // Print updated game state
       std::cout << "\n" << trading_state->ToString(ENV_INDEX);
@@ -176,7 +190,7 @@ int main() {
   std::cout << trading_state->ToString(ENV_INDEX);
   
   // Get and print final returns
-  torch::Tensor returns_buffer = torch::zeros({num_envs, 4}, torch::kInt32);
+  torch::Tensor returns_buffer = torch::zeros({num_envs, 4}, torch::kInt32).to(torch::Device(torch::kCUDA, 0));
   trading_state->FillReturns(returns_buffer);
   auto returns_cpu = returns_buffer.cpu();
   auto returns_accessor = returns_cpu.accessor<int32_t, 2>();

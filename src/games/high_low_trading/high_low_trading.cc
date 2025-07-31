@@ -523,96 +523,95 @@ std::unique_ptr<State> HighLowTradingState::Clone() const {
   return std::unique_ptr<State>(new HighLowTradingState(*this));
 }
 
-std::vector<int> HighLowTradingGame::InformationStateTensorShape() const {
-  // See `high_low_trading.h` for what each entry means 
-  return {11 + GetStepsPerPlayer() * GetNumPlayers() * 6 + GetNumPlayers() * 2};
+std::vector<int64_t> HighLowTradingGame::InformationStateTensorShape() const {
+  AstraFatalError("InformationStateTensorShape not implemented");
 }
 
 void HighLowTradingState::FillInformationStateTensor(Player player,
   torch::Tensor values) const {
   ASTRA_CHECK_GE(player, 0);
   ASTRA_CHECK_LT(player, GetGame()->NumPlayers());
-  values.fill_(0);
-  // int offset = 0;
-  
-  // // 1. Game setup (5): [num_steps, max_contracts_per_trade, customer_max_size, max_contract_value, players]
-  // values[offset++] = static_cast<ObservationScalarType>(GetGame()->GetStepsPerPlayer());
-  // values[offset++] = static_cast<ObservationScalarType>(GetGame()->GetMaxContractsPerTrade());
-  // values[offset++] = static_cast<ObservationScalarType>(GetGame()->GetCustomerMaxSize());
-  // values[offset++] = static_cast<ObservationScalarType>(GetGame()->GetMaxContractValue());
-  // values[offset++] = static_cast<ObservationScalarType>(GetGame()->GetNumPlayers());
-  
-  // // 2. One-hot player role (3): [is_value, is_maxmin, is_customer]
-  // if (MoveNumber() >= GetGame()->MaxChanceNodesInHistory()) {
-  //   int perm_id = player_permutation_.permutation_[player]; 
-  //   if (perm_id == 0 || perm_id == 1) {
-  //     values[offset] = 1.0; // is_value
-  //   } else if (perm_id == 2) {
-  //     values[offset + 1] = 1.0; // is_maxmin (high/low cheater)
-  //   } else {
-  //     values[offset + 2] = 1.0; // is_customer
-  //   }
-  // }
-  // offset += 3;
-  
-  // // 3. Player id (2): [sin(2 pi player_id / players), cos(2 pi player_id / players)]
-  // double angle = 2.0 * M_PI * player / GetGame()->GetNumPlayers();
-  // values[offset++] = static_cast<ObservationScalarType>(std::sin(angle));
-  // values[offset++] = static_cast<ObservationScalarType>(std::cos(angle));
-  
-  // // 4. Private information (1): [contract value, max / min, customer target size]
-  // if (MoveNumber() >= GetGame()->MaxChanceNodesInHistory()) {
-  //   int perm_id = player_permutation_.permutation_[player]; 
-  //   if (perm_id == 0 || perm_id == 1) {
-  //     values[offset] = static_cast<ObservationScalarType>(contract_values_[perm_id].contract_value_);
-  //   } else if (perm_id == 2) {
-  //     values[offset] = contract_high_settle_.is_high_ ? 1.0 : -1.0;
-  //   } else {
-  //     values[offset] = static_cast<ObservationScalarType>(player_target_positions_[player]);
-  //   }
-  // }
-  // offset += 1;
-  
-  // // 5. Positions (num_players, 2): [num_contracts, cash_position] - fixed length first
-  // int num_players = GetGame()->GetNumPlayers();
-  // for (int p = 0; p < num_players; ++p) {
-  //   values[offset++] = static_cast<ObservationScalarType>(player_positions_[p].num_contracts);
-  //   values[offset++] = static_cast<ObservationScalarType>(player_positions_[p].cash_balance);
-  // }
-  
-  // // 6. Quotes: [bid_px, ask_px, bid_sz, ask_sz, *player_id] - fill remaining space
-  // for (int quote_idx = 0; quote_idx < static_cast<int>(player_quotes_.size()); ++quote_idx) {
-  //   const auto& quote_pair = player_quotes_[quote_idx];
-  //   int acting_player = quote_pair.first;
-  //   const auto& quote = quote_pair.second;
-    
-  //   // Assert we have enough space (InformationStateTensorShape should guarantee this)
-  //   ASTRA_CHECK_LE(offset + 6, static_cast<int>(values.size()));
-    
-  //   values[offset++] = static_cast<ObservationScalarType>(quote.bid_price_);
-  //   values[offset++] = static_cast<ObservationScalarType>(quote.ask_price_);
-  //   values[offset++] = static_cast<ObservationScalarType>(quote.bid_size_);
-  //   values[offset++] = static_cast<ObservationScalarType>(quote.ask_size_);
-    
-  //   // Player id as sin/cos
-  //   double p_angle = 2.0 * M_PI * acting_player / num_players;
-  //   values[offset++] = static_cast<ObservationScalarType>(std::sin(p_angle));
-  //   values[offset++] = static_cast<ObservationScalarType>(std::cos(p_angle));
-  // }
-}
-
-// Observations are exactly the info states. Preserve Markov condition. 
-std::vector<int> HighLowTradingGame::ObservationTensorShape() const {
-  return InformationStateTensorShape(); 
+  AstraFatalError("FillInformationStateTensor not implemented");
 }
 
 std::string HighLowTradingState::ObservationString(Player player, int32_t index) const {
-  return InformationStateString(player, index); 
+  return InformationStateString(player, index);
+}
+
+std::vector<int64_t> HighLowTradingGame::ObservationTensorShape() const {
+  return {static_cast<int64_t>(num_markets_), static_cast<int64_t>(GetNumPlayers() * 6 + 6 + 5)}; 
 }
 
 void HighLowTradingState::FillObservationTensor(Player player,
   torch::Tensor values) const {
-  return FillInformationStateTensor(player, values); 
+    ASTRA_CHECK_GE(player, 0);
+    ASTRA_CHECK_LT(player, GetGame()->NumPlayers());
+    ASTRA_CHECK_GE(MoveNumber(), GetGame()->MaxChanceNodesInHistory());
+    values.fill_(0);
+    
+    // Check tensor shape - use sizes() instead of shape()
+    auto expected_shape = GetGame()->ObservationTensorShape();
+    ASTRA_CHECK_EQ(values.sizes().size(), expected_shape.size());
+    for (size_t i = 0; i < expected_shape.size(); ++i) {
+        ASTRA_CHECK_EQ(values.size(i), expected_shape[i]);
+    }
+    
+    int offset = 0; 
+    
+    // Fill player role, id, and private information
+    // Get permutation IDs for this player across all environments
+    torch::Tensor perm_ids = player_permutation_.index({torch::indexing::Slice(), player});
+    // Create boolean masks
+    torch::Tensor value_cheater_mask = (perm_ids == 0) | (perm_ids == 1);
+    torch::Tensor high_low_cheater_mask = (perm_ids == 2);
+    torch::Tensor customer_mask = (perm_ids > 2);
+    // Fill role indicators
+    values.index({torch::indexing::Slice(), offset}) = value_cheater_mask.to(torch::kFloat32);
+    values.index({torch::indexing::Slice(), offset + 1}) = high_low_cheater_mask.to(torch::kFloat32);
+    values.index({torch::indexing::Slice(), offset + 2}) = customer_mask.to(torch::kFloat32);
+    // Fill player ID encoding
+    double angle = 2.0 * M_PI * player / GetGame()->GetNumPlayers();
+    values.index({torch::indexing::Slice(), offset + 3}).fill_(std::sin(angle));
+    values.index({torch::indexing::Slice(), offset + 4}).fill_(std::cos(angle));
+    // Fill private information based on role
+    torch::Tensor mask_val0 = (perm_ids == 0);
+    values.index_put_({mask_val0, offset + 5}, 
+                      contract_values_.index({mask_val0, 0}).to(torch::kFloat32));
+    torch::Tensor mask_val1 = (perm_ids == 1);
+    values.index_put_({mask_val1, offset + 5}, 
+                      contract_values_.index({mask_val1, 1}).to(torch::kFloat32));
+    values.index_put_({high_low_cheater_mask, offset + 5}, 
+                      contract_high_settle_.index({high_low_cheater_mask}).to(torch::kFloat32));
+    values.index_put_({customer_mask, offset + 5}, 
+                      target_positions_.index({customer_mask, player}).to(torch::kFloat32));
+    offset += 6;
+    
+    // All player's quotes and positions
+    int current_trade_move = std::max(0, MoveNumber() - GetGame()->MaxChanceNodesInHistory());
+    int current_round = current_trade_move / num_players_;
+    torch::Tensor current_round_data = player_contract_over_time_.index({
+        torch::indexing::Slice(), 
+        torch::indexing::Slice(), 
+        current_round, 
+        torch::indexing::Slice()
+    }).reshape({num_envs_, num_players_ * 6});
+    values.index({torch::indexing::Slice(), 
+                  torch::indexing::Slice(offset, offset + 6 * num_players_)}) = 
+        current_round_data.to(torch::kFloat32);
+    offset += 6 * num_players_;
+    
+    // BBOs and last trade prices
+    values.index({torch::indexing::Slice(), offset}) = 
+        bbo_batch_.best_bid_prices.to(torch::kFloat32);
+    values.index({torch::indexing::Slice(), offset + 1}) = 
+        bbo_batch_.best_ask_prices.to(torch::kFloat32);
+    values.index({torch::indexing::Slice(), offset + 2}) = 
+        bbo_batch_.best_bid_sizes.to(torch::kFloat32);
+    values.index({torch::indexing::Slice(), offset + 3}) = 
+        bbo_batch_.best_ask_sizes.to(torch::kFloat32);
+    values.index({torch::indexing::Slice(), offset + 4}) = 
+        bbo_batch_.last_prices.to(torch::kFloat32);
+    offset += 5;
 }
 
 HighLowTradingGame::HighLowTradingGame(const GameParameters& params)
@@ -726,7 +725,7 @@ std::string HighLowTradingState::PublicInformationString(int32_t index) const {
     auto fill_counts_accessor = fill_counts_cpu.accessor<int32_t, 1>();
     int32_t num_fills_for_env = fill_counts_accessor[index];
     
-    result << fmt::format("Number of fills: {}\n", num_fills_for_env);
+    result << fmt::format("Number of fills in the last round: {}\n", num_fills_for_env);
     
     if (num_fills_for_env > 0) {
       // Access fill data - these are 2D tensors [num_markets, max_fills]
@@ -765,7 +764,7 @@ std::string HighLowTradingState::PublicInformationString(int32_t index) const {
       }
     }
   } else {
-    result << "Number of fills: 0\n";
+    result << "Number of fills in the last round: 0\n";
   }
   
   // Print historical quotes from player_contract_over_time_
@@ -794,12 +793,12 @@ std::string HighLowTradingState::PublicInformationString(int32_t index) const {
   // Print market movement over time
   result << "\n--- Market Movement ---\n";
   auto market_contract_cpu = market_contract_over_time_.cpu();
-  auto market_contract_accessor = market_contract_cpu.accessor<int32_t, 2>();
+  auto market_contract_accessor = market_contract_cpu.accessor<int32_t, 3>();
   
   for (int t = 0; t < current_trade_move && t < (num_players_ * steps_per_player_); ++t) {
-    int32_t best_bid = static_cast<int32_t>(market_contract_accessor[t][0]);
-    int32_t best_ask = static_cast<int32_t>(market_contract_accessor[t][1]);
-    int32_t last_price = static_cast<int32_t>(market_contract_accessor[t][2]);
+    int32_t best_bid = static_cast<int32_t>(market_contract_accessor[index][t][0]);
+    int32_t best_ask = static_cast<int32_t>(market_contract_accessor[index][t][1]);
+    int32_t last_price = static_cast<int32_t>(market_contract_accessor[index][t][2]);
     
     result << fmt::format("Time {}: Bid: {} @ Ask: {}{}\n", 
                          t,

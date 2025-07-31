@@ -482,7 +482,7 @@ class Game : public std::enable_shared_from_this<Game> {
    // reinforcement learning and neural networks. Note: the actual information is
    // returned in a 1-D vector by State::InformationStateTensor -
    // see the documentation of that function for details of the data layout.
-   virtual std::vector<int> InformationStateTensorShape() const {
+   virtual std::vector<int64_t> InformationStateTensorShape() const {
      AstraFatalError("InformationStateTensorShape unimplemented.");
    }
  
@@ -491,7 +491,8 @@ class Game : public std::enable_shared_from_this<Game> {
    // reinforcement learning and neural networks. Note: the actual observation is
    // returned in a 1-D vector by State::ObservationTensor -
    // see the documentation of that function for details of the data layout.
-   virtual std::vector<int> ObservationTensorShape() const {
+   // Assumes that batch dimension is included. 
+   virtual std::vector<int64_t> ObservationTensorShape() const {
      AstraFatalError("ObservationTensorShape unimplemented.");
    }
  

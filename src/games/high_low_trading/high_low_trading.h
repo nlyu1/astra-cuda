@@ -239,8 +239,8 @@ class HighLowTradingGame : public Game {
   public:
     explicit HighLowTradingGame(const GameParameters& params);
     std::unique_ptr<State> NewInitialState() const override;
-    std::vector<int> InformationStateTensorShape() const override;
-    std::vector<int> ObservationTensorShape() const override;
+    std::vector<int64_t> InformationStateTensorShape() const override;
+    std::vector<int64_t> ObservationTensorShape() const override;
 
     int MaxGameLength() const override {
       return MaxChanceNodesInHistory() + GetStepsPerPlayer() * GetNumPlayers(); 

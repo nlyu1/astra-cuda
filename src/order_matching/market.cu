@@ -450,8 +450,8 @@ BBOBatch VecMarket::NewBBOBatch() const
     batch.best_bid_sizes = torch::zeros({num_markets_}, options_options_i32);
     batch.best_ask_prices = torch::zeros({num_markets_}, options_options_i32);
     batch.best_ask_sizes = torch::zeros({num_markets_}, options_options_i32);
-    // Initialize last_prices with NULL_INDEX to indicate no trades yet
-    batch.last_prices = torch::full({num_markets_}, NULL_INDEX, options_options_i32);
+    // Initialize last_prices with 0 to indicate no trades yet
+    batch.last_prices = torch::zeros({num_markets_}, options_options_i32);
     
     return batch;
 }
@@ -742,8 +742,7 @@ void BBOBatch::Reset()
     best_bid_sizes.zero_();
     best_ask_prices.zero_();
     best_ask_sizes.zero_();
-    // Reset last_prices to NULL_INDEX to indicate no trades
-    last_prices.fill_(NULL_INDEX);
+    last_prices.zero_();
 }
 
 void BBOBatch::UpdateLastPrices(FillBatch& fills)
