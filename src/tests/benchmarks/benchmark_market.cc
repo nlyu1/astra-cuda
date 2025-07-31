@@ -10,7 +10,7 @@
 #include <unistd.h>  // For getopt_long
 #include <getopt.h>  // For getopt_long structure
 
-#include "../order_matching/market.h"
+#include "market.h"
 
 #include <torch/torch.h>
 

@@ -14,6 +14,7 @@ This directory contains all tests for the Astra CUDA order matching system.
 - `benchmarks/` - Performance benchmarking tools
   - `benchmark_market.cc` - C++ benchmark for market throughput
   - `benchmark_market.py` - Python benchmark wrapper
+  - `benchmark_env.cc` - Benchmark for vectorized CUDA environment with High Low Trading game
 
 ## Running Tests
 
@@ -58,6 +59,10 @@ cd ../../build/build-release
 ./tests/benchmarks/benchmark_market -i 1  # GPU 1
 # Or run Python benchmark:
 python tests/benchmarks/benchmark_market.py
+
+# Run the vectorized environment benchmark:
+./tests/benchmarks/benchmark_env      # Default GPU 0
+./tests/benchmarks/benchmark_env 1    # GPU 1
 ```
 
 ## Test Requirements
@@ -92,3 +97,16 @@ The tests cover:
 - Execution price determination
 - Multi-GPU support
 - Python bindings functionality
+- Vectorized CUDA environment performance
+- High Low Trading game integration with CUDA markets
+
+## Benchmark Details
+
+### benchmark_env
+The vectorized environment benchmark tests the High Low Trading game with CUDA market integration:
+- Tests multiple environment counts: 64, 128, 256
+- Tests different thread block sizes: 256, 512, 1024
+- Measures step latency and frames per second (FPS)
+- Uses persistent tensors to minimize allocation overhead
+- Collects rewards at each step (immediate, cumulative, terminal)
+- Generates appropriate random actions for each game phase

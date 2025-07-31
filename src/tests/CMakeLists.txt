@@ -24,3 +24,6 @@ add_custom_target(python_tests
 # Benchmarks
 add_executable(benchmark_market benchmarks/benchmark_market.cc)
 target_link_libraries(benchmark_market PRIVATE astra_tests)
+
+add_executable(benchmark_env benchmarks/benchmark_env.cc)
+target_link_libraries(benchmark_env PRIVATE astra_tests)
