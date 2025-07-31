@@ -456,66 +456,12 @@ ExposeInfo HighLowTradingState::expose_info() const {
     AstraFatalError("ExposeInfo called on non-terminal state");
   }
   ExposeInfo info; 
-  
-  // int min_value, max_value;
-  // min_value = std::min(contract_values_[0].contract_value_, contract_values_[1].contract_value_); 
-  // max_value = std::max(contract_values_[0].contract_value_, contract_values_[1].contract_value_); 
-  // info["contract"] = torch::zeros({3}, torch::kInt32); 
-  // auto contract_tensor = std::get<torch::Tensor>(info["contract"]);
-  // auto contract_accessor = contract_tensor.accessor<int, 1>();
-  // contract_accessor[0] = min_value; 
-  // contract_accessor[1] = max_value; 
-  // contract_accessor[2] = GetContractValue(); 
 
-  // info["players"] = player_contract_over_time_; 
-  // info["market"] = market_contract_over_time_; 
-
-  // auto returns = Returns(); 
-  // info["total_return"] = std::reduce(returns.begin(), returns.end());
-  
-  // // Environment tensor: [contract_value1, contract_value2, settlement_value, customer_sizes...]
-  // // Size: 3 + number_of_customers = 3 + (NumPlayers() - 3) = NumPlayers()
-  // info["environment"] = torch::zeros({NumPlayers()}, torch::kInt32); 
-  // auto environment_tensor = std::get<torch::Tensor>(info["environment"]);
-  // auto environment_accessor = environment_tensor.accessor<int, 1>();
-  // environment_accessor[0] = contract_values_[0].contract_value_; 
-  // environment_accessor[1] = contract_values_[1].contract_value_; 
-  // environment_accessor[2] = GetContractValue(); 
-  
-  // // For each customer role (starting from role 3), get their target position
-  // for (int role_id = 3; role_id < NumPlayers(); ++role_id) {
-  //   int customer_player_id = player_permutation_.inv_permutation_[role_id]; 
-  //   environment_accessor[role_id] = player_target_positions_[customer_player_id]; 
-  // }
-
-  // info["target_positions"] = torch::zeros({NumPlayers()}, torch::kInt32); 
-  // auto target_positions_tensor = std::get<torch::Tensor>(info["target_positions"]);
-  // auto target_positions_accessor = target_positions_tensor.accessor<int, 1>();
-  // for (int i = 0; i < NumPlayers(); ++i) {
-  //   target_positions_accessor[i] = player_target_positions_[i]; 
-  // }
-  
-  // // 0, 1, 2, 3 = goodValue, badValue, highLow, customer
-  // info["info_roles"] = torch::zeros({NumPlayers()}, torch::kInt32); 
-  // auto info_roles_tensor = std::get<torch::Tensor>(info["info_roles"]);
-  // auto info_roles_accessor = info_roles_tensor.accessor<int, 1>();
-  
-  // // Only assign roles if we're past the chance phase
-  // for (int i = 0; i < NumPlayers(); ++i) {
-  //   int perm_id = player_permutation_.permutation_[i]; 
-  //   if (perm_id == 0 || perm_id == 1) {
-  //     if (contract_values_[perm_id].contract_value_ == GetContractValue()) {
-  //       info_roles_accessor[i] = 0; // goodValue
-  //     } else {
-  //       info_roles_accessor[i] = 1; // badValue
-  //     }
-  //   } else if (perm_id == 2) {
-  //     info_roles_accessor[i] = 2; // highLow
-  //   } else {
-  //     info_roles_accessor[i] = 3; // customer
-  //   }
-  // }
-  
+  info["contract"] = contract_values_.clone();
+  info["players"] = player_contract_over_time_.clone();
+  info["market"] = market_contract_over_time_.clone();
+  info["permutation"] = player_permutation_.clone();
+  info["target_positions"] = target_positions_.clone();
   return info; 
 }
 
@@ -555,7 +501,6 @@ void HighLowTradingState::FillObservationTensor(Player player,
     for (size_t i = 0; i < expected_shape.size(); ++i) {
         ASTRA_CHECK_EQ(values.size(i), expected_shape[i]);
     }
-    
     int offset = 0; 
     
     // Fill player role, id, and private information

@@ -130,51 +130,16 @@ class HighLowTradingState : public State {
   void FillRewardsSinceLastAction(torch::Tensor reward_buffer, Player player_id) const override;
   void FillReturns(torch::Tensor returns_buffer) const override;
   std::string InformationStateString(Player player, int32_t index) const override;
-  // Each player's information state tensor: 
-  // 1. Game setup & private information (11):
-  //    - Game setup (5): [num_steps, max_contracts_per_trade, customer_max_size, max_contract_value, players]
-  //    - One-hot player role (3): [is_value, is_maxmin, is_customer]
-  //    - Player id (2): *player_id = [sin(2 pi player_id / players), cos(...)]. *player_id is always denoted with sin and cos
-  //    - Private information (1): [contract value, max / min, customer target size]
-  // 2. Public information (num_timesteps * num_players * 6 + num_players * 2): quotes, positions
-  //    - Positions (num_players, 2): [num_contracts, cash_position]
-  //    - Quotes (num_timesteps, num_players, 6): [bid_px, ask_px, bid_sz, ask_sz, *player_id]
   void FillInformationStateTensor(Player player, torch::Tensor values) const override;
   std::string ObservationString(Player player, int32_t index) const override;
+  // Each player's observation tensor:
+  // 1. Player role and private information (6)
+  //    - is_valueCheater, is_highLowCheater, is_customer, sin(id), cos(id), private_info
+  // 2. Players' quotes and positions (6 * players): [bid_px, ask_px, bid_sz, ask_sz, contract_position, cash_position]
+  // 3. Market features (6): BBO (4) and last_trade_px
   void FillObservationTensor(Player player, torch::Tensor values) const override;
   std::unique_ptr<State> Clone() const override;
   
-  // Returns game state information for analysis/visualization/training.
-  // The returned ExposeInfo map contains the following keys:
-  //
-  // "contract" - torch::Tensor (int32, shape=[3]):
-  //   [0] = minimum of the two candidate contract values
-  //   [1] = maximum of the two candidate contract values  
-  //   [2] = actual settlement value (min if "low", max if "high")
-  //
-  // "players" - torch::Tensor (float32, shape=[num_players, num_timesteps, 5]):
-  //   For each player and timestep: [bid_price, ask_price, bid_size, ask_size, position]
-  //   Updated each time a player submits quotes
-  //
-  // "market" - torch::Tensor (float32, shape=[num_timesteps*5, 5]):
-  //   For each timestep: [best_bid_price, best_ask_price, last_trade_price, buy size, sell size]
-  //   Updated after each order matching cycle
-  //
-  // "environment" - torch::Tensor (int32, shape=[num_players]):
-  //   Complete environment chance outcomes: [value1, value2, settlement_value, customer_targets...]
-  //   [0] = first candidate contract value
-  //   [1] = second candidate contract value  
-  //   [2] = actual settlement value (GetContractValue())
-  //   [3+] = customer target positions in role order (only after chance phase)
-  //
-  // "info_roles" - torch::Tensor (int32, shape=[num_players]):
-  //   Player role indicators (only valid after chance phase):
-  //   0 = goodValue (knows the contract value that will be selected)
-  //   1 = badValue (knows the contract value that will NOT be selected)
-  //   2 = highLow (knows whether "high" or "low" settlement will be chosen)
-  //   3 = customer (has a target position requirement)
-  //
-  // Note: Role assignments are only populated after MoveNumber() >= MaxChanceNodesInHistory()
   ExposeInfo expose_info() const override;
 
   torch::Tensor GetContractValue() const; 
