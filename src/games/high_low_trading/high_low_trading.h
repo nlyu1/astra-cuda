@@ -228,7 +228,7 @@ class HighLowTradingState : public State {
 
   // Purely for ExposeInfo uses
   torch::Tensor player_contract_over_time_; // [N, P, T, 6] int standing for (bid_px, ask_px, bid_sz, ask_sz, contract_position, cash_position)
-  torch::Tensor market_contract_over_time_; // [N*P, 2+1] int (best bid px, best ask px, last_price)
+  torch::Tensor market_contract_over_time_; // [N, P*T, 2+1] int (best bid px, best ask px, last_price)
 
   // See `market.h` 
   order_matching::BBOBatch bbo_batch_; 

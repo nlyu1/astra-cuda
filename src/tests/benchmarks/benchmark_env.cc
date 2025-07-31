@@ -57,7 +57,7 @@ public:
         customer_sizes_ = torch::zeros({num_envs_, num_players_ - 3}, options_i32_);
         trading_action_ = torch::zeros({num_envs_, 4}, options_i32_);
         
-        // Pre-allocate reward buffers
+        // Pre-allocate reward buffers on the correct device
         immediate_rewards_ = torch::zeros({num_envs_, num_players_}, options_i32_);
         player_rewards_ = torch::zeros({num_envs_}, options_i32_);
         terminal_rewards_ = torch::zeros({num_envs_, num_players_}, options_i32_);
@@ -145,6 +145,11 @@ public:
                 
                 // If it's a player action, also get cumulative rewards since last action
                 if (current_player >= 0) {
+                    // Debug: Check tensor shapes before calling
+                    if (player_rewards_.dim() != 1 || player_rewards_.size(0) != num_envs_) {
+                        std::cerr << "Error: player_rewards_ has wrong shape. Expected [" << num_envs_ 
+                                  << "], got " << player_rewards_.sizes() << std::endl;
+                    }
                     hlt_state_->FillRewardsSinceLastAction(player_rewards_, current_player);
                 }
                 
@@ -162,10 +167,10 @@ public:
             hlt_state_->FillReturns(terminal_rewards_);
             
             // Optionally verify rewards are reasonable
-            auto terminal_sum = terminal_rewards_.sum().item<int>();
-            if (terminal_sum == 0 && episode == 0) {
-                std::cout << "Warning: Terminal rewards sum to zero!" << std::endl;
-            }
+            // auto terminal_sum = terminal_rewards_.sum().item<int>();
+            // if (terminal_sum == 0 && episode == 0) {
+            //     std::cout << "Warning: Terminal rewards sum to zero!" << std::endl;
+            // }
         }
         
         auto end_time = std::chrono::high_resolution_clock::now();

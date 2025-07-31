@@ -12,3 +12,8 @@ cmake -S ./src -B ./build/build-release -G Ninja -DCMAKE_BUILD_TYPE=Release && c
 ./build/build-release/tests/benchmarks/benchmark_market -i 1
 ./build/build-release/tests/benchmarks/benchmark_market -i 0
 ```
+
+Quick benchmarking 
+```
+cmake -S ./src -B ./build/build-release -G Ninja -DCMAKE_BUILD_TYPE=Release && cmake --build ./build/build-release -j$(nproc) && ./build/build-release/tests/benchmark_env
+```

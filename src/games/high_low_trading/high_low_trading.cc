@@ -87,7 +87,7 @@ HighLowTradingState::HighLowTradingState(std::shared_ptr<const Game> game)
     
     // Initialize tracking tensors for ExposeInfo
     player_contract_over_time_ = torch::zeros({num_envs_, num_players_, steps_per_player_, 6}, options_i32);
-    market_contract_over_time_ = torch::zeros({num_envs_ * num_players_, 3}, options_i32); // best bid, best ask, last_price
+    market_contract_over_time_ = torch::zeros({num_envs_, num_players_ * steps_per_player_, 3}, options_i32); // best bid, best ask, last_price
 
     // Initialize reward tensors
     immediate_rewards_ = torch::zeros({num_envs_, num_players_}, options_i32);
@@ -278,13 +278,13 @@ void HighLowTradingState::ApplyPlayerTrading(torch::Tensor move) {
   market_.GetBBOs(bbo_batch_); 
   bbo_batch_.UpdateLastPrices(fill_batch_); // Update last prices based on fills
   auto cash_diff = current_positions.index({torch::indexing::Slice(), torch::indexing::Slice(), 1}) - 
-                   player_last_positions_.index({torch::indexing::Slice(), torch::indexing::Slice(), 1}); // [N, P]
+    player_last_positions_.index({torch::indexing::Slice(), torch::indexing::Slice(), 1}); // [N, P]
   // Update logging metrics for tracking market movement
   player_contract_over_time_.index({torch::indexing::Slice(), player, player_move_number, torch::indexing::Slice(0, 4)}).copy_(move);
   player_contract_over_time_.index({torch::indexing::Slice(), torch::indexing::Slice(), player_move_number, torch::indexing::Slice(4, torch::indexing::None)}).copy_(current_positions);
-  market_contract_over_time_.index({trade_move_number, 0}).copy_(bbo_batch_.best_bid_prices);
-  market_contract_over_time_.index({trade_move_number, 1}).copy_(bbo_batch_.best_ask_prices);
-  market_contract_over_time_.index({trade_move_number, 2}).copy_(bbo_batch_.last_prices);
+  market_contract_over_time_.index({torch::indexing::Slice(), trade_move_number, 0}).copy_(bbo_batch_.best_bid_prices);
+  market_contract_over_time_.index({torch::indexing::Slice(), trade_move_number, 1}).copy_(bbo_batch_.best_ask_prices);
+  market_contract_over_time_.index({torch::indexing::Slice(), trade_move_number, 2}).copy_(bbo_batch_.last_prices);
 
   // Compute how much closer we are towards the final target position
   auto previous_positions = player_last_positions_.index({torch::indexing::Slice(), torch::indexing::Slice(), 0}); // [N, P]
@@ -596,6 +596,36 @@ void HighLowTradingState::FillInformationStateTensor(Player player,
   // }
 }
 
+// Observations are exactly the info states. Preserve Markov condition. 
+std::vector<int> HighLowTradingGame::ObservationTensorShape() const {
+  return InformationStateTensorShape(); 
+}
+
+std::string HighLowTradingState::ObservationString(Player player, int32_t index) const {
+  return InformationStateString(player, index); 
+}
+
+void HighLowTradingState::FillObservationTensor(Player player,
+  torch::Tensor values) const {
+  return FillInformationStateTensor(player, values); 
+}
+
+HighLowTradingGame::HighLowTradingGame(const GameParameters& params)
+    : Game(kGameType, params),
+      steps_per_player_(ParameterValue<int>("steps_per_player")),
+      max_contracts_per_trade_(ParameterValue<int>("max_contracts_per_trade")),
+      customer_max_size_(ParameterValue<int>("customer_max_size")),
+      max_contract_value_(ParameterValue<int>("max_contract_value")),
+      num_players_(ParameterValue<int>("players")),
+      num_markets_(ParameterValue<int>("num_markets")),
+      threads_per_block_(ParameterValue<int>("threads_per_block")),
+      device_id_(ParameterValue<int>("device_id")) {
+}
+
+std::unique_ptr<State> HighLowTradingGame::NewInitialState() const {
+  return std::unique_ptr<State>(new HighLowTradingState(shared_from_this()));
+}
+
 std::string HighLowTradingState::InformationStateString(Player player, int32_t index) const {
   ASTRA_CHECK_GE(player, 0);
   ASTRA_CHECK_LT(player, GetGame()->NumPlayers());
@@ -658,36 +688,6 @@ std::string HighLowTradingState::InformationStateString(Player player, int32_t i
   }
   
   return result.str();
-}
-
-// Observations are exactly the info states. Preserve Markov condition. 
-std::vector<int> HighLowTradingGame::ObservationTensorShape() const {
-  return InformationStateTensorShape(); 
-}
-
-std::string HighLowTradingState::ObservationString(Player player, int32_t index) const {
-  return InformationStateString(player, index); 
-}
-
-void HighLowTradingState::FillObservationTensor(Player player,
-  torch::Tensor values) const {
-  return FillInformationStateTensor(player, values); 
-}
-
-HighLowTradingGame::HighLowTradingGame(const GameParameters& params)
-    : Game(kGameType, params),
-      steps_per_player_(ParameterValue<int>("steps_per_player")),
-      max_contracts_per_trade_(ParameterValue<int>("max_contracts_per_trade")),
-      customer_max_size_(ParameterValue<int>("customer_max_size")),
-      max_contract_value_(ParameterValue<int>("max_contract_value")),
-      num_players_(ParameterValue<int>("players")),
-      num_markets_(ParameterValue<int>("num_markets")),
-      threads_per_block_(ParameterValue<int>("threads_per_block")),
-      device_id_(ParameterValue<int>("device_id")) {
-}
-
-std::unique_ptr<State> HighLowTradingGame::NewInitialState() const {
-  return std::unique_ptr<State>(new HighLowTradingState(shared_from_this()));
 }
 
 std::string HighLowTradingState::PublicInformationString(int32_t index) const {
