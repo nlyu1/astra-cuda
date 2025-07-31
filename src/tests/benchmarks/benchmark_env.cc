@@ -69,51 +69,44 @@ public:
     void RandomizeActions(int move_number) {
         if (move_number == 0) {
             // First chance move: two candidate contract values [1, max_contract_value]
-            std::uniform_int_distribution<int> value_dist(1, max_contract_value_);
-            for (int i = 0; i < num_envs_; ++i) {
-                candidate_values_[i][0] = value_dist(rng_);
-                candidate_values_[i][1] = value_dist(rng_);
-            }
+            // For benchmarking, use fixed values that are different
+            candidate_values_.index({torch::indexing::Slice(), 0}).fill_(3);
+            candidate_values_.index({torch::indexing::Slice(), 1}).fill_(8);
         } else if (move_number == 1) {
             // Second chance move: high/low settlement (0 or 1)
-            std::uniform_int_distribution<int> binary_dist(0, 1);
-            for (int i = 0; i < num_envs_; ++i) {
-                high_low_settle_[i] = binary_dist(rng_);
-            }
+            // For benchmarking, alternate between high and low
+            high_low_settle_ = torch::arange(num_envs_, options_i32_) % 2;
         } else if (move_number == 2) {
             // Third chance move: permutation
-            // Generate a fixed permutation and use it for all environments
-            std::vector<int> perm(num_players_);
-            std::iota(perm.begin(), perm.end(), 0);
-            std::shuffle(perm.begin(), perm.end(), rng_);
-            
-            for (int i = 0; i < num_envs_; ++i) {
-                for (int j = 0; j < num_players_; ++j) {
-                    permutation_[i][j] = perm[j];
-                }
-            }
+            // Use a fixed permutation for all environments
+            // e.g., [0, 1, 2, 3, 4] for 5 players (no shuffle)
+            auto base_perm = torch::arange(num_players_, options_i32_);
+            permutation_ = base_perm.unsqueeze(0).repeat({num_envs_, 1});
         } else if (move_number == 3) {
             // Fourth chance move: customer sizes [-customer_max_size, customer_max_size] excluding 0
-            std::uniform_int_distribution<int> size_dist(1, customer_max_size_);
-            std::uniform_int_distribution<int> sign_dist(0, 1);
-            
-            for (int i = 0; i < num_envs_; ++i) {
-                for (int j = 0; j < num_players_ - 3; ++j) {
-                    int size = size_dist(rng_);
-                    customer_sizes_[i][j] = sign_dist(rng_) ? size : -size;
-                }
+            // Use fixed customer sizes for consistency
+            // Customers are players 3 and 4 (indices 3, 4) with the fixed permutation
+            // Give them target positions of -2 and 2
+            customer_sizes_.index({torch::indexing::Slice(), 0}).fill_(-2);
+            if (num_players_ - 3 > 1) {
+                customer_sizes_.index({torch::indexing::Slice(), 1}).fill_(2);
             }
         } else {
             // Player trading actions: [bid_px, ask_px, bid_sz, ask_sz]
-            std::uniform_int_distribution<int> price_dist(0, max_contract_value_);
-            std::uniform_int_distribution<int> size_dist(0, 10);  // Reasonable size range
+            // Only randomize trading actions for actual gameplay
             
-            for (int i = 0; i < num_envs_; ++i) {
-                trading_action_[i][0] = price_dist(rng_);  // bid_px
-                trading_action_[i][1] = price_dist(rng_);  // ask_px
-                trading_action_[i][2] = size_dist(rng_);   // bid_sz
-                trading_action_[i][3] = size_dist(rng_);   // ask_sz
-            }
+            // Generate random prices in range [1, max_contract_value]
+            auto bid_prices = torch::randint(1, max_contract_value_ + 1, 
+                                           {num_envs_}, options_i32_);
+            auto ask_prices = torch::randint(1, max_contract_value_ + 1, 
+                                           {num_envs_}, options_i32_);
+            
+            // Generate random sizes in range [0, 10]
+            auto bid_sizes = torch::randint(0, 11, {num_envs_}, options_i32_);
+            auto ask_sizes = torch::randint(0, 11, {num_envs_}, options_i32_);
+            
+            // Stack into shape [num_envs, 4]
+            trading_action_ = torch::stack({bid_prices, ask_prices, bid_sizes, ask_sizes}, /*dim=*/1);
         }
     }
     

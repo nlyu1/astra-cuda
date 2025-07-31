@@ -261,7 +261,11 @@ void HighLowTradingState::ApplyPlayerTrading(torch::Tensor move) {
   auto bid_sizes = move.index({torch::indexing::Slice(), 2}).contiguous();
   auto ask_sizes = move.index({torch::indexing::Slice(), 3}).contiguous();
   auto customer_ids = torch::ones({num_envs_}, torch::kInt32).to(torch::Device(torch::kCUDA, device_id_)) * player;
-  
+  ASTRA_CHECK_GT(torch::min(bid_prices).item<int>(), 0);
+  ASTRA_CHECK_GT(torch::min(ask_prices).item<int>(), 0);
+  ASTRA_CHECK_LE(torch::max(bid_prices).item<int>(), GetGame()->GetMaxContractValue());
+  ASTRA_CHECK_LE(torch::max(ask_prices).item<int>(), GetGame()->GetMaxContractValue());
+
   // Compute the fills 
   market_.AddTwoSidedQuotes(
     bid_prices, bid_sizes, ask_prices, ask_sizes, customer_ids, fill_batch_);
