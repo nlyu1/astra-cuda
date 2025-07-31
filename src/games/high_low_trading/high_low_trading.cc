@@ -351,8 +351,9 @@ void HighLowTradingState::FillReturns(torch::Tensor returns_buffer) const {
   auto position_diff = torch::abs(
     portfolios.index({torch::indexing::Slice(), torch::indexing::Slice(), 0}) - target_positions_);
   // returns += -is_customer * position_diff * max_value
+  // Convert bool to int to allow negation
   returns_buffer.add_(
-    -is_customer * position_diff * GetGame()->GetMaxContractValue());
+    -is_customer.to(torch::kInt32) * position_diff * GetGame()->GetMaxContractValue());
 }
 
 void HighLowTradingState::DoReset() {

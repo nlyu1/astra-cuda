@@ -32,7 +32,6 @@ struct BenchmarkResult {
     double total_time_seconds;
     double fps;  // Frames (env-steps) per second
     int total_steps;
-    int total_frames;
 };
 
 class EnvironmentBenchmark {
@@ -165,7 +164,7 @@ public:
             }
             
             // Get terminal rewards
-            // hlt_state_->FillReturns(terminal_rewards_);
+            hlt_state_->FillReturns(terminal_rewards_);
             
             // Optionally verify rewards are reasonable
             // auto terminal_sum = terminal_rewards_.sum().item<int>();
@@ -179,8 +178,7 @@ public:
         
         double total_time_seconds = duration.count() / 1000000.0;
         double avg_step_time_ms = total_step_time_ms / total_steps;
-        int total_frames = total_steps * num_envs_;
-        double fps = total_frames / total_time_seconds;
+        double fps = static_cast<double>(total_steps) * static_cast<double>(num_envs_) / total_time_seconds;
         
         // Compute num_blocks from num_envs and threads_per_block
         int threads_per_block = hlt_game_->GetThreadsPerBlock();
@@ -193,7 +191,6 @@ public:
             total_time_seconds,
             fps,
             total_steps,
-            total_frames
         };
     }
     

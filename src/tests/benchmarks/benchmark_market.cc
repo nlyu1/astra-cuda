@@ -146,7 +146,7 @@ BenchmarkResult test_market_throughput(int32_t num_markets_per_block, int32_t nu
     double total_time_seconds = duration.count() / 1000000.0;
     double latency_ms = (total_time_seconds * 1000.0) / benchmark_steps;
     double operations_per_second = benchmark_steps / total_time_seconds;
-    double markets_per_second = (static_cast<double>(benchmark_steps) * total_markets) / total_time_seconds;
+    double markets_per_second = (static_cast<double>(benchmark_steps) * static_cast<double>(total_markets)) / total_time_seconds;
     
     return BenchmarkResult{
         num_markets_per_block,
