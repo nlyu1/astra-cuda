@@ -457,11 +457,11 @@ ExposeInfo HighLowTradingState::expose_info() const {
   }
   ExposeInfo info; 
 
-  info["contract"] = contract_values_.clone();
+  // info["contract"] = contract_values_.clone();
   info["players"] = player_contract_over_time_.clone();
   info["market"] = market_contract_over_time_.clone();
-  info["permutation"] = player_permutation_.clone();
-  info["target_positions"] = target_positions_.clone();
+  // info["permutation"] = player_permutation_.clone();
+  // info["target_positions"] = target_positions_.clone();
   return info; 
 }
 

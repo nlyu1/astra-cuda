@@ -30,9 +30,6 @@ void AddCoreBindings(py::module& m) {
 
     m.def("registered_names", &GameRegistrar::RegisteredNames,
         "Get list of all registered game names");
-        
-    m.def("registered_games", &GameRegistrar::RegisteredGames,
-        "Get list of all registered game types");
 
     // State class using classh for smart pointer support
     py::classh<State> state(m, "State");
@@ -116,27 +113,6 @@ void AddCoreBindings(py::module& m) {
         .def("__eq__", [](std::shared_ptr<const Game> a, std::shared_ptr<const Game> b) {
             return b && a->GetType().short_name == b->GetType().short_name;
         });
-
-    // Game factory functions - using original names
-    m.def("CreateByName", &GameRegistrar::CreateByName, 
-          "Load a game by name with parameters",
-          py::arg("short_name"), py::arg("params") = GameParameters{});
-    
-    m.def("RegisteredNames", &GameRegistrar::RegisteredNames,
-          "Get list of all registered game names");
-    
-    m.def("RegisteredConcreteNames", &GameRegistrar::RegisteredConcreteNames,
-          "Get list of all registered concrete game names");
-          
-    m.def("RegisteredGames", &GameRegistrar::RegisteredGames,
-          "Get list of all registered game types");
-    
-    m.def("RegisteredConcreteGames", &GameRegistrar::RegisteredConcreteGames,
-          "Get list of all registered concrete game types");
-    
-    m.def("IsValidName", &GameRegistrar::IsValidName,
-          "Check if a game name is valid",
-          py::arg("short_name"));
 
     // Expose constants with original names
     m.attr("kInvalidAction") = py::int_(kInvalidAction);

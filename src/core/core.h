@@ -614,7 +614,6 @@ class GameRegistrar {
    static std::vector<std::string> RegisteredConcreteNames();
    static std::vector<GameType> RegisteredGames();
    static std::vector<GameType> RegisteredConcreteGames();
-   static bool IsValidName(const std::string& short_name);
    static void RegisterGame(const GameType& game_type, CreateFunc creator);
  
   private:
