@@ -1,0 +1,3047 @@
+=== High Low Trading CUDA Environment Benchmark ===
+Using device 0: NVIDIA GeForce RTX 5090
+
+Running benchmarks with 1 episodes per configuration...
+
+Testing 256 blocks × 256 threads/block = 65536 environments...Episode 0
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=9, Best ask=6
+  Bid head=0, Ask head=1
+  Bid size=6, Ask size=9
+  Bid customer=0, Ask customer=0
+  Bid tid=0, Ask tid=1
+  Bid price=9, Ask price=6
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=5
+  Bid head=2, Ask head=4
+  Bid size=8, Ask size=10
+  Bid customer=1, Ask customer=2
+  Bid tid=2, Ask tid=5
+  Bid price=5, Ask price=5
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=9, Best ask=3
+  Bid head=5, Ask head=6
+  Bid size=6, Ask size=9
+  Bid customer=3, Ask customer=3
+  Bid tid=6, Ask tid=7
+  Bid price=9, Ask price=3
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=3
+  Bid head=7, Ask head=6
+  Bid size=2, Ask size=3
+  Bid customer=4, Ask customer=3
+  Bid tid=8, Ask tid=7
+  Bid price=5, Ask price=3
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=3
+  Bid head=9, Ask head=6
+  Bid size=8, Ask size=1
+  Bid customer=0, Ask customer=3
+  Bid tid=10, Ask tid=7
+  Bid price=7, Ask price=3
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=7, Best ask=3
+  Bid head=9, Ask head=8
+  Bid size=7, Ask size=5
+  Bid customer=0, Ask customer=4
+  Bid tid=10, Ask tid=9
+  Bid price=7, Ask price=3
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=7, Best ask=5
+  Bid head=9, Ask head=4
+  Bid size=2, Ask size=2
+  Bid customer=0, Ask customer=2
+  Bid tid=10, Ask tid=5
+  Bid price=7, Ask price=5
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=4
+  Bid head=10, Ask head=11
+  Bid size=5, Ask size=1
+  Bid customer=1, Ask customer=1
+  Bid tid=12, Ask tid=13
+  Bid price=7, Ask price=4
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=7, Best ask=6
+  Bid head=10, Ask head=1
+  Bid size=4, Ask size=3
+  Bid customer=1, Ask customer=0
+  Bid tid=12, Ask tid=1
+  Bid price=7, Ask price=6
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=7, Best ask=7
+  Bid head=10, Ask head=3
+  Bid size=1, Ask size=6
+  Bid customer=1, Ask customer=1
+  Bid tid=12, Ask tid=3
+  Bid price=7, Ask price=7
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=7
+  Bid head=15, Ask head=3
+  Bid size=7, Ask size=5
+  Bid customer=2, Ask customer=1
+  Bid tid=24, Ask tid=3
+  Bid price=7, Ask price=7
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=7, Best ask=7
+  Bid head=15, Ask head=12
+  Bid size=2, Ask size=8
+  Bid customer=2, Ask customer=4
+  Bid tid=24, Ask tid=19
+  Bid price=7, Ask price=7
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=9, Best ask=5
+  Bid head=20, Ask head=17
+  Bid size=7, Ask size=9
+  Bid customer=0, Ask customer=3
+  Bid tid=30, Ask tid=27
+  Bid price=9, Ask price=5
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=4, Best ask=2
+  Bid head=16, Ask head=24
+  Bid size=9, Ask size=3
+  Bid customer=3, Ask customer=3
+  Bid tid=26, Ask tid=37
+  Bid price=4, Ask price=2
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=3
+  Bid head=29, Ask head=30
+  Bid size=1, Ask size=4
+  Bid customer=2, Ask customer=2
+  Bid tid=44, Ask tid=45
+  Bid price=8, Ask price=3
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=4, Best ask=3
+  Bid head=16, Ask head=30
+  Bid size=6, Ask size=3
+  Bid customer=3, Ask customer=2
+  Bid tid=26, Ask tid=45
+  Bid price=4, Ask price=3
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=1
+  Bid head=37, Ask head=38
+  Bid size=10, Ask size=4
+  Bid customer=2, Ask customer=2
+  Bid tid=54, Ask tid=55
+  Bid price=7, Ask price=1
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=7, Best ask=5
+  Bid head=37, Ask head=17
+  Bid size=6, Ask size=2
+  Bid customer=2, Ask customer=3
+  Bid tid=54, Ask tid=27
+  Bid price=7, Ask price=5
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=7, Best ask=5
+  Bid head=37, Ask head=19
+  Bid size=4, Ask size=3
+  Bid customer=2, Ask customer=4
+  Bid tid=54, Ask tid=29
+  Bid price=7, Ask price=5
+Market 0 block 0: fill_count=3, max_fills=2
+  Best bid=7, Best ask=5
+  Bid head=37, Ask head=25
+  Bid size=1, Ask size=5
+  Bid customer=2, Ask customer=4
+  Bid tid=54, Ask tid=39
+  Bid price=7, Ask price=5
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=5
+  Bid head=39, Ask head=25
+  Bid size=7, Ask size=4
+  Bid customer=3, Ask customer=4
+  Bid tid=56, Ask tid=39
+  Bid price=7, Ask price=5
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=7, Best ask=5
+  Bid head=39, Ask head=27
+  Bid size=3, Ask size=7
+  Bid customer=3, Ask customer=0
+  Bid tid=56, Ask tid=41
+  Bid price=7, Ask price=5
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=5
+  Bid head=42, Ask head=27
+  Bid size=10, Ask size=4
+  Bid customer=0, Ask customer=0
+  Bid tid=60, Ask tid=41
+  Bid price=8, Ask price=5
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=8, Best ask=5
+  Bid head=42, Ask head=33
+  Bid size=6, Ask size=7
+  Bid customer=0, Ask customer=4
+  Bid tid=60, Ask tid=49
+  Bid price=8, Ask price=5
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=5
+  Bid head=46, Ask head=33
+  Bid size=5, Ask size=1
+  Bid customer=2, Ask customer=4
+  Bid tid=64, Ask tid=49
+  Bid price=8, Ask price=5
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=8, Best ask=5
+  Bid head=46, Ask head=34
+  Bid size=4, Ask size=6
+  Bid customer=2, Ask customer=0
+  Bid tid=64, Ask tid=51
+  Bid price=8, Ask price=5
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=4, Best ask=4
+  Bid head=16, Ask head=49
+  Bid size=3, Ask size=6
+  Bid customer=3, Ask customer=3
+  Bid tid=26, Ask tid=67
+  Bid price=4, Ask price=4
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=4, Best ask=4
+  Bid head=21, Ask head=49
+  Bid size=8, Ask size=3
+  Bid customer=1, Ask customer=3
+  Bid tid=32, Ask tid=67
+  Bid price=4, Ask price=4
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=4, Best ask=4
+  Bid head=21, Ask head=51
+  Bid size=5, Ask size=9
+  Bid customer=1, Ask customer=4
+  Bid tid=32, Ask tid=69
+  Bid price=4, Ask price=4
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=4, Best ask=4
+  Bid head=52, Ask head=51
+  Bid size=5, Ask size=4
+  Bid customer=0, Ask customer=4
+  Bid tid=70, Ask tid=69
+  Bid price=4, Ask price=4
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=4
+  Bid head=56, Ask head=57
+  Bid size=2, Ask size=8
+  Bid customer=2, Ask customer=2
+  Bid tid=74, Ask tid=75
+  Bid price=5, Ask price=4
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=4, Best ask=4
+  Bid head=52, Ask head=57
+  Bid size=1, Ask size=6
+  Bid customer=0, Ask customer=2
+  Bid tid=70, Ask tid=75
+  Bid price=4, Ask price=4
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=4, Best ask=4
+  Bid head=54, Ask head=57
+  Bid size=2, Ask size=5
+  Bid customer=1, Ask customer=2
+  Bid tid=72, Ask tid=75
+  Bid price=4, Ask price=4
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=3
+  Bid head=58, Ask head=59
+  Bid size=4, Ask size=5
+  Bid customer=3, Ask customer=3
+  Bid tid=76, Ask tid=77
+  Bid price=5, Ask price=3
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=3, Best ask=3
+  Bid head=13, Ask head=59
+  Bid size=4, Ask size=1
+  Bid customer=1, Ask customer=3
+  Bid tid=22, Ask tid=77
+  Bid price=3, Ask price=3
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=9, Best ask=4
+  Bid head=60, Ask head=57
+  Bid size=9, Ask size=3
+  Bid customer=4, Ask customer=2
+  Bid tid=78, Ask tid=75
+  Bid price=9, Ask price=4
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=9, Best ask=4
+  Bid head=60, Ask head=61
+  Bid size=6, Ask size=5
+  Bid customer=4, Ask customer=4
+  Bid tid=78, Ask tid=79
+  Bid price=9, Ask price=4
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=9, Best ask=5
+  Bid head=60, Ask head=34
+  Bid size=1, Ask size=2
+  Bid customer=4, Ask customer=0
+  Bid tid=78, Ask tid=51
+  Bid price=9, Ask price=5
+ Done (FPS: 15434514)
+Testing 256 blocks × 512 threads/block = 131072 environments...Episode 0
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=2
+  Bid head=1, Ask head=4
+  Bid size=3, Ask size=2
+  Bid customer=1, Ask customer=4
+  Bid tid=2, Ask tid=9
+  Bid price=7, Ask price=2
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=4
+  Bid head=1, Ask head=6
+  Bid size=1, Ask size=6
+  Bid customer=1, Ask customer=0
+  Bid tid=2, Ask tid=11
+  Bid price=7, Ask price=4
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=5, Best ask=4
+  Bid head=0, Ask head=6
+  Bid size=2, Ask size=5
+  Bid customer=0, Ask customer=0
+  Bid tid=0, Ask tid=11
+  Bid price=5, Ask price=4
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=5, Best ask=4
+  Bid head=3, Ask head=6
+  Bid size=8, Ask size=3
+  Bid customer=3, Ask customer=0
+  Bid tid=6, Ask tid=11
+  Bid price=5, Ask price=4
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=4
+  Bid head=7, Ask head=9
+  Bid size=1, Ask size=5
+  Bid customer=1, Ask customer=2
+  Bid tid=12, Ask tid=15
+  Bid price=8, Ask price=4
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=5, Best ask=4
+  Bid head=3, Ask head=9
+  Bid size=5, Ask size=4
+  Bid customer=3, Ask customer=2
+  Bid tid=6, Ask tid=15
+  Bid price=5, Ask price=4
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=2
+  Bid head=10, Ask head=11
+  Bid size=6, Ask size=8
+  Bid customer=3, Ask customer=3
+  Bid tid=16, Ask tid=17
+  Bid price=7, Ask price=2
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=5, Best ask=2
+  Bid head=3, Ask head=11
+  Bid size=1, Ask size=2
+  Bid customer=3, Ask customer=3
+  Bid tid=6, Ask tid=17
+  Bid price=5, Ask price=2
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=3, Best ask=2
+  Bid head=2, Ask head=11
+  Bid size=6, Ask size=1
+  Bid customer=2, Ask customer=3
+  Bid tid=4, Ask tid=17
+  Bid price=3, Ask price=2
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=3, Best ask=1
+  Bid head=2, Ask head=13
+  Bid size=5, Ask size=8
+  Bid customer=2, Ask customer=4
+  Bid tid=4, Ask tid=19
+  Bid price=3, Ask price=1
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=2, Best ask=1
+  Bid head=5, Ask head=13
+  Bid size=2, Ask size=3
+  Bid customer=0, Ask customer=4
+  Bid tid=10, Ask tid=19
+  Bid price=2, Ask price=1
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=2, Best ask=1
+  Bid head=8, Ask head=13
+  Bid size=1, Ask size=1
+  Bid customer=2, Ask customer=4
+  Bid tid=14, Ask tid=19
+  Bid price=2, Ask price=1
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=4
+  Bid head=15, Ask head=17
+  Bid size=5, Ask size=4
+  Bid customer=1, Ask customer=2
+  Bid tid=22, Ask tid=25
+  Bid price=7, Ask price=4
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=1
+  Bid head=15, Ask head=19
+  Bid size=1, Ask size=4
+  Bid customer=1, Ask customer=3
+  Bid tid=22, Ask tid=27
+  Bid price=7, Ask price=1
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=7, Best ask=1
+  Bid head=16, Ask head=19
+  Bid size=5, Ask size=3
+  Bid customer=2, Ask customer=3
+  Bid tid=24, Ask tid=27
+  Bid price=7, Ask price=1
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=2
+  Bid head=20, Ask head=21
+  Bid size=10, Ask size=10
+  Bid customer=4, Ask customer=4
+  Bid tid=28, Ask tid=29
+  Bid price=8, Ask price=2
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=6
+  Bid head=16, Ask head=25
+  Bid size=2, Ask size=4
+  Bid customer=2, Ask customer=1
+  Bid tid=24, Ask tid=33
+  Bid price=7, Ask price=6
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=7, Best ask=6
+  Bid head=24, Ask head=25
+  Bid size=8, Ask size=2
+  Bid customer=1, Ask customer=1
+  Bid tid=32, Ask tid=33
+  Bid price=7, Ask price=6
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=5
+  Bid head=24, Ask head=27
+  Bid size=6, Ask size=2
+  Bid customer=1, Ask customer=2
+  Bid tid=32, Ask tid=35
+  Bid price=7, Ask price=5
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=6
+  Bid head=24, Ask head=29
+  Bid size=4, Ask size=10
+  Bid customer=1, Ask customer=3
+  Bid tid=32, Ask tid=37
+  Bid price=7, Ask price=6
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=9, Best ask=4
+  Bid head=33, Ask head=34
+  Bid size=10, Ask size=7
+  Bid customer=2, Ask customer=2
+  Bid tid=44, Ask tid=45
+  Bid price=9, Ask price=4
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=9, Best ask=6
+  Bid head=33, Ask head=29
+  Bid size=3, Ask size=6
+  Bid customer=2, Ask customer=3
+  Bid tid=44, Ask tid=37
+  Bid price=9, Ask price=6
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=6, Best ask=4
+  Bid head=37, Ask head=38
+  Bid size=9, Ask size=5
+  Bid customer=4, Ask customer=4
+  Bid tid=48, Ask tid=49
+  Bid price=6, Ask price=4
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=6, Best ask=6
+  Bid head=37, Ask head=29
+  Bid size=4, Ask size=3
+  Bid customer=4, Ask customer=3
+  Bid tid=48, Ask tid=37
+  Bid price=6, Ask price=6
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=6, Best ask=6
+  Bid head=37, Ask head=31
+  Bid size=1, Ask size=10
+  Bid customer=4, Ask customer=4
+  Bid tid=48, Ask tid=39
+  Bid price=6, Ask price=6
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=9, Best ask=6
+  Bid head=39, Ask head=31
+  Bid size=5, Ask size=9
+  Bid customer=0, Ask customer=4
+  Bid tid=50, Ask tid=39
+  Bid price=9, Ask price=6
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=6, Best ask=2
+  Bid head=40, Ask head=41
+  Bid size=1, Ask size=10
+  Bid customer=1, Ask customer=1
+  Bid tid=52, Ask tid=53
+  Bid price=6, Ask price=2
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=5, Best ask=2
+  Bid head=26, Ask head=41
+  Bid size=2, Ask size=9
+  Bid customer=2, Ask customer=1
+  Bid tid=34, Ask tid=53
+  Bid price=5, Ask price=2
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=4, Best ask=2
+  Bid head=14, Ask head=41
+  Bid size=1, Ask size=7
+  Bid customer=0, Ask customer=1
+  Bid tid=20, Ask tid=53
+  Bid price=4, Ask price=2
+Market 0 block 0: fill_count=3, max_fills=2
+  Best bid=4, Best ask=2
+  Bid head=28, Ask head=41
+  Bid size=7, Ask size=6
+  Bid customer=3, Ask customer=1
+  Bid tid=36, Ask tid=53
+  Bid price=4, Ask price=2
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=4, Best ask=3
+  Bid head=28, Ask head=43
+  Bid size=1, Ask size=6
+  Bid customer=3, Ask customer=2
+  Bid tid=36, Ask tid=55
+  Bid price=4, Ask price=3
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=4, Best ask=3
+  Bid head=42, Ask head=43
+  Bid size=1, Ask size=5
+  Bid customer=2, Ask customer=2
+  Bid tid=54, Ask tid=55
+  Bid price=4, Ask price=3
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=3, Best ask=3
+  Bid head=18, Ask head=43
+  Bid size=1, Ask size=4
+  Bid customer=3, Ask customer=2
+  Bid tid=26, Ask tid=55
+  Bid price=3, Ask price=3
+Market 0 block 0: fill_count=3, max_fills=2
+  Best bid=3, Best ask=3
+  Bid head=32, Ask head=43
+  Bid size=7, Ask size=3
+  Bid customer=0, Ask customer=2
+  Bid tid=40, Ask tid=55
+  Bid price=3, Ask price=3
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=6, Best ask=6
+  Bid head=44, Ask head=31
+  Bid size=4, Ask size=4
+  Bid customer=3, Ask customer=4
+  Bid tid=56, Ask tid=39
+  Bid price=6, Ask price=6
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=9, Best ask=3
+  Bid head=48, Ask head=49
+  Bid size=2, Ask size=5
+  Bid customer=0, Ask customer=0
+  Bid tid=60, Ask tid=61
+  Bid price=9, Ask price=3
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=4, Best ask=3
+  Bid head=46, Ask head=49
+  Bid size=6, Ask size=3
+  Bid customer=4, Ask customer=0
+  Bid tid=58, Ask tid=61
+  Bid price=4, Ask price=3
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=4, Best ask=4
+  Bid head=46, Ask head=50
+  Bid size=3, Ask size=7
+  Bid customer=4, Ask customer=1
+  Bid tid=58, Ask tid=63
+  Bid price=4, Ask price=4
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=6, Best ask=1
+  Bid head=51, Ask head=52
+  Bid size=4, Ask size=8
+  Bid customer=2, Ask customer=2
+  Bid tid=64, Ask tid=65
+  Bid price=6, Ask price=1
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=3, Best ask=1
+  Bid head=32, Ask head=52
+  Bid size=4, Ask size=4
+  Bid customer=0, Ask customer=2
+  Bid tid=40, Ask tid=65
+  Bid price=3, Ask price=1
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=1
+  Bid head=53, Ask head=54
+  Bid size=2, Ask size=9
+  Bid customer=3, Ask customer=3
+  Bid tid=66, Ask tid=67
+  Bid price=7, Ask price=1
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=3, Best ask=1
+  Bid head=35, Ask head=54
+  Bid size=8, Ask size=7
+  Bid customer=3, Ask customer=3
+  Bid tid=46, Ask tid=67
+  Bid price=3, Ask price=1
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=3, Best ask=1
+  Bid head=35, Ask head=55
+  Bid size=1, Ask size=8
+  Bid customer=3, Ask customer=4
+  Bid tid=46, Ask tid=69
+  Bid price=3, Ask price=1
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=2, Best ask=1
+  Bid head=12, Ask head=55
+  Bid size=5, Ask size=7
+  Bid customer=4, Ask customer=4
+  Bid tid=18, Ask tid=69
+  Bid price=2, Ask price=1
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=2, Best ask=1
+  Bid head=22, Ask head=55
+  Bid size=10, Ask size=2
+  Bid customer=0, Ask customer=4
+  Bid tid=30, Ask tid=69
+  Bid price=2, Ask price=1
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=4, Best ask=1
+  Bid head=56, Ask head=57
+  Bid size=8, Ask size=8
+  Bid customer=0, Ask customer=0
+  Bid tid=70, Ask tid=71
+  Bid price=4, Ask price=1
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=4
+  Bid head=58, Ask head=50
+  Bid size=3, Ask size=4
+  Bid customer=1, Ask customer=1
+  Bid tid=72, Ask tid=63
+  Bid price=7, Ask price=4
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=1
+  Bid head=60, Ask head=61
+  Bid size=1, Ask size=9
+  Bid customer=2, Ask customer=2
+  Bid tid=74, Ask tid=75
+  Bid price=5, Ask price=1
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=2, Best ask=1
+  Bid head=22, Ask head=61
+  Bid size=8, Ask size=8
+  Bid customer=0, Ask customer=2
+  Bid tid=30, Ask tid=75
+  Bid price=2, Ask price=1
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=6, Best ask=2
+  Bid head=63, Ask head=62
+  Bid size=6, Ask size=7
+  Bid customer=4, Ask customer=3
+  Bid tid=78, Ask tid=77
+  Bid price=6, Ask price=2
+ Done (FPS: 175507243)
+Testing 256 blocks × 1024 threads/block = 262144 environments...Episode 0
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=4
+  Bid head=0, Ask head=1
+  Bid size=4, Ask size=1
+  Bid customer=0, Ask customer=1
+  Bid tid=0, Ask tid=3
+  Bid price=5, Ask price=4
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=1
+  Bid head=0, Ask head=4
+  Bid size=3, Ask size=3
+  Bid customer=0, Ask customer=3
+  Bid tid=0, Ask tid=7
+  Bid price=5, Ask price=1
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=2
+  Bid head=6, Ask head=7
+  Bid size=2, Ask size=5
+  Bid customer=0, Ask customer=0
+  Bid tid=10, Ask tid=11
+  Bid price=8, Ask price=2
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=7, Best ask=2
+  Bid head=5, Ask head=7
+  Bid size=9, Ask size=3
+  Bid customer=4, Ask customer=0
+  Bid tid=8, Ask tid=11
+  Bid price=7, Ask price=2
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=2
+  Bid head=8, Ask head=9
+  Bid size=9, Ask size=6
+  Bid customer=1, Ask customer=2
+  Bid tid=12, Ask tid=15
+  Bid price=8, Ask price=2
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=9, Best ask=3
+  Bid head=10, Ask head=11
+  Bid size=7, Ask size=6
+  Bid customer=3, Ask customer=3
+  Bid tid=16, Ask tid=17
+  Bid price=9, Ask price=3
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=9, Best ask=6
+  Bid head=10, Ask head=12
+  Bid size=1, Ask size=1
+  Bid customer=3, Ask customer=4
+  Bid tid=16, Ask tid=19
+  Bid price=9, Ask price=6
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=9, Best ask=6
+  Bid head=13, Ask head=14
+  Bid size=4, Ask size=6
+  Bid customer=0, Ask customer=0
+  Bid tid=20, Ask tid=21
+  Bid price=9, Ask price=6
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=8, Best ask=6
+  Bid head=8, Ask head=14
+  Bid size=3, Ask size=2
+  Bid customer=1, Ask customer=0
+  Bid tid=12, Ask tid=21
+  Bid price=8, Ask price=6
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=9, Best ask=5
+  Bid head=16, Ask head=17
+  Bid size=8, Ask size=9
+  Bid customer=2, Ask customer=2
+  Bid tid=24, Ask tid=25
+  Bid price=9, Ask price=5
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=8, Best ask=5
+  Bid head=8, Ask head=17
+  Bid size=1, Ask size=1
+  Bid customer=1, Ask customer=2
+  Bid tid=12, Ask tid=25
+  Bid price=8, Ask price=5
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=3
+  Bid head=5, Ask head=19
+  Bid size=6, Ask size=8
+  Bid customer=4, Ask customer=3
+  Bid tid=8, Ask tid=27
+  Bid price=7, Ask price=3
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=7, Best ask=3
+  Bid head=18, Ask head=19
+  Bid size=9, Ask size=2
+  Bid customer=3, Ask customer=3
+  Bid tid=26, Ask tid=27
+  Bid price=7, Ask price=3
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=2
+  Bid head=20, Ask head=24
+  Bid size=3, Ask size=10
+  Bid customer=4, Ask customer=2
+  Bid tid=28, Ask tid=35
+  Bid price=8, Ask price=2
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=7, Best ask=2
+  Bid head=18, Ask head=24
+  Bid size=7, Ask size=7
+  Bid customer=3, Ask customer=2
+  Bid tid=26, Ask tid=35
+  Bid price=7, Ask price=2
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=9, Best ask=8
+  Bid head=27, Ask head=26
+  Bid size=5, Ask size=10
+  Bid customer=4, Ask customer=3
+  Bid tid=38, Ask tid=37
+  Bid price=9, Ask price=8
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=5
+  Bid head=22, Ask head=29
+  Bid size=7, Ask size=2
+  Bid customer=1, Ask customer=0
+  Bid tid=32, Ask tid=41
+  Bid price=7, Ask price=5
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=1
+  Bid head=22, Ask head=31
+  Bid size=5, Ask size=7
+  Bid customer=1, Ask customer=1
+  Bid tid=32, Ask tid=43
+  Bid price=7, Ask price=1
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=7, Best ask=1
+  Bid head=23, Ask head=31
+  Bid size=2, Ask size=2
+  Bid customer=2, Ask customer=1
+  Bid tid=34, Ask tid=43
+  Bid price=7, Ask price=1
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=3
+  Bid head=21, Ask head=32
+  Bid size=6, Ask size=3
+  Bid customer=0, Ask customer=2
+  Bid tid=30, Ask tid=45
+  Bid price=5, Ask price=3
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=5
+  Bid head=21, Ask head=34
+  Bid size=3, Ask size=9
+  Bid customer=0, Ask customer=4
+  Bid tid=30, Ask tid=49
+  Bid price=5, Ask price=5
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=4
+  Bid head=35, Ask head=36
+  Bid size=6, Ask size=5
+  Bid customer=0, Ask customer=0
+  Bid tid=50, Ask tid=51
+  Bid price=8, Ask price=4
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=8, Best ask=5
+  Bid head=35, Ask head=34
+  Bid size=1, Ask size=6
+  Bid customer=0, Ask customer=4
+  Bid tid=50, Ask tid=49
+  Bid price=8, Ask price=5
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=4
+  Bid head=37, Ask head=38
+  Bid size=7, Ask size=2
+  Bid customer=1, Ask customer=1
+  Bid tid=52, Ask tid=53
+  Bid price=7, Ask price=4
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=7, Best ask=5
+  Bid head=37, Ask head=34
+  Bid size=5, Ask size=5
+  Bid customer=1, Ask customer=4
+  Bid tid=52, Ask tid=49
+  Bid price=7, Ask price=5
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=7
+  Bid head=39, Ask head=33
+  Bid size=10, Ask size=7
+  Bid customer=3, Ask customer=3
+  Bid tid=56, Ask tid=47
+  Bid price=7, Ask price=7
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=4
+  Bid head=39, Ask head=41
+  Bid size=3, Ask size=9
+  Bid customer=3, Ask customer=4
+  Bid tid=56, Ask tid=59
+  Bid price=7, Ask price=4
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=4
+  Bid head=45, Ask head=41
+  Bid size=9, Ask size=6
+  Bid customer=2, Ask customer=4
+  Bid tid=64, Ask tid=59
+  Bid price=8, Ask price=4
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=8, Best ask=4
+  Bid head=45, Ask head=42
+  Bid size=3, Ask size=10
+  Bid customer=2, Ask customer=0
+  Bid tid=64, Ask tid=61
+  Bid price=8, Ask price=4
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=4
+  Bid head=47, Ask head=42
+  Bid size=3, Ask size=7
+  Bid customer=3, Ask customer=0
+  Bid tid=66, Ask tid=61
+  Bid price=5, Ask price=4
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=4
+  Bid head=48, Ask head=42
+  Bid size=10, Ask size=4
+  Bid customer=0, Ask customer=0
+  Bid tid=70, Ask tid=61
+  Bid price=5, Ask price=4
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=5, Best ask=4
+  Bid head=48, Ask head=44
+  Bid size=6, Ask size=1
+  Bid customer=0, Ask customer=1
+  Bid tid=70, Ask tid=63
+  Bid price=5, Ask price=4
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=5, Best ask=4
+  Bid head=48, Ask head=46
+  Bid size=5, Ask size=6
+  Bid customer=0, Ask customer=2
+  Bid tid=70, Ask tid=65
+  Bid price=5, Ask price=4
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=4
+  Bid head=50, Ask head=46
+  Bid size=2, Ask size=1
+  Bid customer=1, Ask customer=2
+  Bid tid=72, Ask tid=65
+  Bid price=8, Ask price=4
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=8, Best ask=6
+  Bid head=50, Ask head=49
+  Bid size=1, Ask size=1
+  Bid customer=1, Ask customer=0
+  Bid tid=72, Ask tid=71
+  Bid price=8, Ask price=6
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=9, Best ask=7
+  Bid head=52, Ask head=51
+  Bid size=5, Ask size=10
+  Bid customer=2, Ask customer=1
+  Bid tid=74, Ask tid=73
+  Bid price=9, Ask price=7
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=3, Best ask=2
+  Bid head=40, Ask head=54
+  Bid size=5, Ask size=9
+  Bid customer=4, Ask customer=3
+  Bid tid=58, Ask tid=77
+  Bid price=3, Ask price=2
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=2, Best ask=2
+  Bid head=25, Ask head=54
+  Bid size=9, Ask size=4
+  Bid customer=3, Ask customer=3
+  Bid tid=36, Ask tid=77
+  Bid price=2, Ask price=2
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=6, Best ask=4
+  Bid head=55, Ask head=56
+  Bid size=6, Ask size=10
+  Bid customer=4, Ask customer=4
+  Bid tid=78, Ask tid=79
+  Bid price=6, Ask price=4
+ Done (FPS: 205918806)
+Testing 512 blocks × 256 threads/block = 131072 environments...Episode 0
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=4, Best ask=4
+  Bid head=1, Ask head=2
+  Bid size=1, Ask size=8
+  Bid customer=1, Ask customer=1
+  Bid tid=2, Ask tid=3
+  Bid price=4, Ask price=4
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=4, Best ask=4
+  Bid head=3, Ask head=2
+  Bid size=8, Ask size=7
+  Bid customer=2, Ask customer=1
+  Bid tid=4, Ask tid=3
+  Bid price=4, Ask price=4
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=4, Best ask=3
+  Bid head=3, Ask head=6
+  Bid size=1, Ask size=3
+  Bid customer=2, Ask customer=3
+  Bid tid=4, Ask tid=7
+  Bid price=4, Ask price=3
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=3, Best ask=3
+  Bid head=5, Ask head=6
+  Bid size=5, Ask size=2
+  Bid customer=3, Ask customer=3
+  Bid tid=6, Ask tid=7
+  Bid price=3, Ask price=3
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=8
+  Bid head=8, Ask head=4
+  Bid size=1, Ask size=9
+  Bid customer=0, Ask customer=2
+  Bid tid=10, Ask tid=5
+  Bid price=8, Ask price=8
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=8
+  Bid head=10, Ask head=4
+  Bid size=10, Ask size=8
+  Bid customer=1, Ask customer=2
+  Bid tid=12, Ask tid=5
+  Bid price=8, Ask price=8
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=8, Best ask=8
+  Bid head=10, Ask head=7
+  Bid size=2, Ask size=4
+  Bid customer=1, Ask customer=4
+  Bid tid=12, Ask tid=9
+  Bid price=8, Ask price=8
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=4, Best ask=1
+  Bid head=14, Ask head=17
+  Bid size=5, Ask size=9
+  Bid customer=3, Ask customer=4
+  Bid tid=16, Ask tid=19
+  Bid price=4, Ask price=1
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=3, Best ask=1
+  Bid head=5, Ask head=17
+  Bid size=3, Ask size=4
+  Bid customer=3, Ask customer=4
+  Bid tid=6, Ask tid=19
+  Bid price=3, Ask price=1
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=3, Best ask=1
+  Bid head=12, Ask head=17
+  Bid size=2, Ask size=1
+  Bid customer=2, Ask customer=4
+  Bid tid=14, Ask tid=19
+  Bid price=3, Ask price=1
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=8
+  Bid head=18, Ask head=7
+  Bid size=1, Ask size=2
+  Bid customer=0, Ask customer=4
+  Bid tid=20, Ask tid=9
+  Bid price=8, Ask price=8
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=6, Best ask=1
+  Bid head=20, Ask head=21
+  Bid size=4, Ask size=8
+  Bid customer=1, Ask customer=1
+  Bid tid=22, Ask tid=23
+  Bid price=6, Ask price=1
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=3, Best ask=1
+  Bid head=12, Ask head=21
+  Bid size=1, Ask size=4
+  Bid customer=2, Ask customer=1
+  Bid tid=14, Ask tid=23
+  Bid price=3, Ask price=1
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=2, Best ask=1
+  Bid head=0, Ask head=21
+  Bid size=10, Ask size=3
+  Bid customer=0, Ask customer=1
+  Bid tid=0, Ask tid=23
+  Bid price=2, Ask price=1
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=9, Best ask=8
+  Bid head=22, Ask head=7
+  Bid size=9, Ask size=1
+  Bid customer=2, Ask customer=4
+  Bid tid=24, Ask tid=9
+  Bid price=9, Ask price=8
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=9, Best ask=8
+  Bid head=22, Ask head=9
+  Bid size=8, Ask size=2
+  Bid customer=2, Ask customer=0
+  Bid tid=24, Ask tid=11
+  Bid price=9, Ask price=8
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=9, Best ask=8
+  Bid head=22, Ask head=11
+  Bid size=6, Ask size=1
+  Bid customer=2, Ask customer=1
+  Bid tid=24, Ask tid=13
+  Bid price=9, Ask price=8
+Market 0 block 0: fill_count=3, max_fills=2
+  Best bid=9, Best ask=8
+  Bid head=22, Ask head=19
+  Bid size=5, Ask size=10
+  Bid customer=2, Ask customer=0
+  Bid tid=24, Ask tid=21
+  Bid price=9, Ask price=8
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=2
+  Bid head=23, Ask head=26
+  Bid size=9, Ask size=1
+  Bid customer=3, Ask customer=4
+  Bid tid=26, Ask tid=29
+  Bid price=5, Ask price=2
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=2
+  Bid head=23, Ask head=28
+  Bid size=8, Ask size=7
+  Bid customer=3, Ask customer=0
+  Bid tid=26, Ask tid=31
+  Bid price=5, Ask price=2
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=9, Best ask=6
+  Bid head=29, Ask head=24
+  Bid size=8, Ask size=3
+  Bid customer=1, Ask customer=3
+  Bid tid=32, Ask tid=27
+  Bid price=9, Ask price=6
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=9, Best ask=6
+  Bid head=29, Ask head=30
+  Bid size=5, Ask size=2
+  Bid customer=1, Ask customer=1
+  Bid tid=32, Ask tid=33
+  Bid price=9, Ask price=6
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=9, Best ask=8
+  Bid head=29, Ask head=19
+  Bid size=3, Ask size=5
+  Bid customer=1, Ask customer=0
+  Bid tid=32, Ask tid=21
+  Bid price=9, Ask price=8
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=5
+  Bid head=23, Ask head=31
+  Bid size=1, Ask size=7
+  Bid customer=3, Ask customer=2
+  Bid tid=26, Ask tid=35
+  Bid price=5, Ask price=5
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=5, Best ask=5
+  Bid head=25, Ask head=31
+  Bid size=2, Ask size=6
+  Bid customer=4, Ask customer=2
+  Bid tid=28, Ask tid=35
+  Bid price=5, Ask price=5
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=4
+  Bid head=35, Ask head=36
+  Bid size=1, Ask size=9
+  Bid customer=0, Ask customer=0
+  Bid tid=40, Ask tid=41
+  Bid price=7, Ask price=4
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=6, Best ask=4
+  Bid head=39, Ask head=36
+  Bid size=10, Ask size=8
+  Bid customer=2, Ask customer=0
+  Bid tid=44, Ask tid=41
+  Bid price=6, Ask price=4
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=6, Best ask=5
+  Bid head=39, Ask head=31
+  Bid size=2, Ask size=4
+  Bid customer=2, Ask customer=2
+  Bid tid=44, Ask tid=35
+  Bid price=6, Ask price=5
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=3
+  Bid head=40, Ask head=41
+  Bid size=4, Ask size=7
+  Bid customer=3, Ask customer=3
+  Bid tid=46, Ask tid=47
+  Bid price=8, Ask price=3
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=3, Best ask=3
+  Bid head=27, Ask head=41
+  Bid size=7, Ask size=3
+  Bid customer=0, Ask customer=3
+  Bid tid=30, Ask tid=47
+  Bid price=3, Ask price=3
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=3, Best ask=2
+  Bid head=27, Ask head=43
+  Bid size=4, Ask size=1
+  Bid customer=0, Ask customer=4
+  Bid tid=30, Ask tid=49
+  Bid price=3, Ask price=2
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=5
+  Bid head=46, Ask head=31
+  Bid size=5, Ask size=2
+  Bid customer=1, Ask customer=2
+  Bid tid=52, Ask tid=35
+  Bid price=7, Ask price=5
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=7, Best ask=5
+  Bid head=46, Ask head=47
+  Bid size=3, Ask size=7
+  Bid customer=1, Ask customer=1
+  Bid tid=52, Ask tid=53
+  Bid price=7, Ask price=5
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=4, Best ask=3
+  Bid head=44, Ask head=51
+  Bid size=6, Ask size=8
+  Bid customer=0, Ask customer=3
+  Bid tid=50, Ask tid=57
+  Bid price=4, Ask price=3
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=3, Best ask=3
+  Bid head=27, Ask head=51
+  Bid size=3, Ask size=2
+  Bid customer=0, Ask customer=3
+  Bid tid=30, Ask tid=57
+  Bid price=3, Ask price=3
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=3, Best ask=1
+  Bid head=27, Ask head=53
+  Bid size=1, Ask size=2
+  Bid customer=0, Ask customer=4
+  Bid tid=30, Ask tid=59
+  Bid price=3, Ask price=1
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=3, Best ask=1
+  Bid head=32, Ask head=53
+  Bid size=6, Ask size=1
+  Bid customer=3, Ask customer=4
+  Bid tid=36, Ask tid=59
+  Bid price=3, Ask price=1
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=5
+  Bid head=54, Ask head=47
+  Bid size=7, Ask size=4
+  Bid customer=0, Ask customer=1
+  Bid tid=60, Ask tid=53
+  Bid price=8, Ask price=5
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=8, Best ask=7
+  Bid head=54, Ask head=45
+  Bid size=3, Ask size=3
+  Bid customer=0, Ask customer=0
+  Bid tid=60, Ask tid=51
+  Bid price=8, Ask price=7
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=6
+  Bid head=55, Ask head=56
+  Bid size=10, Ask size=8
+  Bid customer=1, Ask customer=1
+  Bid tid=62, Ask tid=63
+  Bid price=7, Ask price=6
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=7, Best ask=7
+  Bid head=55, Ask head=49
+  Bid size=2, Ask size=3
+  Bid customer=1, Ask customer=2
+  Bid tid=62, Ask tid=55
+  Bid price=7, Ask price=7
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=2
+  Bid head=57, Ask head=58
+  Bid size=5, Ask size=8
+  Bid customer=2, Ask customer=2
+  Bid tid=64, Ask tid=65
+  Bid price=8, Ask price=2
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=3, Best ask=2
+  Bid head=32, Ask head=58
+  Bid size=5, Ask size=3
+  Bid customer=3, Ask customer=2
+  Bid tid=36, Ask tid=65
+  Bid price=3, Ask price=2
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=9, Best ask=7
+  Bid head=59, Ask head=49
+  Bid size=8, Ask size=1
+  Bid customer=3, Ask customer=2
+  Bid tid=66, Ask tid=55
+  Bid price=9, Ask price=7
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=9, Best ask=8
+  Bid head=59, Ask head=19
+  Bid size=7, Ask size=2
+  Bid customer=3, Ask customer=0
+  Bid tid=66, Ask tid=21
+  Bid price=9, Ask price=8
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=9, Best ask=9
+  Bid head=59, Ask head=13
+  Bid size=5, Ask size=10
+  Bid customer=3, Ask customer=2
+  Bid tid=66, Ask tid=15
+  Bid price=9, Ask price=9
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=9, Best ask=9
+  Bid head=60, Ask head=13
+  Bid size=2, Ask size=5
+  Bid customer=4, Ask customer=2
+  Bid tid=68, Ask tid=15
+  Bid price=9, Ask price=9
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=5
+  Bid head=62, Ask head=61
+  Bid size=2, Ask size=2
+  Bid customer=1, Ask customer=0
+  Bid tid=72, Ask tid=71
+  Bid price=5, Ask price=5
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=4, Best ask=3
+  Bid head=63, Ask head=64
+  Bid size=6, Ask size=6
+  Bid customer=2, Ask customer=2
+  Bid tid=74, Ask tid=75
+  Bid price=4, Ask price=3
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=9, Best ask=4
+  Bid head=65, Ask head=66
+  Bid size=8, Ask size=10
+  Bid customer=3, Ask customer=3
+  Bid tid=76, Ask tid=77
+  Bid price=9, Ask price=4
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=9, Best ask=4
+  Bid head=67, Ask head=66
+  Bid size=8, Ask size=2
+  Bid customer=4, Ask customer=3
+  Bid tid=78, Ask tid=77
+  Bid price=9, Ask price=4
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=9, Best ask=6
+  Bid head=67, Ask head=68
+  Bid size=6, Ask size=5
+  Bid customer=4, Ask customer=4
+  Bid tid=78, Ask tid=79
+  Bid price=9, Ask price=6
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=9, Best ask=9
+  Bid head=67, Ask head=13
+  Bid size=1, Ask size=3
+  Bid customer=4, Ask customer=2
+  Bid tid=78, Ask tid=15
+  Bid price=9, Ask price=9
+ Done (FPS: 173987631)
+Testing 512 blocks × 512 threads/block = 262144 environments...Episode 0
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=2
+  Bid head=2, Ask head=5
+  Bid size=10, Ask size=8
+  Bid customer=1, Ask customer=2
+  Bid tid=2, Ask tid=5
+  Bid price=5, Ask price=2
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=6, Best ask=6
+  Bid head=12, Ask head=1
+  Bid size=7, Ask size=10
+  Bid customer=2, Ask customer=0
+  Bid tid=14, Ask tid=1
+  Bid price=6, Ask price=6
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=6
+  Bid head=13, Ask head=1
+  Bid size=6, Ask size=3
+  Bid customer=3, Ask customer=0
+  Bid tid=16, Ask tid=1
+  Bid price=7, Ask price=6
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=7, Best ask=6
+  Bid head=13, Ask head=7
+  Bid size=3, Ask size=2
+  Bid customer=3, Ask customer=3
+  Bid tid=16, Ask tid=7
+  Bid price=7, Ask price=6
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=7, Best ask=6
+  Bid head=13, Ask head=11
+  Bid size=1, Ask size=1
+  Bid customer=3, Ask customer=1
+  Bid tid=16, Ask tid=13
+  Bid price=7, Ask price=6
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=5
+  Bid head=2, Ask head=16
+  Bid size=2, Ask size=2
+  Bid customer=1, Ask customer=0
+  Bid tid=2, Ask tid=21
+  Bid price=5, Ask price=5
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=6
+  Bid head=17, Ask head=18
+  Bid size=10, Ask size=5
+  Bid customer=1, Ask customer=1
+  Bid tid=22, Ask tid=23
+  Bid price=7, Ask price=6
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=7, Best ask=7
+  Bid head=17, Ask head=15
+  Bid size=5, Ask size=8
+  Bid customer=1, Ask customer=4
+  Bid tid=22, Ask tid=19
+  Bid price=7, Ask price=7
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=6, Best ask=6
+  Bid head=21, Ask head=22
+  Bid size=6, Ask size=6
+  Bid customer=3, Ask customer=3
+  Bid tid=26, Ask tid=27
+  Bid price=6, Ask price=6
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=6, Best ask=4
+  Bid head=23, Ask head=24
+  Bid size=3, Ask size=4
+  Bid customer=4, Ask customer=4
+  Bid tid=28, Ask tid=29
+  Bid price=6, Ask price=4
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=5, Best ask=4
+  Bid head=19, Ask head=24
+  Bid size=5, Ask size=1
+  Bid customer=2, Ask customer=4
+  Bid tid=24, Ask tid=29
+  Bid price=5, Ask price=4
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=5
+  Bid head=19, Ask head=26
+  Bid size=4, Ask size=6
+  Bid customer=2, Ask customer=0
+  Bid tid=24, Ask tid=31
+  Bid price=5, Ask price=5
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=5
+  Bid head=27, Ask head=26
+  Bid size=5, Ask size=2
+  Bid customer=1, Ask customer=0
+  Bid tid=32, Ask tid=31
+  Bid price=7, Ask price=5
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=7, Best ask=7
+  Bid head=27, Ask head=15
+  Bid size=3, Ask size=3
+  Bid customer=1, Ask customer=4
+  Bid tid=32, Ask tid=19
+  Bid price=7, Ask price=7
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=1
+  Bid head=28, Ask head=29
+  Bid size=7, Ask size=6
+  Bid customer=2, Ask customer=2
+  Bid tid=34, Ask tid=35
+  Bid price=8, Ask price=1
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=8, Best ask=7
+  Bid head=28, Ask head=20
+  Bid size=1, Ask size=1
+  Bid customer=2, Ask customer=2
+  Bid tid=34, Ask tid=25
+  Bid price=8, Ask price=7
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=4, Best ask=3
+  Bid head=4, Ask head=30
+  Bid size=2, Ask size=2
+  Bid customer=2, Ask customer=3
+  Bid tid=4, Ask tid=37
+  Bid price=4, Ask price=3
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=4
+  Bid head=31, Ask head=32
+  Bid size=3, Ask size=3
+  Bid customer=4, Ask customer=4
+  Bid tid=38, Ask tid=39
+  Bid price=5, Ask price=4
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=6
+  Bid head=33, Ask head=35
+  Bid size=9, Ask size=8
+  Bid customer=0, Ask customer=1
+  Bid tid=40, Ask tid=43
+  Bid price=7, Ask price=6
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=5
+  Bid head=33, Ask head=37
+  Bid size=1, Ask size=5
+  Bid customer=0, Ask customer=2
+  Bid tid=40, Ask tid=45
+  Bid price=7, Ask price=5
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=5
+  Bid head=41, Ask head=37
+  Bid size=4, Ask size=4
+  Bid customer=0, Ask customer=2
+  Bid tid=50, Ask tid=45
+  Bid price=7, Ask price=5
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=5
+  Bid head=43, Ask head=38
+  Bid size=6, Ask size=10
+  Bid customer=1, Ask customer=3
+  Bid tid=52, Ask tid=47
+  Bid price=5, Ask price=5
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=4, Best ask=1
+  Bid head=6, Ask head=46
+  Bid size=7, Ask size=2
+  Bid customer=3, Ask customer=3
+  Bid tid=6, Ask tid=57
+  Bid price=4, Ask price=1
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=1
+  Bid head=47, Ask head=48
+  Bid size=2, Ask size=8
+  Bid customer=4, Ask customer=4
+  Bid tid=58, Ask tid=59
+  Bid price=7, Ask price=1
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=4, Best ask=1
+  Bid head=6, Ask head=48
+  Bid size=5, Ask size=6
+  Bid customer=3, Ask customer=4
+  Bid tid=6, Ask tid=59
+  Bid price=4, Ask price=1
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=3, Best ask=1
+  Bid head=25, Ask head=48
+  Bid size=3, Ask size=1
+  Bid customer=0, Ask customer=4
+  Bid tid=30, Ask tid=59
+  Bid price=3, Ask price=1
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=3, Best ask=1
+  Bid head=25, Ask head=50
+  Bid size=2, Ask size=5
+  Bid customer=0, Ask customer=0
+  Bid tid=30, Ask tid=61
+  Bid price=3, Ask price=1
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=3, Best ask=1
+  Bid head=36, Ask head=50
+  Bid size=1, Ask size=3
+  Bid customer=2, Ask customer=0
+  Bid tid=44, Ask tid=61
+  Bid price=3, Ask price=1
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=3, Best ask=1
+  Bid head=39, Ask head=50
+  Bid size=7, Ask size=2
+  Bid customer=4, Ask customer=0
+  Bid tid=48, Ask tid=61
+  Bid price=3, Ask price=1
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=3, Best ask=1
+  Bid head=39, Ask head=51
+  Bid size=5, Ask size=1
+  Bid customer=4, Ask customer=1
+  Bid tid=48, Ask tid=63
+  Bid price=3, Ask price=1
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=4, Best ask=3
+  Bid head=52, Ask head=53
+  Bid size=7, Ask size=5
+  Bid customer=2, Ask customer=2
+  Bid tid=64, Ask tid=65
+  Bid price=4, Ask price=3
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=4, Best ask=3
+  Bid head=52, Ask head=55
+  Bid size=2, Ask size=6
+  Bid customer=2, Ask customer=3
+  Bid tid=64, Ask tid=67
+  Bid price=4, Ask price=3
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=3, Best ask=3
+  Bid head=39, Ask head=55
+  Bid size=4, Ask size=4
+  Bid customer=4, Ask customer=3
+  Bid tid=48, Ask tid=67
+  Bid price=3, Ask price=3
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=4, Best ask=4
+  Bid head=56, Ask head=58
+  Bid size=7, Ask size=10
+  Bid customer=4, Ask customer=0
+  Bid tid=68, Ask tid=71
+  Bid price=4, Ask price=4
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+ Done (FPS: 199262952)
+Testing 512 blocks × 1024 threads/block = 524288 environments...Episode 0
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=4
+  Bid head=0, Ask head=5
+  Bid size=1, Ask size=8
+  Bid customer=0, Ask customer=2
+  Bid tid=0, Ask tid=5
+  Bid price=7, Ask price=4
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=7, Best ask=4
+  Bid head=2, Ask head=5
+  Bid size=8, Ask size=7
+  Bid customer=1, Ask customer=2
+  Bid tid=2, Ask tid=5
+  Bid price=7, Ask price=4
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=5
+  Bid head=2, Ask head=7
+  Bid size=1, Ask size=4
+  Bid customer=1, Ask customer=3
+  Bid tid=2, Ask tid=7
+  Bid price=7, Ask price=5
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=5, Best ask=5
+  Bid head=6, Ask head=7
+  Bid size=2, Ask size=3
+  Bid customer=3, Ask customer=3
+  Bid tid=6, Ask tid=7
+  Bid price=5, Ask price=5
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=5
+  Bid head=8, Ask head=7
+  Bid size=8, Ask size=1
+  Bid customer=4, Ask customer=3
+  Bid tid=8, Ask tid=7
+  Bid price=7, Ask price=5
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=2
+  Bid head=8, Ask head=11
+  Bid size=7, Ask size=6
+  Bid customer=4, Ask customer=0
+  Bid tid=8, Ask tid=11
+  Bid price=7, Ask price=2
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=5
+  Bid head=8, Ask head=13
+  Bid size=1, Ask size=5
+  Bid customer=4, Ask customer=1
+  Bid tid=8, Ask tid=13
+  Bid price=7, Ask price=5
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=5
+  Bid head=16, Ask head=13
+  Bid size=2, Ask size=4
+  Bid customer=3, Ask customer=1
+  Bid tid=16, Ask tid=13
+  Bid price=8, Ask price=5
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=4, Best ask=3
+  Bid head=12, Ask head=17
+  Bid size=6, Ask size=7
+  Bid customer=1, Ask customer=4
+  Bid tid=12, Ask tid=19
+  Bid price=4, Ask price=3
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=3, Best ask=3
+  Bid head=14, Ask head=17
+  Bid size=1, Ask size=1
+  Bid customer=2, Ask customer=4
+  Bid tid=14, Ask tid=19
+  Bid price=3, Ask price=3
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=3
+  Bid head=18, Ask head=19
+  Bid size=8, Ask size=2
+  Bid customer=0, Ask customer=0
+  Bid tid=20, Ask tid=21
+  Bid price=7, Ask price=3
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=7, Best ask=5
+  Bid head=18, Ask head=13
+  Bid size=6, Ask size=2
+  Bid customer=0, Ask customer=1
+  Bid tid=20, Ask tid=13
+  Bid price=7, Ask price=5
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=7, Best ask=5
+  Bid head=18, Ask head=15
+  Bid size=4, Ask size=10
+  Bid customer=0, Ask customer=2
+  Bid tid=20, Ask tid=15
+  Bid price=7, Ask price=5
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=9, Best ask=5
+  Bid head=20, Ask head=15
+  Bid size=1, Ask size=6
+  Bid customer=1, Ask customer=2
+  Bid tid=22, Ask tid=15
+  Bid price=9, Ask price=5
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=6, Best ask=2
+  Bid head=23, Ask head=22
+  Bid size=2, Ask size=9
+  Bid customer=3, Ask customer=2
+  Bid tid=26, Ask tid=25
+  Bid price=6, Ask price=2
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=2, Best ask=2
+  Bid head=25, Ask head=22
+  Bid size=8, Ask size=7
+  Bid customer=0, Ask customer=2
+  Bid tid=30, Ask tid=25
+  Bid price=2, Ask price=2
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=3
+  Bid head=27, Ask head=24
+  Bid size=2, Ask size=9
+  Bid customer=1, Ask customer=3
+  Bid tid=32, Ask tid=27
+  Bid price=8, Ask price=3
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=3, Best ask=3
+  Bid head=32, Ask head=24
+  Bid size=4, Ask size=7
+  Bid customer=4, Ask customer=3
+  Bid tid=38, Ask tid=27
+  Bid price=3, Ask price=3
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=3
+  Bid head=36, Ask head=24
+  Bid size=4, Ask size=3
+  Bid customer=2, Ask customer=3
+  Bid tid=44, Ask tid=27
+  Bid price=5, Ask price=3
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=5, Best ask=5
+  Bid head=36, Ask head=15
+  Bid size=1, Ask size=5
+  Bid customer=2, Ask customer=2
+  Bid tid=44, Ask tid=15
+  Bid price=5, Ask price=5
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=3, Best ask=3
+  Bid head=38, Ask head=41
+  Bid size=3, Ask size=7
+  Bid customer=3, Ask customer=4
+  Bid tid=46, Ask tid=49
+  Bid price=3, Ask price=3
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=2, Best ask=2
+  Bid head=25, Ask head=44
+  Bid size=1, Ask size=2
+  Bid customer=0, Ask customer=1
+  Bid tid=30, Ask tid=53
+  Bid price=2, Ask price=2
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=2, Best ask=2
+  Bid head=31, Ask head=44
+  Bid size=1, Ask size=1
+  Bid customer=3, Ask customer=1
+  Bid tid=36, Ask tid=53
+  Bid price=2, Ask price=2
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=9, Best ask=3
+  Bid head=45, Ask head=41
+  Bid size=9, Ask size=4
+  Bid customer=2, Ask customer=4
+  Bid tid=54, Ask tid=49
+  Bid price=9, Ask price=3
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=9, Best ask=5
+  Bid head=45, Ask head=15
+  Bid size=5, Ask size=4
+  Bid customer=2, Ask customer=2
+  Bid tid=54, Ask tid=15
+  Bid price=9, Ask price=5
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=9, Best ask=5
+  Bid head=45, Ask head=28
+  Bid size=1, Ask size=5
+  Bid customer=2, Ask customer=1
+  Bid tid=54, Ask tid=33
+  Bid price=9, Ask price=5
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=1
+  Bid head=47, Ask head=48
+  Bid size=5, Ask size=3
+  Bid customer=3, Ask customer=3
+  Bid tid=56, Ask tid=57
+  Bid price=7, Ask price=1
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=7, Best ask=5
+  Bid head=47, Ask head=28
+  Bid size=2, Ask size=4
+  Bid customer=3, Ask customer=1
+  Bid tid=56, Ask tid=33
+  Bid price=7, Ask price=5
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=4, Best ask=2
+  Bid head=51, Ask head=52
+  Bid size=10, Ask size=2
+  Bid customer=0, Ask customer=0
+  Bid tid=60, Ask tid=61
+  Bid price=4, Ask price=2
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=4, Best ask=1
+  Bid head=51, Ask head=54
+  Bid size=8, Ask size=1
+  Bid customer=0, Ask customer=1
+  Bid tid=60, Ask tid=63
+  Bid price=4, Ask price=1
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=4, Best ask=3
+  Bid head=51, Ask head=55
+  Bid size=7, Ask size=10
+  Bid customer=0, Ask customer=2
+  Bid tid=60, Ask tid=65
+  Bid price=4, Ask price=3
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=3, Best ask=3
+  Bid head=53, Ask head=55
+  Bid size=3, Ask size=3
+  Bid customer=1, Ask customer=2
+  Bid tid=62, Ask tid=65
+  Bid price=3, Ask price=3
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=5
+  Bid head=56, Ask head=28
+  Bid size=10, Ask size=2
+  Bid customer=3, Ask customer=1
+  Bid tid=66, Ask tid=33
+  Bid price=7, Ask price=5
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=7, Best ask=6
+  Bid head=56, Ask head=21
+  Bid size=8, Ask size=6
+  Bid customer=3, Ask customer=1
+  Bid tid=66, Ask tid=23
+  Bid price=7, Ask price=6
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=7, Best ask=6
+  Bid head=56, Ask head=37
+  Bid size=2, Ask size=10
+  Bid customer=3, Ask customer=2
+  Bid tid=66, Ask tid=45
+  Bid price=7, Ask price=6
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=6, Best ask=6
+  Bid head=58, Ask head=37
+  Bid size=3, Ask size=8
+  Bid customer=4, Ask customer=2
+  Bid tid=68, Ask tid=45
+  Bid price=6, Ask price=6
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=9, Best ask=6
+  Bid head=60, Ask head=37
+  Bid size=9, Ask size=5
+  Bid customer=0, Ask customer=2
+  Bid tid=70, Ask tid=45
+  Bid price=9, Ask price=6
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=9, Best ask=6
+  Bid head=60, Ask head=46
+  Bid size=4, Ask size=8
+  Bid customer=0, Ask customer=2
+  Bid tid=70, Ask tid=55
+  Bid price=9, Ask price=6
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+ Done (FPS: 219517661)
+Testing 1024 blocks × 256 threads/block = 262144 environments...Episode 0
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=4
+  Bid head=5, Ask head=4
+  Bid size=7, Ask size=10
+  Bid customer=3, Ask customer=2
+  Bid tid=6, Ask tid=5
+  Bid price=5, Ask price=4
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=9, Best ask=4
+  Bid head=7, Ask head=4
+  Bid size=3, Ask size=3
+  Bid customer=4, Ask customer=2
+  Bid tid=8, Ask tid=5
+  Bid price=9, Ask price=4
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=4
+  Bid head=9, Ask head=8
+  Bid size=7, Ask size=4
+  Bid customer=0, Ask customer=4
+  Bid tid=10, Ask tid=9
+  Bid price=5, Ask price=4
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=5, Best ask=5
+  Bid head=9, Ask head=6
+  Bid size=3, Ask size=1
+  Bid customer=0, Ask customer=3
+  Bid tid=10, Ask tid=7
+  Bid price=5, Ask price=5
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=3
+  Bid head=9, Ask head=14
+  Bid size=2, Ask size=2
+  Bid customer=0, Ask customer=3
+  Bid tid=10, Ask tid=17
+  Bid price=5, Ask price=3
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=6
+  Bid head=15, Ask head=12
+  Bid size=10, Ask size=5
+  Bid customer=4, Ask customer=2
+  Bid tid=18, Ask tid=15
+  Bid price=7, Ask price=6
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=7, Best ask=7
+  Bid head=15, Ask head=2
+  Bid size=5, Ask size=6
+  Bid customer=4, Ask customer=1
+  Bid tid=18, Ask tid=3
+  Bid price=7, Ask price=7
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=6
+  Bid head=20, Ask head=21
+  Bid size=5, Ask size=5
+  Bid customer=2, Ask customer=2
+  Bid tid=24, Ask tid=25
+  Bid price=7, Ask price=6
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=7
+  Bid head=23, Ask head=2
+  Bid size=4, Ask size=1
+  Bid customer=4, Ask customer=1
+  Bid tid=28, Ask tid=3
+  Bid price=8, Ask price=7
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=8, Best ask=7
+  Bid head=23, Ask head=11
+  Bid size=3, Ask size=9
+  Bid customer=4, Ask customer=1
+  Bid tid=28, Ask tid=13
+  Bid price=8, Ask price=7
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=7
+  Bid head=26, Ask head=11
+  Bid size=9, Ask size=6
+  Bid customer=3, Ask customer=1
+  Bid tid=36, Ask tid=13
+  Bid price=8, Ask price=7
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=8, Best ask=8
+  Bid head=26, Ask head=1
+  Bid size=3, Ask size=3
+  Bid customer=3, Ask customer=0
+  Bid tid=36, Ask tid=1
+  Bid price=8, Ask price=8
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=3
+  Bid head=25, Ask head=29
+  Bid size=5, Ask size=6
+  Bid customer=1, Ask customer=4
+  Bid tid=32, Ask tid=39
+  Bid price=5, Ask price=3
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=3, Best ask=3
+  Bid head=0, Ask head=29
+  Bid size=9, Ask size=1
+  Bid customer=0, Ask customer=4
+  Bid tid=0, Ask tid=39
+  Bid price=3, Ask price=3
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=5
+  Bid head=32, Ask head=31
+  Bid size=8, Ask size=5
+  Bid customer=1, Ask customer=0
+  Bid tid=42, Ask tid=41
+  Bid price=8, Ask price=5
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=8, Best ask=8
+  Bid head=32, Ask head=19
+  Bid size=3, Ask size=7
+  Bid customer=1, Ask customer=1
+  Bid tid=42, Ask tid=23
+  Bid price=8, Ask price=8
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=5
+  Bid head=34, Ask head=37
+  Bid size=6, Ask size=9
+  Bid customer=2, Ask customer=3
+  Bid tid=44, Ask tid=47
+  Bid price=7, Ask price=5
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=4, Best ask=2
+  Bid head=30, Ask head=39
+  Bid size=6, Ask size=6
+  Bid customer=0, Ask customer=4
+  Bid tid=40, Ask tid=49
+  Bid price=4, Ask price=2
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=3, Best ask=3
+  Bid head=0, Ask head=40
+  Bid size=8, Ask size=1
+  Bid customer=0, Ask customer=0
+  Bid tid=0, Ask tid=51
+  Bid price=3, Ask price=3
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=9, Best ask=5
+  Bid head=45, Ask head=37
+  Bid size=2, Ask size=3
+  Bid customer=3, Ask customer=3
+  Bid tid=56, Ask tid=47
+  Bid price=9, Ask price=5
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=4, Best ask=4
+  Bid head=46, Ask head=49
+  Bid size=4, Ask size=6
+  Bid customer=4, Ask customer=0
+  Bid tid=58, Ask tid=61
+  Bid price=4, Ask price=4
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=9, Best ask=3
+  Bid head=50, Ask head=51
+  Bid size=8, Ask size=2
+  Bid customer=1, Ask customer=1
+  Bid tid=62, Ask tid=63
+  Bid price=9, Ask price=3
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=9, Best ask=4
+  Bid head=50, Ask head=49
+  Bid size=6, Ask size=2
+  Bid customer=1, Ask customer=0
+  Bid tid=62, Ask tid=61
+  Bid price=9, Ask price=4
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=9, Best ask=5
+  Bid head=50, Ask head=37
+  Bid size=4, Ask size=1
+  Bid customer=1, Ask customer=3
+  Bid tid=62, Ask tid=47
+  Bid price=9, Ask price=5
+Market 0 block 0: fill_count=3, max_fills=2
+  Best bid=9, Best ask=5
+  Bid head=50, Ask head=44
+  Bid size=3, Ask size=3
+  Bid customer=1, Ask customer=2
+  Bid tid=62, Ask tid=55
+  Bid price=9, Ask price=5
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=3, Best ask=3
+  Bid head=0, Ask head=53
+  Bid size=7, Ask size=2
+  Bid customer=0, Ask customer=2
+  Bid tid=0, Ask tid=65
+  Bid price=3, Ask price=3
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=4, Best ask=1
+  Bid head=54, Ask head=55
+  Bid size=2, Ask size=7
+  Bid customer=3, Ask customer=3
+  Bid tid=66, Ask tid=67
+  Bid price=4, Ask price=1
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=3, Best ask=1
+  Bid head=0, Ask head=55
+  Bid size=5, Ask size=5
+  Bid customer=0, Ask customer=3
+  Bid tid=0, Ask tid=67
+  Bid price=3, Ask price=1
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=2
+  Bid head=56, Ask head=57
+  Bid size=1, Ask size=10
+  Bid customer=4, Ask customer=4
+  Bid tid=68, Ask tid=69
+  Bid price=7, Ask price=2
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=3, Best ask=2
+  Bid head=17, Ask head=57
+  Bid size=6, Ask size=9
+  Bid customer=0, Ask customer=4
+  Bid tid=20, Ask tid=69
+  Bid price=3, Ask price=2
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=3, Best ask=2
+  Bid head=22, Ask head=57
+  Bid size=3, Ask size=3
+  Bid customer=3, Ask customer=4
+  Bid tid=26, Ask tid=69
+  Bid price=3, Ask price=2
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=3, Best ask=1
+  Bid head=28, Ask head=58
+  Bid size=8, Ask size=1
+  Bid customer=4, Ask customer=0
+  Bid tid=38, Ask tid=71
+  Bid price=3, Ask price=1
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=3
+  Bid head=63, Ask head=64
+  Bid size=9, Ask size=1
+  Bid customer=3, Ask customer=3
+  Bid tid=76, Ask tid=77
+  Bid price=7, Ask price=3
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=7, Best ask=7
+  Bid head=63, Ask head=42
+  Bid size=8, Ask size=7
+  Bid customer=3, Ask customer=1
+  Bid tid=76, Ask tid=53
+  Bid price=7, Ask price=7
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=7, Best ask=7
+  Bid head=63, Ask head=47
+  Bid size=1, Ask size=8
+  Bid customer=3, Ask customer=4
+  Bid tid=76, Ask tid=59
+  Bid price=7, Ask price=7
+############## Kernel start ##############
+ Done (FPS: 197120963)
+Testing 1024 blocks × 512 threads/block = 524288 environments...Episode 0
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=6, Best ask=5
+  Bid head=4, Ask head=5
+  Bid size=7, Ask size=7
+  Bid customer=3, Ask customer=3
+  Bid tid=6, Ask tid=7
+  Bid price=6, Ask price=5
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=4, Best ask=4
+  Bid head=0, Ask head=6
+  Bid size=7, Ask size=10
+  Bid customer=0, Ask customer=4
+  Bid tid=0, Ask tid=9
+  Bid price=4, Ask price=4
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=4
+  Bid head=8, Ask head=6
+  Bid size=5, Ask size=3
+  Bid customer=1, Ask customer=4
+  Bid tid=12, Ask tid=9
+  Bid price=5, Ask price=4
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=3
+  Bid head=8, Ask head=11
+  Bid size=2, Ask size=5
+  Bid customer=1, Ask customer=3
+  Bid tid=12, Ask tid=17
+  Bid price=5, Ask price=3
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=3, Best ask=3
+  Bid head=12, Ask head=11
+  Bid size=10, Ask size=3
+  Bid customer=4, Ask customer=3
+  Bid tid=18, Ask tid=17
+  Bid price=3, Ask price=3
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=9, Best ask=5
+  Bid head=14, Ask head=13
+  Bid size=8, Ask size=10
+  Bid customer=0, Ask customer=4
+  Bid tid=20, Ask tid=19
+  Bid price=9, Ask price=5
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=2
+  Bid head=15, Ask head=16
+  Bid size=8, Ask size=1
+  Bid customer=1, Ask customer=1
+  Bid tid=22, Ask tid=23
+  Bid price=7, Ask price=2
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=7, Best ask=5
+  Bid head=15, Ask head=13
+  Bid size=7, Ask size=2
+  Bid customer=1, Ask customer=4
+  Bid tid=22, Ask tid=19
+  Bid price=7, Ask price=5
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=7, Best ask=6
+  Bid head=15, Ask head=7
+  Bid size=5, Ask size=2
+  Bid customer=1, Ask customer=0
+  Bid tid=22, Ask tid=11
+  Bid price=7, Ask price=6
+Market 0 block 0: fill_count=3, max_fills=2
+  Best bid=7, Best ask=7
+  Bid head=15, Ask head=1
+  Bid size=3, Ask size=9
+  Bid customer=1, Ask customer=0
+  Bid tid=22, Ask tid=1
+  Bid price=7, Ask price=7
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=6, Best ask=3
+  Bid head=19, Ask head=22
+  Bid size=6, Ask size=5
+  Bid customer=3, Ask customer=0
+  Bid tid=26, Ask tid=31
+  Bid price=6, Ask price=3
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=5
+  Bid head=23, Ask head=24
+  Bid size=1, Ask size=10
+  Bid customer=1, Ask customer=1
+  Bid tid=32, Ask tid=33
+  Bid price=8, Ask price=5
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=6, Best ask=5
+  Bid head=19, Ask head=24
+  Bid size=1, Ask size=9
+  Bid customer=3, Ask customer=1
+  Bid tid=26, Ask tid=33
+  Bid price=6, Ask price=5
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=5, Best ask=5
+  Bid head=21, Ask head=24
+  Bid size=5, Ask size=8
+  Bid customer=0, Ask customer=1
+  Bid tid=30, Ask tid=33
+  Bid price=5, Ask price=5
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=5
+  Bid head=28, Ask head=24
+  Bid size=3, Ask size=3
+  Bid customer=4, Ask customer=1
+  Bid tid=38, Ask tid=33
+  Bid price=5, Ask price=5
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=4, Best ask=1
+  Bid head=27, Ask head=30
+  Bid size=2, Ask size=6
+  Bid customer=3, Ask customer=0
+  Bid tid=36, Ask tid=41
+  Bid price=4, Ask price=1
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=3, Best ask=1
+  Bid head=12, Ask head=30
+  Bid size=7, Ask size=4
+  Bid customer=4, Ask customer=0
+  Bid tid=18, Ask tid=41
+  Bid price=3, Ask price=1
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=5
+  Bid head=31, Ask head=32
+  Bid size=6, Ask size=7
+  Bid customer=1, Ask customer=1
+  Bid tid=42, Ask tid=43
+  Bid price=8, Ask price=5
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=1
+  Bid head=33, Ask head=34
+  Bid size=4, Ask size=10
+  Bid customer=2, Ask customer=2
+  Bid tid=44, Ask tid=45
+  Bid price=5, Ask price=1
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=3, Best ask=1
+  Bid head=12, Ask head=34
+  Bid size=3, Ask size=6
+  Bid customer=4, Ask customer=2
+  Bid tid=18, Ask tid=45
+  Bid price=3, Ask price=1
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=3, Best ask=1
+  Bid head=17, Ask head=34
+  Bid size=2, Ask size=3
+  Bid customer=2, Ask customer=2
+  Bid tid=24, Ask tid=45
+  Bid price=3, Ask price=1
+Market 0 block 0: fill_count=3, max_fills=2
+  Best bid=3, Best ask=1
+  Bid head=25, Ask head=34
+  Bid size=5, Ask size=1
+  Bid customer=2, Ask customer=2
+  Bid tid=34, Ask tid=45
+  Bid price=3, Ask price=1
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=3, Best ask=3
+  Bid head=25, Ask head=36
+  Bid size=4, Ask size=1
+  Bid customer=2, Ask customer=3
+  Bid tid=34, Ask tid=47
+  Bid price=3, Ask price=3
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=6, Best ask=5
+  Bid head=37, Ask head=32
+  Bid size=2, Ask size=1
+  Bid customer=4, Ask customer=1
+  Bid tid=48, Ask tid=43
+  Bid price=6, Ask price=5
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=6, Best ask=5
+  Bid head=37, Ask head=38
+  Bid size=1, Ask size=2
+  Bid customer=4, Ask customer=4
+  Bid tid=48, Ask tid=49
+  Bid price=6, Ask price=5
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=6, Best ask=5
+  Bid head=39, Ask head=38
+  Bid size=5, Ask size=1
+  Bid customer=0, Ask customer=4
+  Bid tid=50, Ask tid=49
+  Bid price=6, Ask price=5
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=6, Best ask=6
+  Bid head=39, Ask head=26
+  Bid size=4, Ask size=8
+  Bid customer=0, Ask customer=2
+  Bid tid=50, Ask tid=35
+  Bid price=6, Ask price=6
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=3
+  Bid head=42, Ask head=45
+  Bid size=7, Ask size=5
+  Bid customer=2, Ask customer=3
+  Bid tid=54, Ask tid=57
+  Bid price=5, Ask price=3
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=1
+  Bid head=46, Ask head=47
+  Bid size=8, Ask size=10
+  Bid customer=4, Ask customer=4
+  Bid tid=58, Ask tid=59
+  Bid price=7, Ask price=1
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=5, Best ask=1
+  Bid head=42, Ask head=47
+  Bid size=2, Ask size=2
+  Bid customer=2, Ask customer=4
+  Bid tid=54, Ask tid=59
+  Bid price=5, Ask price=1
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=9, Best ask=6
+  Bid head=49, Ask head=26
+  Bid size=5, Ask size=4
+  Bid customer=1, Ask customer=2
+  Bid tid=62, Ask tid=35
+  Bid price=9, Ask price=6
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=9, Best ask=7
+  Bid head=49, Ask head=1
+  Bid size=1, Ask size=6
+  Bid customer=1, Ask customer=0
+  Bid tid=62, Ask tid=1
+  Bid price=9, Ask price=7
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=6
+  Bid head=51, Ask head=52
+  Bid size=2, Ask size=7
+  Bid customer=2, Ask customer=2
+  Bid tid=64, Ask tid=65
+  Bid price=7, Ask price=6
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=6
+  Bid head=53, Ask head=52
+  Bid size=7, Ask size=5
+  Bid customer=3, Ask customer=2
+  Bid tid=66, Ask tid=65
+  Bid price=7, Ask price=6
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=7, Best ask=7
+  Bid head=53, Ask head=1
+  Bid size=2, Ask size=5
+  Bid customer=3, Ask customer=0
+  Bid tid=66, Ask tid=1
+  Bid price=7, Ask price=7
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=3, Best ask=1
+  Bid head=25, Ask head=56
+  Bid size=3, Ask size=6
+  Bid customer=2, Ask customer=4
+  Bid tid=34, Ask tid=69
+  Bid price=3, Ask price=1
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=3, Best ask=1
+  Bid head=55, Ask head=56
+  Bid size=8, Ask size=3
+  Bid customer=4, Ask customer=4
+  Bid tid=68, Ask tid=69
+  Bid price=3, Ask price=1
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=6, Best ask=5
+  Bid head=58, Ask head=57
+  Bid size=6, Ask size=5
+  Bid customer=1, Ask customer=0
+  Bid tid=72, Ask tid=71
+  Bid price=6, Ask price=5
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=6, Best ask=5
+  Bid head=58, Ask head=61
+  Bid size=1, Ask size=3
+  Bid customer=1, Ask customer=2
+  Bid tid=72, Ask tid=75
+  Bid price=6, Ask price=5
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=6, Best ask=5
+  Bid head=60, Ask head=61
+  Bid size=2, Ask size=2
+  Bid customer=2, Ask customer=2
+  Bid tid=74, Ask tid=75
+  Bid price=6, Ask price=5
+############## Kernel start ##############
+############## Kernel start ##############
+ Done (FPS: 215078475)
+Testing 1024 blocks × 1024 threads/block = 1048576 environments...Episode 0
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=3
+  Bid head=2, Ask head=3
+  Bid size=6, Ask size=7
+  Bid customer=1, Ask customer=1
+  Bid tid=2, Ask tid=3
+  Bid price=8, Ask price=3
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=3
+  Bid head=4, Ask head=3
+  Bid size=9, Ask size=1
+  Bid customer=2, Ask customer=1
+  Bid tid=4, Ask tid=3
+  Bid price=5, Ask price=3
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=5
+  Bid head=4, Ask head=7
+  Bid size=8, Ask size=4
+  Bid customer=2, Ask customer=3
+  Bid tid=4, Ask tid=7
+  Bid price=5, Ask price=5
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=9, Best ask=1
+  Bid head=8, Ask head=9
+  Bid size=7, Ask size=8
+  Bid customer=4, Ask customer=4
+  Bid tid=8, Ask tid=9
+  Bid price=9, Ask price=1
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=5, Best ask=1
+  Bid head=4, Ask head=9
+  Bid size=4, Ask size=1
+  Bid customer=2, Ask customer=4
+  Bid tid=4, Ask tid=9
+  Bid price=5, Ask price=1
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=3
+  Bid head=4, Ask head=12
+  Bid size=3, Ask size=8
+  Bid customer=2, Ask customer=2
+  Bid tid=4, Ask tid=15
+  Bid price=5, Ask price=3
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=2, Best ask=2
+  Bid head=0, Ask head=13
+  Bid size=1, Ask size=6
+  Bid customer=0, Ask customer=3
+  Bid tid=0, Ask tid=17
+  Bid price=2, Ask price=2
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=2, Best ask=2
+  Bid head=6, Ask head=13
+  Bid size=7, Ask size=5
+  Bid customer=3, Ask customer=3
+  Bid tid=6, Ask tid=17
+  Bid price=2, Ask price=2
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=3, Best ask=3
+  Bid head=15, Ask head=12
+  Bid size=10, Ask size=5
+  Bid customer=0, Ask customer=2
+  Bid tid=20, Ask tid=15
+  Bid price=3, Ask price=3
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=6, Best ask=3
+  Bid head=19, Ask head=20
+  Bid size=6, Ask size=2
+  Bid customer=2, Ask customer=2
+  Bid tid=24, Ask tid=25
+  Bid price=6, Ask price=3
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=6, Best ask=5
+  Bid head=19, Ask head=18
+  Bid size=4, Ask size=3
+  Bid customer=2, Ask customer=1
+  Bid tid=24, Ask tid=23
+  Bid price=6, Ask price=5
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=6, Best ask=6
+  Bid head=19, Ask head=14
+  Bid size=1, Ask size=6
+  Bid customer=2, Ask customer=4
+  Bid tid=24, Ask tid=19
+  Bid price=6, Ask price=6
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=5
+  Bid head=23, Ask head=24
+  Bid size=8, Ask size=1
+  Bid customer=4, Ask customer=4
+  Bid tid=28, Ask tid=29
+  Bid price=8, Ask price=5
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=8, Best ask=6
+  Bid head=23, Ask head=14
+  Bid size=7, Ask size=5
+  Bid customer=4, Ask customer=4
+  Bid tid=28, Ask tid=19
+  Bid price=8, Ask price=6
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=8, Best ask=6
+  Bid head=23, Ask head=22
+  Bid size=2, Ask size=7
+  Bid customer=4, Ask customer=3
+  Bid tid=28, Ask tid=27
+  Bid price=8, Ask price=6
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=4
+  Bid head=25, Ask head=26
+  Bid size=8, Ask size=7
+  Bid customer=0, Ask customer=0
+  Bid tid=30, Ask tid=31
+  Bid price=7, Ask price=4
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=7, Best ask=6
+  Bid head=25, Ask head=22
+  Bid size=1, Ask size=5
+  Bid customer=0, Ask customer=3
+  Bid tid=30, Ask tid=27
+  Bid price=7, Ask price=6
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=6
+  Bid head=27, Ask head=22
+  Bid size=4, Ask size=4
+  Bid customer=1, Ask customer=3
+  Bid tid=32, Ask tid=27
+  Bid price=8, Ask price=6
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=9, Best ask=6
+  Bid head=29, Ask head=28
+  Bid size=7, Ask size=4
+  Bid customer=2, Ask customer=1
+  Bid tid=34, Ask tid=33
+  Bid price=9, Ask price=6
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=9, Best ask=7
+  Bid head=29, Ask head=5
+  Bid size=3, Ask size=1
+  Bid customer=2, Ask customer=2
+  Bid tid=34, Ask tid=5
+  Bid price=9, Ask price=7
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=9, Best ask=7
+  Bid head=29, Ask head=30
+  Bid size=2, Ask size=3
+  Bid customer=2, Ask customer=2
+  Bid tid=34, Ask tid=35
+  Bid price=9, Ask price=7
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=6
+  Bid head=31, Ask head=32
+  Bid size=1, Ask size=6
+  Bid customer=3, Ask customer=3
+  Bid tid=36, Ask tid=37
+  Bid price=8, Ask price=6
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=7, Best ask=6
+  Bid head=33, Ask head=32
+  Bid size=5, Ask size=5
+  Bid customer=4, Ask customer=3
+  Bid tid=38, Ask tid=37
+  Bid price=7, Ask price=6
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=6, Best ask=5
+  Bid head=35, Ask head=37
+  Bid size=5, Ask size=6
+  Bid customer=0, Ask customer=1
+  Bid tid=40, Ask tid=43
+  Bid price=6, Ask price=5
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=6, Best ask=5
+  Bid head=36, Ask head=37
+  Bid size=10, Ask size=1
+  Bid customer=1, Ask customer=1
+  Bid tid=42, Ask tid=43
+  Bid price=6, Ask price=5
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=6, Best ask=2
+  Bid head=36, Ask head=41
+  Bid size=9, Ask size=8
+  Bid customer=1, Ask customer=3
+  Bid tid=42, Ask tid=47
+  Bid price=6, Ask price=2
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=1
+  Bid head=42, Ask head=43
+  Bid size=1, Ask size=6
+  Bid customer=4, Ask customer=4
+  Bid tid=48, Ask tid=49
+  Bid price=8, Ask price=1
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=6, Best ask=1
+  Bid head=36, Ask head=43
+  Bid size=1, Ask size=5
+  Bid customer=1, Ask customer=4
+  Bid tid=42, Ask tid=49
+  Bid price=6, Ask price=1
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=4, Best ask=1
+  Bid head=17, Ask head=43
+  Bid size=10, Ask size=4
+  Bid customer=1, Ask customer=4
+  Bid tid=22, Ask tid=49
+  Bid price=4, Ask price=1
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=7
+  Bid head=44, Ask head=30
+  Bid size=2, Ask size=1
+  Bid customer=0, Ask customer=2
+  Bid tid=50, Ask tid=35
+  Bid price=8, Ask price=7
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=8, Best ask=7
+  Bid head=44, Ask head=45
+  Bid size=1, Ask size=1
+  Bid customer=0, Ask customer=0
+  Bid tid=50, Ask tid=51
+  Bid price=8, Ask price=7
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=4, Best ask=4
+  Bid head=17, Ask head=47
+  Bid size=6, Ask size=9
+  Bid customer=1, Ask customer=1
+  Bid tid=22, Ask tid=53
+  Bid price=4, Ask price=4
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=4, Best ask=4
+  Bid head=40, Ask head=47
+  Bid size=3, Ask size=3
+  Bid customer=3, Ask customer=1
+  Bid tid=46, Ask tid=53
+  Bid price=4, Ask price=4
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=9, Best ask=8
+  Bid head=49, Ask head=1
+  Bid size=7, Ask size=1
+  Bid customer=4, Ask customer=0
+  Bid tid=58, Ask tid=1
+  Bid price=9, Ask price=8
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=9, Best ask=8
+  Bid head=49, Ask head=16
+  Bid size=6, Ask size=8
+  Bid customer=4, Ask customer=0
+  Bid tid=58, Ask tid=21
+  Bid price=9, Ask price=8
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=3, Best ask=1
+  Bid head=15, Ask head=52
+  Bid size=5, Ask size=2
+  Bid customer=0, Ask customer=0
+  Bid tid=20, Ask tid=61
+  Bid price=3, Ask price=1
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=3, Best ask=2
+  Bid head=15, Ask head=53
+  Bid size=3, Ask size=5
+  Bid customer=0, Ask customer=1
+  Bid tid=20, Ask tid=63
+  Bid price=3, Ask price=2
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=3, Best ask=2
+  Bid head=38, Ask head=53
+  Bid size=6, Ask size=2
+  Bid customer=2, Ask customer=1
+  Bid tid=44, Ask tid=63
+  Bid price=3, Ask price=2
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=3, Best ask=3
+  Bid head=38, Ask head=54
+  Bid size=4, Ask size=2
+  Bid customer=2, Ask customer=2
+  Bid tid=44, Ask tid=65
+  Bid price=3, Ask price=3
+############## Kernel start ##############
+############## Kernel start ##############
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=3, Best ask=3
+  Bid head=38, Ask head=60
+  Bid size=2, Ask size=3
+  Bid customer=2, Ask customer=0
+  Bid tid=44, Ask tid=71
+  Bid price=3, Ask price=3
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=8, Best ask=3
+  Bid head=61, Ask head=60
+  Bid size=10, Ask size=1
+  Bid customer=1, Ask customer=0
+  Bid tid=72, Ask tid=71
+  Bid price=8, Ask price=3
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=8, Best ask=4
+  Bid head=61, Ask head=56
+  Bid size=9, Ask size=3
+  Bid customer=1, Ask customer=3
+  Bid tid=72, Ask tid=67
+  Bid price=8, Ask price=4
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=8, Best ask=8
+  Bid head=61, Ask head=16
+  Bid size=6, Ask size=2
+  Bid customer=1, Ask customer=0
+  Bid tid=72, Ask tid=21
+  Bid price=8, Ask price=8
+Market 0 block 0: fill_count=3, max_fills=2
+  Best bid=8, Best ask=8
+  Bid head=61, Ask head=34
+  Bid size=4, Ask size=10
+  Bid customer=1, Ask customer=4
+  Bid tid=72, Ask tid=39
+  Bid price=8, Ask price=8
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=5
+  Bid head=62, Ask head=63
+  Bid size=6, Ask size=6
+  Bid customer=2, Ask customer=2
+  Bid tid=74, Ask tid=75
+  Bid price=5, Ask price=5
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=2, Best ask=1
+  Bid head=6, Ask head=64
+  Bid size=2, Ask size=6
+  Bid customer=3, Ask customer=3
+  Bid tid=6, Ask tid=77
+  Bid price=2, Ask price=1
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=2, Best ask=1
+  Bid head=10, Ask head=64
+  Bid size=8, Ask size=4
+  Bid customer=1, Ask customer=3
+  Bid tid=12, Ask tid=77
+  Bid price=2, Ask price=1
+############## Kernel start ##############
+Market 0 block 0: fill_count=0, max_fills=2
+  Best bid=5, Best ask=1
+  Bid head=65, Ask head=66
+  Bid size=1, Ask size=10
+  Bid customer=4, Ask customer=4
+  Bid tid=78, Ask tid=79
+  Bid price=5, Ask price=1
+Market 0 block 0: fill_count=1, max_fills=2
+  Best bid=2, Best ask=1
+  Bid head=10, Ask head=66
+  Bid size=4, Ask size=9
+  Bid customer=1, Ask customer=4
+  Bid tid=12, Ask tid=79
+  Bid price=2, Ask price=1
+Market 0 block 0: fill_count=2, max_fills=2
+  Best bid=2, Best ask=1
+  Bid head=11, Ask head=66
+  Bid size=2, Ask size=5
+  Bid customer=2, Ask customer=4
+  Bid tid=14, Ask tid=79
+  Bid price=2, Ask price=1
+Market 0 block 0: fill_count=3, max_fills=2
+  Best bid=2, Best ask=1
+  Bid head=21, Ask head=66
+  Bid size=5, Ask size=3
+  Bid customer=3, Ask customer=4
+  Bid tid=26, Ask tid=79
+  Bid price=2, Ask price=1
+ Done (FPS: 217056648)
+
+=== BENCHMARK RESULTS ===
+
+        Envs      Blocks  Threads/Block    Device   Avg Step(ms)   Max Step(ms)  Total Time(s)            FPS
+-------------------------------------------------------------------------------------------------------------------
+       65536         256            256         0          3.490         40.930          0.187       15434514
+      131072         256            512         0          0.719          1.111          0.033      175507243
+      262144         256           1024         0          1.249          1.611          0.056      205918806
+      131072         512            256         0          0.730          1.075          0.033      173987631
+      262144         512            512         0          1.286          1.733          0.058      199262952
+      524288         512           1024         0          2.359          2.879          0.105      219517661
+      262144        1024            256         0          1.301          1.765          0.059      197120963
+      524288        1024            512         0          2.413          2.958          0.107      215078475
+     1048576        1024           1024         0          4.804          5.602          0.213      217056648
+
+=== ANALYSIS ===
+Best FPS: 219517661 FPS (512 blocks × 1024 threads/block = 524288 envs)
+Best config latency: Avg 2.359ms, Max 2.879ms

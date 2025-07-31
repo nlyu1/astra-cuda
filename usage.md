@@ -16,4 +16,6 @@ cmake -S ./src -B ./build/build-release -G Ninja -DCMAKE_BUILD_TYPE=Release && c
 Quick benchmarking: running into bugs right now. 
 ```
 cmake -S ./src -B ./build/build-release -G Ninja -DCMAKE_BUILD_TYPE=Release && cmake --build ./build/build-release -j$(nproc) && ./build/build-release/tests/benchmark_env
+
+compute-sanitizer --tool memcheck ./build/build-release/tests/benchmark_env
 ```

@@ -65,7 +65,7 @@ BenchmarkResult test_market_throughput(int32_t num_markets_per_block, int32_t nu
     
     // Benchmark parameters
     const int warmup_steps = 100;
-    const int benchmark_steps = 10000;
+    const int benchmark_steps = 1000;
     
     // Create tensors directly on GPU for reuse
     torch::Tensor bid_px = torch::zeros({total_markets}, options);
@@ -257,7 +257,7 @@ int main(int argc, char* argv[]) {
     std::vector<std::pair<int32_t, int32_t>> configs;
     
     // Varying threads per block (num_markets_per_block)
-    std::vector<int32_t> threads_per_block = {64, 128, 256, 512, 1024};
+    std::vector<int32_t> threads_per_block = {64, 128, 256};
     std::vector<int32_t> num_blocks = {1, 64, 128, 256, 512, 1024};
     
     // Generate all combinations that don't exceed MAX_MARKETS

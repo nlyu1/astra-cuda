@@ -265,6 +265,10 @@ void HighLowTradingState::ApplyPlayerTrading(torch::Tensor move) {
   ASTRA_CHECK_GT(torch::min(ask_prices).item<int>(), 0);
   ASTRA_CHECK_LE(torch::max(bid_prices).item<int>(), GetGame()->GetMaxContractValue());
   ASTRA_CHECK_LE(torch::max(ask_prices).item<int>(), GetGame()->GetMaxContractValue());
+  ASTRA_CHECK_GE(torch::min(bid_sizes).item<int>(), 0);
+  ASTRA_CHECK_GE(torch::min(ask_sizes).item<int>(), 0);
+  ASTRA_CHECK_LE(torch::max(bid_sizes).item<int>(), GetGame()->GetMaxContractsPerTrade());
+  ASTRA_CHECK_LE(torch::max(ask_sizes).item<int>(), GetGame()->GetMaxContractsPerTrade());
 
   // Compute the fills 
   market_.AddTwoSidedQuotes(

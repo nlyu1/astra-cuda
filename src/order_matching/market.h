@@ -275,7 +275,7 @@ public:
     const torch::Tensor& GetCustomerPortfolios() const { 
         return customer_portfolios_; 
     } 
-    
+
 private:
     /**
      * @brief Matches orders for all markets in parallel and populates fills

@@ -151,21 +151,5 @@ int main() {
         }
     }
     
-    std::cout << "\n=== Analysis ===" << std::endl;
-    std::cout << "\nPotential issues identified:" << std::endl;
-    std::cout << "1. Portfolio index calculation overflow in match_orders_kernel" << std::endl;
-    std::cout << "   - Formula: (market_id * num_customers + customer_id) * 2" << std::endl;
-    std::cout << "   - With 65536+ markets, this can exceed tensor bounds" << std::endl;
-    std::cout << "2. Extremely small max_fills_per_market (2) in benchmark_env" << std::endl;
-    std::cout << "   - May cause assertion failures if many orders match" << std::endl;
-    std::cout << "3. Customer portfolio tensor layout assumptions" << std::endl;
-    std::cout << "   - Kernel assumes flattened indexing but tensor is 3D" << std::endl;
-    
-    std::cout << "\nRecommended fixes:" << std::endl;
-    std::cout << "1. Check customer_id bounds before portfolio access" << std::endl;
-    std::cout << "2. Use proper 3D tensor indexing for customer_portfolios" << std::endl;
-    std::cout << "3. Add bounds checking in match_orders_kernel" << std::endl;
-    std::cout << "4. Increase max_fills_per_market in high_low_trading game" << std::endl;
-    
     return 0;
 }

@@ -102,9 +102,10 @@ public:
             auto ask_prices = torch::randint(1, max_contract_value_ + 1, 
                                            {num_envs_}, options_i32_);
             
-            // Generate random sizes in range [0, 10]
-            auto bid_sizes = torch::randint(0, 11, {num_envs_}, options_i32_);
-            auto ask_sizes = torch::randint(0, 11, {num_envs_}, options_i32_);
+            // Generate random sizes in range [0, max_contracts_per_trade]
+            // Note: max_contracts_per_trade is set to 1 in the game parameters
+            auto bid_sizes = torch::randint(0, 2, {num_envs_}, options_i32_);  // 0 or 1
+            auto ask_sizes = torch::randint(0, 2, {num_envs_}, options_i32_);  // 0 or 1
             
             // Stack into shape [num_envs, 4]
             trading_action_ = torch::stack({bid_prices, ask_prices, bid_sizes, ask_sizes}, /*dim=*/1);
@@ -126,9 +127,7 @@ public:
         int total_steps = 0;
         
         for (int episode = 0; episode < num_episodes; ++episode) {
-            state_->Reset();
-            std::cout << "Episode " << episode << std::endl;
-            
+            state_->Reset();            
             while (!state_->IsTerminal()) {
                 int move_number = state_->MoveNumber();
                 Player current_player = state_->CurrentPlayer();
@@ -288,7 +287,7 @@ int main(int argc, char** argv) {
     
     std::vector<BenchmarkResult> results;
     
-    const int num_episodes = 20;  // Number of episodes per configuration
+    const int num_episodes = 200;  // Number of episodes per configuration
     
     std::cout << "Running benchmarks with " << num_episodes << " episodes per configuration..." << std::endl;
     std::cout << std::endl;
@@ -315,6 +314,7 @@ int main(int argc, char** argv) {
             try {
                 EnvironmentBenchmark benchmark(params);
                 auto result = benchmark.RunBenchmark(num_episodes);
+                cudaDeviceSynchronize(); 
                 results.push_back(result);
                 
                 std::cout << " Done (FPS: " << std::fixed << std::setprecision(0) 

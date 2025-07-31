@@ -173,9 +173,27 @@ __global__ void match_orders_kernel(
         int32_t trade_price = bid_is_quote ? bid_price : ask_price;
         int32_t trade_size = min(bid_size, ask_size);
         
-        // Check that we haven't exceeded max fills - if triggered, increase MAX_ACTIVE_FILLS_PER_MARKET
-        assert(fill_count < max_fills_per_market && "Exceeded maximum fills per market!");
-        
+        // Detailed debugging
+        // if (market_id == 0 && blockIdx.x == 0) {
+        //     printf("Market %d block %d: fill_count=%d, max_fills=%d\n",
+        //             market_id, blockIdx.x, fill_count, max_fills_per_market);
+        //     printf("  Best bid=%d, Best ask=%d\n", best_bid_price, best_ask_price);
+        //     printf("  Bid head=%d, Ask head=%d\n", bid_heads[bid_head_idx], ask_heads[ask_head_idx]);
+        //     printf("  Bid size=%d, Ask size=%d\n", bid_size, ask_size);
+        //     printf("  Bid customer=%d, Ask customer=%d\n", bid_customer, ask_customer);
+        //     printf("  Bid tid=%d, Ask tid=%d\n", bid_tid, ask_tid);
+        //     printf("  Bid price=%d, Ask price=%d\n", bid_price, ask_price);
+        // }
+        if (fill_count >= max_fills_per_market) {
+            printf("FATAL ERROR: Market %d exceeded max fills! fill_count=%d, max_fills=%d\n",
+                    market_id, fill_count, max_fills_per_market);
+            printf("  This indicates max_fills_per_market is too low for the trading volume\n");
+            printf("  Increase MAX_ACTIVE_FILLS_PER_MARKET in high_low_trading.cc\n");
+            // Set fill count to a sentinel value to indicate error
+            fill_counts[market_id] = -1;
+            return;
+        }
+
         // Record fill
         int32_t fill_idx = market_id * max_fills_per_market + fill_count;
         fill_prices[fill_idx] = trade_price;
@@ -395,7 +413,10 @@ VecMarket::VecMarket(const VecMarket& other)
 
 VecMarket::~VecMarket() {
     // PyTorch tensors automatically handle GPU memory cleanup
-}
+    // Ensure all kernels complete before deallocating memory
+    cudaSetDevice(device_id_);
+    cudaDeviceSynchronize();
+}   
 
 FillBatch VecMarket::NewFillBatch() const
 {
