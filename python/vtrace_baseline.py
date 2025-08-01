@@ -27,7 +27,6 @@ args = Args()
 args.meta_steps = 10
 args.exp_name = 'vtrace_single'
 args.num_iterations = 10000000000000
-args.checkpoint_interval = 2000 
 
 # impala configs
 args.psettlement_coef = 0.1
@@ -50,13 +49,13 @@ loads = []
 initial_agents = {}
 for path, name in loads:
     initial_agents[name] = HighLowTransformerModel(
-        args, env).to(device)
+        args, env, verbose=False).to(device)
     initial_agents[name].compile()
     initial_agents[name].load_state_dict(
         torch.load(path, map_location=device, weights_only=False)['model_state_dict'])
 for j in range(args.players - 1 - len(loads)):
     initial_agents[f'Random{j}'] = HighLowTransformerModel(
-        args, env).to(device)
+        args, env, verbose=False).to(device)
     initial_agents[f'Random{j}'].compile()
 
 num_features = env.num_features()
@@ -64,15 +63,13 @@ pool = Arena(env, initial_agents, device)
 print('Debug printout')
 pool.debug_printout()
 
-buffers = [
-    HighLowImpalaBuffer(args, num_features, device)
-    for _ in range(2)]
+buffer = HighLowImpalaBuffer(args, num_features, device)
 
 local_agent = HighLowTransformerModel(args, env).to(device)
 local_agent.compile()
 trainer = HighLowImpalaTrainer(
     args, local_agent, 
-    checkpoint_interval=args.checkpoint_interval,
+    checkpoint_interval=args.iterations_per_checkpoint,
     device=device)
 
 # %%
@@ -80,26 +77,7 @@ trainer = HighLowImpalaTrainer(
 global_step = 0
 timer = Timer()
 
-round_new_agent_name = 'challenger'
-# device = 'cuda' 
-# args = actor_shared_args['args']
 logger = HighLowLogger(args)
-
-random.seed(args.seed)
-np.random.seed(args.seed)
-torch.manual_seed(args.seed)
-
-# buffers = actor_shared_args['buffers']
-# ready_q = actor_shared_args['ready_q']
-# free_q = actor_shared_args['free_q']
-
-game_config = args.get_game_config()
-
-### Initialize environment, arena, and logger ###
-
-# inference_agent = actor_shared_args['inference_agent']
-# local_agent = deepcopy(inference_agent)
-# local_agent.compile()
 
 global_step, total_iterations = 0, 0
 timer, ticker = Timer(), OneTickTimer()
@@ -112,11 +90,6 @@ player_reward_buffer = env.new_player_reward_buffer() # [N]
 
 pbar = tqdm(range(args.num_iterations))
 for iteration in pbar: 
-    # actor_shared_args['shared_info']['total_iterations'] = total_iterations
-    # buf_id = free_q.get()
-    buf_id = 0 
-    training_wait_time = ticker.tick()
-
     # Pick npc agents and player offset
     player_offset = np.random.randint(0, game_config['players'])
     npc_agent_names = pool.select_topk(game_config['players'] - 1)
@@ -130,7 +103,6 @@ for iteration in pbar:
         + [npc_agent_names[j - 1] for j in range(player_offset + 1, game_config['players'])])
 
     ### Rollout ### 
-
     settlement_preds, private_role_preds = [], []
     for step in range(args.num_steps):
         global_step += args.num_envs 
@@ -139,8 +111,9 @@ for iteration in pbar:
             assert (env.current_player() == npc_id), f"Environment must be ready for NPC {npc_id}, but {env.current_player()} is acting."
             env.fill_observation_tensor(observation_buffer)
             # print(f'Player {npc_id} acted upon', observation_buffer[0])
-
-            npc_actions = npc_agents[npc_id].incremental_forward(observation_buffer, step)['action']
+            with torch.autocast(device_type=device.type, dtype=torch.bfloat16):
+                with torch.inference_mode():
+                    npc_actions = npc_agents[npc_id].incremental_forward(observation_buffer, step)['action']
             # print(f'Player {npc_id} action:', npc_actions[0])
             env.step(npc_actions)
         
@@ -148,24 +121,23 @@ for iteration in pbar:
         # Prior to stepping & observing new rewards, flush the cumulated rewards to buffer
         # Environment cannot terminate before player makes action (due to the design of our environment)
         assert env.current_player() == player_offset, f"Environment must be ready for player {player_offset}, but {env.current_player()} is acting."
-
         if step > 0: # Only update if step > 0, since step 0 is the initial state 
-            env.fill_rewards_since_last_action(buffers[buf_id].rewards[step - 1])
-            # print(f'Player {player_offset} reward since last action: {buffers[buf_id].rewards[step - 1]}')
-            buffers[buf_id].update_late_stats(
+            env.fill_rewards_since_last_action(buffer.rewards[step - 1])
+            # print(f'Player {player_offset} reward since last action: {buffer.rewards[step - 1]}')
+            buffer.update_late_stats(
                 {'dones': torch.zeros(args.num_envs).to(device).float()}, step - 1)
 
         # observation, action, log_probs, value can be calculated immediately 
-        env.fill_observation_tensor(buffers[buf_id].obs[step])
-        # print(f'Player! {player_offset} observation: {buffers[buf_id].obs[step][0]}')
+        env.fill_observation_tensor(buffer.obs[step])
+        # print(f'Player! {player_offset} observation: {buffer.obs[step][0]}')
         with torch.autocast(device_type=device.type, dtype=torch.bfloat16):
             with torch.inference_mode():
-                forward_results = local_agent.incremental_forward(buffers[buf_id].obs[step], step)
+                forward_results = local_agent.incremental_forward(buffer.obs[step], step)
         action, log_probs = forward_results['action'], forward_results['logprobs']
         settlement_preds.append(forward_results['pinfo_preds']['settle_price'].clone())
         private_role_preds.append(forward_results['pinfo_preds']['private_roles'].argmax(dim=-1))
 
-        buffers[buf_id].update({
+        buffer.update({
             # Observations are implicitly updated above. 
             'actions': action,
             'logprobs': log_probs,
@@ -180,114 +152,64 @@ for iteration in pbar:
             assert (env.current_player() == player_id), f"Environment must be ready for NPC {npc_id}, but {env.current_player()} is acting."
             env.fill_observation_tensor(observation_buffer)
             # print(f'Player {player_id} acted upon', observation_buffer[0])
-
-            npc_actions = npc_agents[npc_id].incremental_forward(observation_buffer, step)['action']
+            with torch.autocast(device_type=device.type, dtype=torch.bfloat16):
+                with torch.inference_mode():
+                    npc_actions = npc_agents[npc_id].incremental_forward(observation_buffer, step)['action']
             # print(f'Player {player_id} action:', npc_actions[0])
             env.step(npc_actions)
 
         if env.terminal():
             # This is the cumulative rewards, for logging. 
             env.fill_returns(returns_buffer)
-            env.fill_rewards_since_last_action(buffers[buf_id].rewards[step], player_offset)
+            env.fill_rewards_since_last_action(buffer.rewards[step], player_offset)
 
             # Reset environment 
-            buffers[buf_id].update_late_stats({
+            buffer.update_late_stats({
                 'rewards': player_reward_buffer,
                 'dones': torch.ones(args.num_envs).to(device).float()}, step)
 
             # Unfortunately, logging must happen before environment is reset
             env_info = env.expose_info()
             env_pinfo_targets = env.get_pinfo_targets()
-            print('private role preds:', torch.stack(private_role_preds, dim=0).shape)
             logging_inputs = {
                 'returns': returns_buffer,
                 'offset': player_offset,
                 'settlement_preds': torch.stack(settlement_preds, dim=0),
                 'private_role_preds': torch.stack(private_role_preds, dim=0),
                 'infos': env_info | env_pinfo_targets}
-            print('Logging inputs keys:', list(logging_inputs.keys()))
             # Only incur heavy logging when we're in seat 0 and after a certain interval 
             heavy_logging_update = (
-                logger.counter - logger.last_heavy_counter > 1 # args.iterations_per_heavy_logging 
+                logger.counter - logger.last_heavy_counter > args.iterations_per_heavy_logging 
                 and player_offset == 0)
-            logger.update_stats(logging_inputs, global_step, heavy_updates=heavy_logging_update)
             pool.register_playout_scores(returns_buffer.mean(0), round_agent_names) 
             pbar.set_postfix({'mean_score': f'{returns_buffer.mean(0)[player_offset].item():.2f}'})
             if heavy_logging_update:
-                pool.log_stats()
+                pool.log_stats(global_step)
+            logger.update_stats(logging_inputs, global_step, heavy_updates=heavy_logging_update)
 
             # Populate buffer's actual private info
             # See `env.py` env_pinfo_target method
-            buffers[buf_id].actual_private_roles.copy_(env_pinfo_targets['pinfo_targets'], non_blocking=True)
-            buffers[buf_id].actual_settlement.copy_(env_pinfo_targets['settlement_values'], non_blocking=True)
+            buffer.actual_private_roles.copy_(env_pinfo_targets['pinfo_targets'], non_blocking=True)
+            buffer.actual_settlement.copy_(env_pinfo_targets['settlement_values'], non_blocking=True)
             
             ### Reset environment ###
             env.reset()
         assert (env.current_player() == 0), "Next environment must be ready for player"
 
     #### Fill buffer end. Update trainer ####
-    # assert env.is_initial_move_state(), "Environment must have just been reset"
-    # running_sps = timer.tick(args.num_envs * args.num_steps)
-    # wandb.log({"performance/SPS": running_sps}, step=global_step)
-    # rollout_time = ticker.tick()
-    # ready_q.put(buf_id)
+    running_sps = timer.tick(args.num_envs * args.num_steps)
+    wandb.log({"performance/SPS": running_sps}, step=global_step)
 
-    # if iteration > 10: # Skip first 10 iterations to avoid noise 
-    #     learner_logs = deepcopy(actor_shared_args['shared_info']['learner_logs'])
-    #     learner_logs['performance/RolloutTime'] = rollout_time
-    #     learner_logs['performance/TrainingWaitTime'] = training_wait_time
-    #     wandb.log(learner_logs)
-    # local_agent.load_state_dict(actor_shared_args['inference_agent'].state_dict())
+    update_dictionary = buffer.get_update_dictionary()
+    trainer_results = trainer.train(update_dictionary)
+    wandb.log(trainer_results, step=global_step)
 
-    # total_iterations += 1
-
-    # if total_iterations % args.iterations_per_pool_update == 0:
-    #     pool.register_agent(local_agent, agent_name)
-    #     pool.random_maintainance()
-    #     pool.debug_printout()
-    #     agent_name = str(total_iterations)
+    total_iterations += 1
+    if total_iterations % args.iterations_per_pool_update == 0:
+        pool.register_agent(local_agent, agent_name)
+        pool.debug_printout()
+        agent_name = str(total_iterations)
 
 # Benchmark notes: 
-#    At 64 T/B * 128 B, 5090 goes at ~2.5 it/s. 4060ti goes at ~1.61 it/s
-
-def learner_process(learner_shared_args):
-    """
-    Learner keeps track of training. 
-    """
-    device = 'cuda' 
-    args = learner_shared_args['args']
-    inference_agent = learner_shared_args['inference_agent']
-
-    trainer = HighLowImpalaTrainer(
-        args, 
-        deepcopy(inference_agent).to(device),
-        name='impala', 
-        checkpoint_interval=args.iterations_per_checkpoint,
-        device=device)
-    trainer.agent.compile()
-
-    random.seed(args.seed)
-    np.random.seed(args.seed)
-    torch.manual_seed(args.seed)
-
-    buffers = learner_shared_args['buffers']
-    ready_q = learner_shared_args['ready_q']
-    free_q = learner_shared_args['free_q']
-
-    ticker = OneTickTimer()
-    while True:
-        buf_id = ready_q.get()
-        learner_shared_args['shared_info']['learner_logs']['performance/RolloutWaitTime'] = ticker.tick()
-
-        # This is an out of place operation; grabs from shared memory to local 
-        update_dictionary = buffers[buf_id].get_update_dictionary()
-
-        results = trainer.train(update_dictionary)
-        free_q.put(buf_id)
-        learner_shared_args['shared_info']['learner_logs']['performance/TrainingTime'] = ticker.tick()
-
-        for k, v in results.items():
-            learner_shared_args['shared_info']['learner_logs'][k] = v
-        # Push the newly learned weights to actors 
-        inference_agent.load_state_dict(trainer.agent.state_dict())
-        trainer.save_checkpoint(learner_shared_args['shared_info']['total_iterations'])
+#    Pure rollout: At 64 T/B * 128 B, 5090 goes at ~2.5 it/s. 4060ti goes at ~1.61 it/s
+#    Rollout + training: ~2 it/s

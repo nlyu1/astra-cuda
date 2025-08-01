@@ -59,7 +59,7 @@ Model size: 2.29 MB (assuming float32)
 """
 context = agent.initial_context()
 for t in range(T):
-    outputs = agent.sample_actions(mock_input[t], context)
+    outputs = agent.incremental_forward_with_context(mock_input[t], context)
     context = outputs['context']
     # print(context.shape)
 

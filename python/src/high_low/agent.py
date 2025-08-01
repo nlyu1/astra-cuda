@@ -130,7 +130,8 @@ class HighLowTransformerModel(nn.Module):
             values: [T, B]
             logprobs: [T, B]
             entropy: [T, B]
-            pinfo_preds: dict
+            pinfo_preds / private_roles: [T, B, num_players, 3]
+            pinfo_preds / settle_price: [T, B]
         """
         T, B, F = x.shape
         bid_px, ask_px, bid_sz, ask_sz = actions.unbind(dim=-1) #[T, B] each
@@ -156,6 +157,7 @@ class HighLowTransformerModel(nn.Module):
         values = self.critic(features).reshape(T, B)
         pinfo_preds = {k: self.pinfo_model[k](features) for k in self.pinfo_model}
         pinfo_preds['private_roles'] = pinfo_preds['private_roles'].reshape(T, B, self.P, 3)
+        pinfo_preds['settle_price'] = pinfo_preds['settle_price'].reshape(T, B)
         
         return {
             'values': values,
@@ -248,7 +250,7 @@ class HighLowTransformerModel(nn.Module):
         """Compile the batch forward method for faster execution."""
         self._compiled_batch_forward = torch.compile(
             self._batch_forward, 
-            mode=mode, 
+            mode='default', # Doesn't work with max-autotune
             fullgraph=fullgraph)
         
         # Compile sample_actions with dynamic shapes support

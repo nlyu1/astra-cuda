@@ -86,7 +86,7 @@ class Arena:
                 'stds': stds_sorted, 'choose_prob': choose_sorted}
     
     # ------------------------- wandb‑native logging ------------------------ #
-    def log_stats(self):
+    def log_stats(self, global_step=None):
         """
         Push two bar-charts to wandb:
         1. Average return for every agent in the pool
@@ -114,7 +114,12 @@ class Arena:
             tbl, "agent", "sampling_prob",
             title=f"Sampling probability",
         )
-        wandb.log({
+        log_data = {
             "arena/average_returns": bar_ret,
             "arena/sampling_probability": bar_prob
-        })
+        }
+        
+        if global_step is not None:
+            wandb.log(log_data, step=global_step)
+        else:
+            wandb.log(log_data)

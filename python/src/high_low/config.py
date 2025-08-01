@@ -27,7 +27,7 @@ class Args:
     update_epochs: int = 2
     """the K epochs to update the policy.
     `num_minibatches * update_epochs` trades between sampling efficiency and training stability."""
-    ent_coef: float = 0.05
+    ent_coef: float = 0.1
     """coefficient of the entropy"""
     vf_coef: float = 0.5
     """coefficient of the value function"""
@@ -52,11 +52,11 @@ class Args:
     """Number of vectorized times to interact with environment per meta-step. 
     Per each iteration, we sample (num_envs * num_steps) frames to form a batch, 
     then split into (num_minibatches) minibatches and update network for (update_epochs) epochs."""
-    iterations_per_pool_update: int = None 
+    iterations_per_pool_update: int = 3000
     """Number of iterations between pool updates. Set to none to do static training."""
 
     #### Logging specification ####
-    iterations_per_checkpoint: int = 2000
+    iterations_per_checkpoint: int = 1500
     """Number of iterations between checkpoints"""
     iterations_per_heavy_logging: int = 1000
     """Number of iterations between heavy logging"""

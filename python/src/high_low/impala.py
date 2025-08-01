@@ -139,7 +139,7 @@ def vtrace_losses(
         'value_r2': value_r2,
     }
     return result 
-compiled_vtrace_losses = torch.compile(vtrace_losses, mode='max-autotune', fullgraph=True)
+compiled_vtrace_losses = torch.compile(vtrace_losses, mode='default', fullgraph=True)
     
 
 class HighLowImpalaTrainer:
@@ -153,7 +153,7 @@ class HighLowImpalaTrainer:
         )
         self.last_checkpoint = -1
         self.checkpoint_interval = checkpoint_interval
-        self._compiled_train_step = torch.compile(self._train_step, mode="max-autotune", fullgraph=True)
+        self._compiled_train_step = torch.compile(self._train_step, mode="default", fullgraph=True)
 
         # Weights for private loss: [0, ..., 1] across different time steps
         # Decay by half every (tau) ratio away from horizon. 
@@ -188,31 +188,32 @@ class HighLowImpalaTrainer:
         num_envs_per_minibatch = self.args.num_envs // self.args.num_minibatches
         assert num_envs_per_minibatch * self.args.num_minibatches == self.args.num_envs
 
-        for _ in range(self.args.update_epochs):
-            batch_env_indices = torch.randperm(self.args.num_envs).to(obs.device)
-            for start in range(0, self.args.num_envs, num_envs_per_minibatch):
-                end = start + num_envs_per_minibatch
-                minibatch_env_indices = batch_env_indices[start:end]
+        with torch.autocast(device_type=obs.device.type, dtype=torch.bfloat16):
+            for _ in range(self.args.update_epochs):
+                batch_env_indices = torch.randperm(self.args.num_envs).to(obs.device)
+                for start in range(0, self.args.num_envs, num_envs_per_minibatch):
+                    end = start + num_envs_per_minibatch
+                    minibatch_env_indices = batch_env_indices[start:end]
 
-                step_results = self._compiled_train_step(
-                    minibatch_env_indices,
-                    obs, logprobs, actions, rewards, dones, 
-                    update_dictionary['actual_settlement'],
-                    update_dictionary['actual_private_roles'],
-                )
-                step_results['loss'].backward()
-                nn.utils.clip_grad_norm_(self.agent.parameters(), self.args.max_grad_norm)
-                self.optimizer.step()
-                self.optimizer.zero_grad()
+                    # step_results = self._compiled_train_step(
+                    step_results = self._train_step(
+                        minibatch_env_indices,
+                        obs, logprobs, actions, rewards, dones, 
+                        update_dictionary['actual_settlement'],
+                        update_dictionary['actual_private_roles'])
+                    step_results['loss'].backward()
+                    nn.utils.clip_grad_norm_(self.agent.parameters(), self.args.max_grad_norm)
+                    self.optimizer.step()
+                    self.optimizer.zero_grad()
 
-                explained_vars[logging_counter] = step_results['explained_vars']
-                value_losses[logging_counter] = step_results['value_losses']
-                pg_losses[logging_counter] = step_results['pg_losses']
-                entropy_losses[logging_counter] = step_results['entropy_losses']
-                approx_kls[logging_counter] = step_results['approx_kls']
-                pred_settlement_losses[logging_counter] = step_results['pred_settlement_loss']
-                pred_private_roles_losses[logging_counter] = step_results['pred_private_roles_loss']
-                logging_counter += 1
+                    explained_vars[logging_counter] = step_results['explained_vars']
+                    value_losses[logging_counter] = step_results['value_losses']
+                    pg_losses[logging_counter] = step_results['pg_losses']
+                    entropy_losses[logging_counter] = step_results['entropy_losses']
+                    approx_kls[logging_counter] = step_results['approx_kls']
+                    pred_settlement_losses[logging_counter] = step_results['pred_settlement_loss']
+                    pred_private_roles_losses[logging_counter] = step_results['pred_private_roles_loss']
+                    logging_counter += 1
 
         return {
             'metrics/explained_vars': explained_vars.mean().item(),
@@ -241,28 +242,14 @@ class HighLowImpalaTrainer:
 
         # Off-policy network, using surrogate loss 
         # [T, b, 4] -> [T*b, 4]
-        reference_actions = actions[:, minibatch_env_indices].reshape(-1, 4)
-        batch_obs = obs[:, minibatch_env_indices].reshape(-1, *single_obs_shape)
-        reference_actions = {
-            'bid_price': reference_actions[:, 0],
-            'ask_price': reference_actions[:, 1],
-            'bid_size': reference_actions[:, 2],
-            'ask_size': reference_actions[:, 3],
-        }
-        outputs = self.agent._forward_impl(
-            batch_obs, reference_actions)
+        outputs = self.agent(
+            obs[:, minibatch_env_indices],
+            actions[:, minibatch_env_indices])
         # _, new_logprob, entropy, values
-        new_logprob, entropy, values = outputs['log_prob'], outputs['entropy'], outputs['values']
-        pred_settlement = outputs['private_info']['predicted_settlement'] # [T*b]
-        pred_private_roles = outputs['private_info']['predicted_private_roles'] # [T*b, num_players, 3]
-
-        # Recast back to normal shape 
-        new_logprob = new_logprob.reshape(T, num_envs_per_minibatch)
-        entropy = entropy.reshape(T, num_envs_per_minibatch)
-        values = values.reshape(T, num_envs_per_minibatch)
-        pred_settlement = pred_settlement.reshape(T, num_envs_per_minibatch)
-        # pred_private_roles = pred_private_roles.reshape(T, num_envs_per_minibatch, self.args.players, 3)
-
+        new_logprob, entropy, values = outputs['logprobs'], outputs['entropy'], outputs['values']
+        pred_settlement = outputs['pinfo_preds']['settle_price']
+        pred_private_roles = outputs['pinfo_preds']['private_roles'] # [T*b, num_players, 3]
+        
         # Private loss 
         pred_settlement_loss = torch.nn.functional.smooth_l1_loss(
             pred_settlement, 

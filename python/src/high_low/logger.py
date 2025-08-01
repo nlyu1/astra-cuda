@@ -59,7 +59,7 @@ class HighLowLogger:
 
         if customer_mask.any():
             position_diff = (
-                (infos['target_positions'][:, offset] - infos['players'][:, offset, -1, -1])
+                (infos['target_positions'][:, offset] - infos['players'][:, offset, -1, -2])
             )[customer_mask].abs().float().mean().item() # Position difference at last timestep 
         else:
             position_diff = 0
@@ -73,7 +73,7 @@ class HighLowLogger:
             'reward/welfare': returns.sum(-1).mean().item(),
             'reward/missed_positions': position_diff}
 
-        for s in [-6, 0, 6]: 
+        for s in [-10, -6, 0, 6, 10]: 
             size_mask = (customer_size_sum == s)
             log_data = log_data | ({
                 f'last_price_diff/{s}': last_price_diff[size_mask, -1].float().mean().item(),
@@ -102,7 +102,6 @@ class HighLowLogger:
             idx = int(pivot * (settlement_preds.shape[0] - 1))
             log_data[f'settlement_pred_diff/{idx+1}'] = settlement_diff[idx].mean().item()
             log_data[f'acc/non_self_acc{idx+1}'] = non_self_acc[idx].mean().item()
-        wandb.log(log_data, step=global_step)
 
         if heavy_updates: 
             customer_size_mask = (customer_size_sum == 0)
@@ -129,4 +128,4 @@ class HighLowLogger:
             #     f"probes/probe{probe}": wandb.Plotly(plot_market_and_players(infos, self.args, env_idx=probe))
             #     for probe in env_probe_indices}
             # log_data.update(probe_plots)
-            wandb.log(log_data, step=global_step)
+        wandb.log(log_data, step=global_step)
