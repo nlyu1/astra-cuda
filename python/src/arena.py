@@ -13,11 +13,12 @@ class Arena:
     """
     Playout scores can be registered freely, while agents can only be sampled after they're registered. 
     """
-    def __init__(self, env, initial_agents):
+    def __init__(self, env, initial_agents, device):
+        self.device = device 
         self.agents = {k: deepcopy(v) for k, v in initial_agents.items()}
         for k in self.agents:
             self.agents[k].eval()
-            self.agents[k].cuda()
+            self.agents[k].to(self.device)
         self.playout_scores = defaultdict(list)
         self.eval_env = env 
 
@@ -27,7 +28,7 @@ class Arena:
         """
         self.agents[agent_name] = deepcopy(agent)
         self.agents[agent_name].eval()
-        self.agents[agent_name].cuda()
+        self.agents[agent_name].to(self.device)
         
     def register_playout_scores(self, scores, agent_names):
         for agent_name, score in zip(agent_names, scores):
@@ -54,7 +55,7 @@ class Arena:
             playable_string = "playable=" + ("true" if name in self.agents else "false")
             print(f"    {name} ({playable_string}): {score:.2f} ± {std:.2f} (prob={prob:.2f})")
 
-    def select_topk(self, k, random_prob=.2):
+    def select_topk(self, k): 
         sorted_info = self.get_sorted_info()
         chosen_names = np.random.choice(
             sorted_info['names'], k, replace=False, p=sorted_info['choose_prob'])
@@ -70,7 +71,8 @@ class Arena:
         ranks = np.empty_like(means, dtype=int)
         ranks[np.argsort(-means)] = np.arange(len(means))
         
-        rank_prob    = 1 / (ranks + 1 + 5)
+        normalize_offset = 3
+        rank_prob    = 1 / (ranks + 1 + normalize_offset)
         rank_prob    = rank_prob / rank_prob.sum()
 
         # ---- sort by mean so charts look tidy ------------------------------

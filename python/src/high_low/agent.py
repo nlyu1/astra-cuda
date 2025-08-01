@@ -163,24 +163,21 @@ class HighLowTransformerModel(nn.Module):
             'pinfo_preds': pinfo_preds
         }
 
-    def initial_context(self):
-        """Returns initial context (empty tensor for compatibility)."""
-        return torch.zeros(0, device=self.device)
-
-    def _incremental_core(self, context: torch.Tensor) -> torch.Tensor:
-        """
-        Sample actions for a single timestep given augmented context. 
-        context: [T_sofar, B, D]
-        """
-        context = self.pos_encoding(context)
-        T_ctx = context.size(0)
-        mask = nn.Transformer.generate_square_subsequent_mask(T_ctx, device=context.device)
-        h = self.transformer(context, mask=mask, is_causal=True)[-1] # [B, D]
-        features = self.decoder(h)
-        return features # [B, D]
+    @torch.inference_mode()
+    def incremental_forward(self, x, step):
+        if step == 0:
+            assert self.context.numel() == 0, f"Context must be empty for first step, but got {self.context.shape}"
+        else:
+            assert self.context.shape[0] == step, f"Context must be of length {step}, but got {self.context.shape[0]}"
+        outputs = self.incremental_forward_with_context(x, self.context)
+        self.context = outputs['context']
+        return {
+            'action': outputs['action'], 
+            'logprobs': outputs['logprobs'], 
+            'pinfo_preds': outputs['pinfo_preds']}
 
     @torch.inference_mode()
-    def sample_actions(self, x, prev_context):
+    def incremental_forward_with_context(self, x, prev_context):
         """
         x: [B, F]
         prev_context: [T_sofar, B, D]. Post-encoder, pre-posEncoding
@@ -211,7 +208,32 @@ class HighLowTransformerModel(nn.Module):
                 actions['ask_size'],
             ], dim=-1)
             logprobs = sum(dists[k].log_prob(actions[k]) for k in dists) 
-            return {'action': action_tensor.int(), 'logprobs': logprobs, 'context': context}
+            pinfo_preds = {k: self.pinfo_model[k](features) for k in self.pinfo_model}
+
+            return {
+                'action': action_tensor.int(), 
+                'logprobs': logprobs, 
+                'pinfo_preds': pinfo_preds,
+                'context': context}
+
+    def initial_context(self):
+        """Returns initial context (empty tensor for compatibility)."""
+        return torch.zeros(0, device=self.device)
+
+    def reset_context(self):
+        self.context = self.initial_context()
+
+    def _incremental_core(self, context: torch.Tensor) -> torch.Tensor:
+        """
+        Sample actions for a single timestep given augmented context. 
+        context: [T_sofar, B, D]
+        """
+        context = self.pos_encoding(context)
+        T_ctx = context.size(0)
+        mask = nn.Transformer.generate_square_subsequent_mask(T_ctx, device=context.device)
+        h = self.transformer(context, mask=mask, is_causal=True)[-1] # [B, D]
+        features = self.decoder(h)
+        return features # [B, D]
 
     def forward(self, x, actions=None):
         if self._compiled_batch_forward is not None:

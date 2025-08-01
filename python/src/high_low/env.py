@@ -62,7 +62,7 @@ class HighLowTrading:
         return current_player
     
     def fill_observation_tensor(self, values, player=None):
-        return self.env.fill_observation_tensor(self.current_player(), values)
+        self.env.fill_observation_tensor(self.current_player(), values)
     
     def observation_shape(self):
         return self.game.observation_tensor_shape()
