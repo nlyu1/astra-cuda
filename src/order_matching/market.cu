@@ -348,6 +348,9 @@ VecMarket::VecMarket(int32_t num_markets, int32_t max_price_levels,
     cudaGetDeviceCount(&device_count);
     ASTRA_CHECK_GE(device_id, 0);
     ASTRA_CHECK_LT(device_id, device_count);
+    
+    // Set the CUDA device for this context
+    cudaSetDevice(device_id_);
 
     // Configure tensor options for the specified device
     auto device = torch::Device(torch::kCUDA, device_id);
@@ -430,6 +433,7 @@ FillBatch VecMarket::NewFillBatch() const
     batch.fill_quote_sizes = torch::zeros({num_markets_, max_fills_per_market_}, options_options_i32);
     batch.fill_tid = torch::zeros({num_markets_, max_fills_per_market_}, options_options_i32);
     batch.fill_quote_tid = torch::zeros({num_markets_, max_fills_per_market_}, options_options_i32);
+    batch.fill_counts = torch::zeros({num_markets_}, options_options_i32);  // CRITICAL: Initialize fill counts!
     
     return batch;
 }
@@ -456,6 +460,9 @@ void VecMarket::AddTwoSidedQuotes(
     torch::Tensor ask_px, torch::Tensor ask_sz,
     torch::Tensor customer_ids, FillBatch& fills)
 {   
+    // Set CUDA device
+    cudaSetDevice(device_id_);
+    
     // Validate input dimensions
     ASTRA_CHECK_EQ(bid_px.size(0), num_markets_);
     ASTRA_CHECK_EQ(bid_sz.size(0), num_markets_);
@@ -529,6 +536,9 @@ void VecMarket::AddTwoSidedQuotes(
 
 void VecMarket::MatchAllMarkets(FillBatch& fills)
 {   
+    // Set CUDA device
+    cudaSetDevice(device_id_);
+    
     // Clear fill counts
     fills.fill_counts.zero_();
 
@@ -562,6 +572,9 @@ void VecMarket::MatchAllMarkets(FillBatch& fills)
 
 void VecMarket::GetBBOs(BBOBatch& bbos)
 {
+    // Set CUDA device
+    cudaSetDevice(device_id_);
+    
     // Launch BBO kernel
     dim3 blocks((num_markets_ + threads_per_block_ - 1) / threads_per_block_);
     dim3 threads(threads_per_block_);
@@ -679,6 +692,9 @@ std::string VecMarket::ToString(int32_t market_id) const
 
 void VecMarket::Reset()
 {
+    // Set CUDA device
+    cudaSetDevice(device_id_);
+    
     // Reset all price level linked lists to NULL_INDEX
     bid_heads_.fill_(NULL_INDEX);
     ask_heads_.fill_(NULL_INDEX);
@@ -701,6 +717,9 @@ void VecMarket::Reset()
 
 void VecMarket::ClearQuotes(torch::Tensor reset_indices)
 {
+    // Set CUDA device
+    cudaSetDevice(device_id_);
+    
     // Validate input
     ASTRA_CHECK_EQ(reset_indices.dim(), 1);
     ASTRA_CHECK_EQ(reset_indices.size(0), num_markets_);

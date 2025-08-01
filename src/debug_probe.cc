@@ -111,9 +111,7 @@ int main() {
             
             // Create fill batch
             auto fills = market.NewFillBatch();
-            
-            std::cout << "Running AddTwoSidedQuotes with realistic trading data..." << std::endl;
-            
+                        
             // Simulate multiple rounds like in benchmark_env
             for (int round = 0; round < steps_per_player; ++round) {
                 for (int player = 0; player < num_players; ++player) {

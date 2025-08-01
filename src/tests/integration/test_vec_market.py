@@ -13,10 +13,10 @@ import astra_cuda
 aom = astra_cuda.order_matching
 
 
-def create_tensors(values, dtype=torch.uint32, device='cuda'):
+def create_tensors(values, dtype=torch.int32, device='cuda'):
     """Helper to create CUDA tensors from values."""
     if isinstance(values, int):
-        return torch.tensor([values], dtype=dtype, device=device)
+        return torch.tensor([values], dtype=dtype, device=device).int()
     return torch.tensor(values, dtype=dtype, device=device)
 
 
@@ -33,9 +33,10 @@ class TestVecMarket:
         )
         
         # Check exposed constants
-        assert aom.MAX_MARKETS == 106496
+        assert aom.MAX_MARKETS == 2048 * 2048  # 4194304
         assert aom.PRICE_LEVELS == 128
-        assert aom.NULL_INDEX == 0xFFFFFFFF
+        # NULL_INDEX is -1 when interpreted as signed int32_t, which equals 0xFFFFFFFF unsigned
+        assert aom.NULL_INDEX == -1  # This is 0xFFFFFFFF in unsigned representation
     
     def test_partial_fills(self):
         """Test partial order fills."""
@@ -210,13 +211,13 @@ class TestVecMarket:
         best_bid_px = bbo.best_bid_prices.cpu()
         
         # Market 0: No bid (size was 0)
-        assert best_bid_px[0].item() == aom.NULL_INDEX
+        assert best_bid_px[0].item() == -1  # NULL_INDEX
         
         # Market 1: Has bid
         assert best_bid_px[1].item() == 20
         
         # Market 2: No bid (size was 0)
-        assert best_bid_px[2].item() == aom.NULL_INDEX
+        assert best_bid_px[2].item() == -1  # NULL_INDEX
     
     def test_price_crossing_logic(self):
         """Test various price crossing scenarios."""
@@ -390,20 +391,20 @@ class TestVecMarket:
         
         # Add orders to each market
         market0.add_two_sided_quotes(
-            bid_px=torch.full((100,), 50, dtype=torch.uint32, device='cuda:0'),
-            bid_sz=torch.full((100,), 100, dtype=torch.uint32, device='cuda:0'),
-            ask_px=torch.full((100,), 50, dtype=torch.uint32, device='cuda:0'),
-            ask_sz=torch.full((100,), 100, dtype=torch.uint32, device='cuda:0'),
-            customer_ids=torch.zeros(100, dtype=torch.uint32, device='cuda:0'),
+            bid_px=torch.full((100,), 50, dtype=torch.int32, device='cuda:0'),
+            bid_sz=torch.full((100,), 100, dtype=torch.int32, device='cuda:0'),
+            ask_px=torch.full((100,), 50, dtype=torch.int32, device='cuda:0'),
+            ask_sz=torch.full((100,), 100, dtype=torch.int32, device='cuda:0'),
+            customer_ids=torch.zeros(100, dtype=torch.int32, device='cuda:0'),
             fills=fills0
         )
         
         market1.add_two_sided_quotes(
-            bid_px=torch.full((200,), 60, dtype=torch.uint32, device='cuda:1'),
-            bid_sz=torch.full((200,), 200, dtype=torch.uint32, device='cuda:1'),
-            ask_px=torch.full((200,), 60, dtype=torch.uint32, device='cuda:1'),
-            ask_sz=torch.full((200,), 200, dtype=torch.uint32, device='cuda:1'),
-            customer_ids=torch.zeros(200, dtype=torch.uint32, device='cuda:1'),
+            bid_px=torch.full((200,), 60, dtype=torch.int32, device='cuda:1'),
+            bid_sz=torch.full((200,), 200, dtype=torch.int32, device='cuda:1'),
+            ask_px=torch.full((200,), 60, dtype=torch.int32, device='cuda:1'),
+            ask_sz=torch.full((200,), 200, dtype=torch.int32, device='cuda:1'),
+            customer_ids=torch.zeros(200, dtype=torch.int32, device='cuda:1'),
             fills=fills1
         )
         

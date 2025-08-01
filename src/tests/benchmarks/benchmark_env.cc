@@ -64,6 +64,11 @@ public:
         
         // Initialize RNG
         rng_ = std::mt19937(42);
+        
+        // Initialize observation buffer (must be done after game_ is initialized)
+        observation_buffer_ = torch::zeros(
+            hlt_game_->ObservationTensorShape(), 
+            torch::TensorOptions().dtype(torch::kFloat32).device(device_));
     }
     
     void RandomizeActions(int move_number) {
@@ -119,8 +124,7 @@ public:
         else return trading_action_;
     }
     
-    torch::Tensor observation_buffer_ = torch::zeros(
-        hlt_game_->ObservationTensorShape(), torch::TensorOptions().dtype(torch::kFloat32).device(device_));
+    torch::Tensor observation_buffer_;
     
     BenchmarkResult RunBenchmark(int num_episodes) {
         auto start_time = std::chrono::high_resolution_clock::now();
@@ -144,11 +148,16 @@ public:
                 state_->ApplyAction(action);
                 
                 // Fill immediate rewards after each step
-                state_->FillObservationTensor(observation_buffer_);
+                // Only fill observation tensor for player actions (not chance moves)
+                if (current_player >= 0) {
+                    state_->FillObservationTensor(current_player, observation_buffer_);
+                }
                 hlt_state_->FillRewards(immediate_rewards_);
                 
                 // If it's a player action, also get cumulative rewards since last action
                 if (current_player >= 0) {
+                    // Assert that current_player is valid
+                    assert(current_player >= 0 && current_player < num_players_);
                     // Debug: Check tensor shapes before calling
                     if (player_rewards_.dim() != 1 || player_rewards_.size(0) != num_envs_) {
                         std::cerr << "Error: player_rewards_ has wrong shape. Expected [" << num_envs_ 

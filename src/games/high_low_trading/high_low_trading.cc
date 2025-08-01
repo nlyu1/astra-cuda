@@ -247,7 +247,7 @@ void HighLowTradingState::DoApplyAction(torch::Tensor move) {
 void HighLowTradingState::ApplyPlayerTrading(torch::Tensor move) {
   Player player = CurrentPlayer(); 
   int trade_move_number = MoveNumber() - game_->MaxChanceNodesInHistory(); 
-  int player_move_number = trade_move_number % steps_per_player_; 
+  int player_move_number = trade_move_number / num_players_;  // Which round/step this player is in
   ASTRA_CHECK_GE(trade_move_number, 0); 
   ASTRA_CHECK_LT(trade_move_number, steps_per_player_ * num_players_);
   ASTRA_CHECK_EQ(move.size(1), 4); // bid_px, ask_px, bid_sz, ask_sz
@@ -357,6 +357,11 @@ void HighLowTradingState::FillReturns(torch::Tensor returns_buffer) const {
 }
 
 void HighLowTradingState::DoReset() {
+  // Debug: Check if tensors are properly initialized
+  if (!contract_values_.defined()) {
+    AstraFatalError("contract_values_ is not defined in DoReset!");
+  }
+  
   contract_values_.zero_();
   contract_high_settle_.zero_();
   player_permutation_.zero_();

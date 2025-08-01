@@ -200,7 +200,7 @@ class HighLowTransformerModel(nn.Module):
                 context = torch.cat([prev_context, encoded], dim=0)
             features = self._compiled_incremental_core(context)
             dists = {k: Categorical(logits=self.actors[k](features)) for k in self.actors}
-            actions = {k: dists[k].sample() for k in dists}
+            actions = {k: dists[k].sample().int() for k in dists}
             action_tensor = torch.stack([
                 actions['bid_price'] + 1,
                 actions['ask_price'] + 1,

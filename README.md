@@ -89,8 +89,7 @@ conda install cuda-toolkit -c nvidia
 
 ```bash
 # From project root with astra environment activated
-cmake -S ./src -B ./build/build-release -G Ninja -DCMAKE_BUILD_TYPE=Release
-cmake --build ./build/build-release -j$(nproc)
+cmake -S ./src -B ./build/build-release -G Ninja -DCMAKE_BUILD_TYPE=Release && cmake --build ./build/build-release -j$(nproc)
 ```
 
 For explicit compiler paths (recommended to avoid mixing system/conda libraries):
