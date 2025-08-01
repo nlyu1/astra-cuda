@@ -144,11 +144,11 @@ class OptimizedTransformerModel(nn.Module):
     
     def _batch_forward(self, x, actions):
         """Optimized forward pass with minimal operations."""
-        B, T, F = x.shape
+        B, T, feat_dim = x.shape
         bid_px, ask_px, bid_sz, ask_sz = actions.unbind(dim=-1)
         
         # Single reshape at the beginning
-        x_flat = x.view(-1, F)  # More efficient than reshape
+        x_flat = x.view(-1, feat_dim)  # More efficient than reshape
         
         # Encode and add positional encoding in one go
         encoded = self.encoder(x_flat).view(B, T, self.n_embd)
@@ -177,6 +177,10 @@ class OptimizedTransformerModel(nn.Module):
         ask_price_logits = all_price_logits[:, self.M:]
         bid_size_logits = all_size_logits[:, :(1 + self.S)]
         ask_size_logits = all_size_logits[:, (1 + self.S):]
+        
+        # Debug info
+        # print(f"all_price_logits shape: {all_price_logits.shape}")
+        # print(f"bid_price_logits type: {type(bid_price_logits)}")
         
         # Vectorized log probability computation
         actions_flat = actions.view(-1, 4)
