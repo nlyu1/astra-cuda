@@ -76,7 +76,7 @@ class Args:
     ##### Environment execution #####
     threads_per_block: int = 64
     """the number of threads per block"""
-    num_blocks: int = 256
+    num_blocks: int = 128
     """the number of environments per worker"""
     num_markets: int = None
     """the number of markets in the game. Filled in at runtime"""

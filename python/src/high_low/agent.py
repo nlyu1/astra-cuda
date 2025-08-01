@@ -155,6 +155,7 @@ class HighLowTransformerModel(nn.Module):
         entropy = sum(d.entropy() for d in dists.values()).reshape(T, B)
         values = self.critic(features).reshape(T, B)
         pinfo_preds = {k: self.pinfo_model[k](features) for k in self.pinfo_model}
+        pinfo_preds['private_roles'] = pinfo_preds['private_roles'].reshape(T, B, self.P, 3)
         
         return {
             'values': values,
@@ -209,7 +210,7 @@ class HighLowTransformerModel(nn.Module):
             ], dim=-1)
             logprobs = sum(dists[k].log_prob(actions[k]) for k in dists) 
             pinfo_preds = {k: self.pinfo_model[k](features) for k in self.pinfo_model}
-
+            pinfo_preds['private_roles'] = pinfo_preds['private_roles'].reshape(B, self.P, 3)
             return {
                 'action': action_tensor.int(), 
                 'logprobs': logprobs, 

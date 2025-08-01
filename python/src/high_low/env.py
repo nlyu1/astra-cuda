@@ -53,6 +53,25 @@ class HighLowTrading:
         self.customer_sizes[self.customer_sizes >= 0] += 1
         self.env.apply_action(self.customer_sizes)
 
+    def get_pinfo_targets(self):
+        # [0, 1, 2] for [valueCheater, highLowCheater, customer], respectively
+        pinfo_targets = (self.permutation - 1).clamp(0, 2) # [N, P]
+        max_values = self.candidate_values.max(dim=1).values # [N] 
+        min_values = self.candidate_values.min(dim=1).values # [N, P]
+        settlement_values = self.high_low * max_values + (1 - self.high_low) * min_values # [N]
+
+        #  info roles [0, 1, 2, 3] for goodValue, badValue, highLow, Customer, respectively
+        info_roles = self.permutation.clone().clamp(0, 3) # [N, P]
+        pos_0_mask = (self.permutation == 0)
+        pos_1_mask = (self.permutation == 1)
+        # Check which contracts were chosen
+        first_chosen = (self.candidate_values[:, 0] == settlement_values) # [N]
+        second_chosen = (self.candidate_values[:, 1] == settlement_values) # [N]
+        N, P = info_roles.shape
+        info_roles[pos_0_mask] = torch.where(first_chosen, 0, 1).repeat_interleave(P).reshape(N, P)[pos_0_mask].int()
+        info_roles[pos_1_mask] = torch.where(second_chosen, 0, 1).repeat_interleave(P).reshape(N, P)[pos_1_mask].int()
+        return {'pinfo_targets': pinfo_targets, 'settlement_values': settlement_values, 'info_roles': info_roles}
+
     def step(self, action):
         return self.env.apply_action(action)
 
@@ -71,6 +90,9 @@ class HighLowTrading:
         # This is fixing a single timestep
         assert len(self.game.observation_tensor_shape()) == 2
         return self.game.observation_tensor_shape()[-1]
+    
+    def expose_info(self):
+        return self.env.expose_info()
     
     def new_observation_buffer(self):
         return torch.zeros(tuple(self.observation_shape()), device=self.device).float()

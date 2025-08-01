@@ -1,4 +1,5 @@
 import os 
+import torch 
 
 import wandb 
 import numpy as np 
@@ -24,108 +25,108 @@ class HighLowLogger:
         self.counter += 1 
 
         offset = logging_inputs['offset'] # Offset of current player 
-        returns = logging_inputs['returns']
-        reward = returns[:, offset]
-        infos = logging_inputs['infos']
+        returns = logging_inputs['returns'] # from env.fill_returns(), [N, P]
+        player_rewards = returns[:, offset].cpu()
+        infos = logging_inputs['infos'] # from env.expose_info()
 
-        info_roles = infos['info_roles'][:, offset]
+        # Obtain the status of the current agent 
+        info_roles = infos['info_roles'][:, offset].cpu()
         good_value_mask = (info_roles == 0)
         bad_value_mask = (info_roles == 1)
         high_low_mask = (info_roles == 2)
         customer_mask = (info_roles == 3)
 
-        last_price = np.array(infos['market'][:, :, 2])
+        # infos['players']: [N, P, T, 6] int standing for (bid_px, ask_px, bid_sz, ask_sz, contract_position, cash_position)
+        # infos['market']: [N, P*T, 2+1] int (best bid px, best ask px, last_price)
+        # infos['settlement_values']: [N]
+        last_price = infos['market'][:, :, 2]
         last_price[last_price == 0] = 2 * self.args.max_contract_value # Explicit penalty
-        last_price_residual = last_price - infos['contract'][:, 2][:, None] 
-        last_price_diff = np.abs(last_price_residual)
+        contract_value = infos['settlement_values'].unsqueeze(-1) # [N, 1]
+        last_price_diff = (last_price - contract_value).abs()
 
-        buy_volume = infos['market'][:, :, 3]
-        sell_volume = infos['market'][:, :, 4]
-        best_bid = infos['market'][:, :, 0] # Shape [num_envs, num_timesteps]
-        best_ask = infos['market'][:, :, 1] # Shape [num_envs, num_timesteps]
+        buy_volume = infos['players'][:, :, :, 2] # [N, P, T]
+        sell_volume = infos['players'][:, :, :, 3] # [N, P, T]
+        best_bid = infos['market'][:, :, 0] # [N, P*T]
+        best_ask = infos['market'][:, :, 1] # [N, P*T]
         bbo_mid = (best_bid + best_ask) / 2
-        spread = np.maximum(best_ask - best_bid, 0)
-        contract_value = infos['contract'][:, 2][:, None] # Shape [num_envs]
-        bbo_mid_diff = np.abs(bbo_mid - contract_value)
+        spread = (best_ask - best_bid).clamp(0)
+        bbo_mid_diff = (bbo_mid - contract_value).abs()
         is_within_bbo = (contract_value >= best_bid) & (contract_value <= best_ask)
 
-        # Stratification symbol based on game's 
+        # Stratification symbol based on game's total customer demand 
         customer_size_sum = infos['target_positions'].sum(-1) 
-        unique_sizes = np.unique(customer_size_sum)
+        unique_sizes = torch.unique(customer_size_sum)
 
         if customer_mask.any():
-            position_diff = np.abs(
+            position_diff = (
                 (infos['target_positions'][:, offset] - infos['players'][:, offset, -1, -1])
-            )[customer_mask].mean()
+            )[customer_mask].abs().float().mean().item() # Position difference at last timestep 
         else:
             position_diff = 0
 
         log_data = {
-            "reward/avg_returns": reward.mean(),
-            'reward/goodValue': reward[good_value_mask].mean(),
-            'reward/badValue': reward[bad_value_mask].mean(),
-            'reward/highLow': reward[high_low_mask].mean(),
-            'reward/customer': reward[customer_mask].mean(),
-            'reward/welfare': returns.sum(-1).mean(),
-            'reward/missed_positions': position_diff,
-        }
+            "reward/avg_returns": player_rewards.mean().item(),
+            'reward/goodValue': player_rewards[good_value_mask].mean().item(),
+            'reward/badValue': player_rewards[bad_value_mask].mean().item(),
+            'reward/highLow': player_rewards[high_low_mask].mean().item(),
+            'reward/customer': player_rewards[customer_mask].mean().item(),
+            'reward/welfare': returns.sum(-1).mean().item(),
+            'reward/missed_positions': position_diff}
 
-        for s in [-4, 0, 4]: 
+        for s in [-6, 0, 6]: 
             size_mask = (customer_size_sum == s)
-            log_data[f'last_price_diff/{s}'] = last_price_diff[size_mask, -1].mean()
-            log_data[f'bbo_mid_diff/{s}'] = bbo_mid_diff[size_mask, 1].mean()
-            log_data[f'total_volume/{s}'] = (
-                buy_volume[size_mask].mean(0).sum() 
-                + sell_volume[size_mask].mean(0).sum())
-            log_data[f'final_spread/{s}'] = spread[size_mask, -1].mean()
-            log_data[f'final_capture/{s}'] = is_within_bbo[size_mask, -1].mean()
+            log_data = log_data | ({
+                f'last_price_diff/{s}': last_price_diff[size_mask, -1].float().mean().item(),
+                f'bbo_mid_diff/{s}': bbo_mid_diff[size_mask, 1].float().mean().item(),
+                f'total_volume/{s}': (
+                    buy_volume[size_mask].float().mean(0).sum() 
+                    + sell_volume[size_mask].float().mean(0).sum()).item(),
+                f'final_spread/{s}': spread[size_mask, -1].float().mean().item(),
+                f'final_capture/{s}': is_within_bbo[size_mask, -1].float().mean().item()
+            })
 
-        T, B = logging_inputs['settlement_preds'].shape
-        settlement_preds = logging_inputs['settlement_preds'].cpu().numpy() # [T, B]
-        private_role_preds = logging_inputs['private_role_preds'].cpu().numpy() # [T, B, num_players]
-        private_role_gt = infos['info_roles'] # [B, num_players]
-        private_role_gt[private_role_gt == 0] = 1 # Aggregate good value (0) and bad value (1) into value cheater. 
-        # (valueCheater 1, highLow 2, customer 3) -> (valueCheater 0, highLow 1, customer 2)
-        private_role_gt = np.stack([private_role_gt] * T, axis=0) - 1
+        T, B, _ = logging_inputs['settlement_preds'].shape
+        settlement_preds = logging_inputs['settlement_preds'] # [T, B]
+        private_role_preds = logging_inputs['private_role_preds'] # [T, B, num_players]
+        private_role_gt = infos['pinfo_targets'].unsqueeze(0) # [1, B, num_players]
         private_role_acc = (private_role_preds == private_role_gt) # [T, B, num_players]
-        non_self_mask = np.ones((self.args.players,), dtype=bool)
+        non_self_mask = torch.ones((self.args.players,), dtype=bool)
         non_self_mask[offset] = 0
-        non_self_acc = private_role_acc[:, :, non_self_mask].mean(-1) # [T, B]
-        self_acc = private_role_acc[:, :, offset] # [T, B]
-
+        non_self_acc = private_role_acc[:, :, non_self_mask].float().mean(-1) # [T, B]
+        self_acc = private_role_acc[:, :, offset].float() # [T, B]
         
-        settlement_price = infos['contract'][:, 2][None, :] # [1, B]
-        settlement_diff = np.abs(settlement_preds - settlement_price).mean(-1) # size-T
-        log_data['acc/self_acc'] = self_acc.mean()
-        for pivot in [0.25, 0.5, 0.75, 1.0]:
+        settlement_price = contract_value.view(1, -1) # [1, B]
+        settlement_diff = (settlement_preds - settlement_price).abs().mean(-1) # [T]
+        log_data['acc/self_acc'] = self_acc.mean().item()
+        for pivot in [0.2, 0.4, 0.6, 0.8, 1.0]:
             idx = int(pivot * (settlement_preds.shape[0] - 1))
-            log_data[f'settlement_pred_diff/{idx+1}'] = settlement_diff[idx].mean()
-            log_data[f'acc/non_self_acc{idx+1}'] = non_self_acc[idx].mean()
+            log_data[f'settlement_pred_diff/{idx+1}'] = settlement_diff[idx].mean().item()
+            log_data[f'acc/non_self_acc{idx+1}'] = non_self_acc[idx].mean().item()
         wandb.log(log_data, step=global_step)
 
         if heavy_updates: 
             customer_size_mask = (customer_size_sum == 0)
             self.last_heavy_counter = self.counter
             market_fig = dual_plot(
-                {'last price diff': last_price_diff[customer_size_mask].mean(0)},
-                {'cumulative volume': (
-                    buy_volume[customer_size_mask].mean(0).cumsum() + 
-                    sell_volume[customer_size_mask].mean(0).cumsum())},
-                title='Last price diff and volume over time',
-            )
-            spread_fig = dual_plot(
-                {'spread': spread[customer_size_mask].mean(0)},
-                {'capture_ratio': is_within_bbo[customer_size_mask].mean(0)},
-                y2min=0.2, y2max=1.0, title='Spread and capture ratio over time',
-            )
-            env_probe_indices = [0, 5, 15, 30, 120, 150, 200, 210, 250, 300, 301, 302, 303, 304, 305]
+                {'last price diff': last_price_diff[customer_size_mask].float().mean(0).cpu().numpy(),
+                 'spread': spread[customer_size_mask].float().mean(0).cpu().numpy()},
+                 {'capture_ratio': is_within_bbo[customer_size_mask].float().mean(0).cpu().numpy()},
+                title='Last-price diff, spread, and capture ratio over time')
+            # Add information for pinfo modeling 
+            customer_acc = non_self_acc[:, customer_mask].mean(-1).cpu().numpy() # [T] 
+            value_cheater_acc = non_self_acc[:, good_value_mask | bad_value_mask].mean(-1).cpu().numpy() # [T]
+            high_low_acc = non_self_acc[:, high_low_mask].mean(-1).cpu().numpy() # [T]
+            acc_fig = dual_plot(
+                {'customer': customer_acc, 'value_cheater': value_cheater_acc, 'high_low': high_low_acc},
+                title='Private role modeling accuracy over time')
+
+            # env_probe_indices = [0, 5, 15, 30, 120, 150, 200, 210, 250, 300, 301, 302, 303, 304, 305]
             
             # Combine all heavy plots into the main log_data dictionary
             log_data["market_fig/market"] = wandb.Plotly(market_fig)
-            log_data["market_fig/spread"] = wandb.Plotly(spread_fig)
-            
-            probe_plots = {
-                f"probes/probe{probe}": wandb.Plotly(plot_market_and_players(infos, self.args, env_idx=probe))
-                for probe in env_probe_indices}
-            log_data.update(probe_plots)
+            log_data["market_fig/pinfo"] = wandb.Plotly(acc_fig)            
+            # probe_plots = {
+            #     f"probes/probe{probe}": wandb.Plotly(plot_market_and_players(infos, self.args, env_idx=probe))
+            #     for probe in env_probe_indices}
+            # log_data.update(probe_plots)
             wandb.log(log_data, step=global_step)
