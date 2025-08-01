@@ -369,9 +369,6 @@ VecMarket::VecMarket(int32_t num_markets, int32_t max_price_levels,
     order_is_bid_ = torch::zeros({num_markets, max_active_orders_per_market}, options_bool);
     order_next_ = torch::full({num_markets, max_active_orders_per_market}, NULL_INDEX, options_options_i32);
 
-    // Initialize fill pool - not used internally, created on demand in MatchAllMarkets
-    fill_counts_ = torch::zeros({num_markets}, options_options_i32);
-
     // Initialize market state
     order_next_slots_ = torch::zeros({num_markets}, options_options_i32);
     
@@ -406,7 +403,6 @@ VecMarket::VecMarket(const VecMarket& other)
     order_is_bid_ = other.order_is_bid_.clone();
     order_next_ = other.order_next_.clone();
     
-    fill_counts_ = other.fill_counts_.clone();
     order_next_slots_ = other.order_next_slots_.clone();
     customer_portfolios_ = other.customer_portfolios_.clone();
 }
@@ -434,7 +430,6 @@ FillBatch VecMarket::NewFillBatch() const
     batch.fill_quote_sizes = torch::zeros({num_markets_, max_fills_per_market_}, options_options_i32);
     batch.fill_tid = torch::zeros({num_markets_, max_fills_per_market_}, options_options_i32);
     batch.fill_quote_tid = torch::zeros({num_markets_, max_fills_per_market_}, options_options_i32);
-    batch.fill_counts = torch::zeros({num_markets_}, options_options_i32);
     
     return batch;
 }
@@ -696,7 +691,6 @@ void VecMarket::Reset()
     
     // Reset market state
     order_next_slots_.zero_();  // Reset slot counters to 0
-    fill_counts_.zero_();        // Reset fill counts to 0
     
     // Reset customer portfolios to zero
     customer_portfolios_.zero_();
