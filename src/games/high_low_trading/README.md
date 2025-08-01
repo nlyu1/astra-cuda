@@ -72,6 +72,59 @@ Where:
 - **Final returns** represent the actual game payoff including penalties
 - Customers receive positive immediate rewards for moving toward their target but face penalties in final returns for missing it
 
+### Detailed Example: Round 3 Trade
+
+From the playthrough, let's analyze the Round 3 trade where Player 2 quotes 7 @ 21 [2 x 4]:
+
+**Setup:**
+- Contract values: 10, 25 (High settlement → final value = 25)
+- Player 0 (Customer): Target position = 4
+- Player 2 (HighLowCheater): Knows settlement is "High"
+- Player 0 had a resting order: 26 @ 27 [3 x 5]
+
+**Trade Execution:**
+- Player 2's ask at 21 crosses with Player 0's bid at 26
+- Execution price = 26 (the resting order price)
+- Fill size = min(3, 4) = 3 contracts
+
+**Immediate Rewards Calculation:**
+```python
+# Player 0 (Customer):
+cash_diff = -3 * 26 = -78
+previous_distance = |0 - 4| = 4
+current_distance = |3 - 4| = 1
+customer_progress = (4 - 1) * 30 = 90
+immediate_reward[0] = -78 + 90 = 12
+
+# Player 2 (HighLowCheater):
+cash_diff = 3 * 26 = 78
+customer_progress = 0 (not a customer)
+immediate_reward[2] = 78 + 0 = 78
+```
+
+Result: `tensor([12., 0., 78., 0.])`
+
+### Final Returns Example
+
+At game end from the playthrough:
+```
+Final positions:
+Player 0: [5 contracts, -103 cash]
+Player 1: [3 contracts, -69 cash]
+Player 2: [-5 contracts, 125 cash]
+Player 3: [-3 contracts, 47 cash]
+
+Settlement value: 25
+
+Returns calculation:
+Player 0: -103 + 5*25 - |5-4|*30 = -103 + 125 - 30 = -8
+Player 1: -69 + 3*25 - 0 = -69 + 75 = 6
+Player 2: 125 + (-5)*25 - 0 = 125 - 125 = 0
+Player 3: 47 + (-3)*25 - 0 = 47 - 75 = -28
+```
+
+Note how Player 0 achieved a positive cumulative immediate reward (+12) from getting closer to their target, but still ended with a negative return (-8) due to the penalty for overshooting by 1 contract.
+
 ## Market Mechanics
 
 ### Order Matching
@@ -97,3 +150,60 @@ Each player's observation is a float tensor containing:
 5. **Market state** (5 values): [best_bid_px, best_ask_px, best_bid_sz, best_ask_sz, last_trade_px]
 
 Total size: `num_markets × (6 + 6*players + 5)`
+
+### Example from Playthrough
+From the playthrough.txt, here's Player 2's observation in Round 3:
+```
+Player 2 observation tensor (first 6 elements):
+  [is_value, is_highlow, is_customer, sin(id), cos(id), private_info]
+  tensor([ 0.0000e+00,  1.0000e+00,  0.0000e+00,  1.2246e-16, -1.0000e+00,
+         1.0000e+00])
+```
+
+This decodes as:
+- **Role**: HighLowCheater (is_highlow = 1.0)
+- **Player ID**: Player 2 encoded as sin(2π*2/4) ≈ 0, cos(2π*2/4) = -1
+- **Private info**: 1.0 (knows settlement will be "High")
+
+## Information State String
+
+The information state string provides a human-readable view of what each player knows:
+
+### Private Information Section
+Shows player-specific knowledge based on role:
+- **ValueCheater**: "Candidate contract value: X"
+- **HighLowCheater**: "Settlement will be: High/Low"
+- **Customer**: "My target position: X"
+
+### Public Information Section
+Includes all publicly observable game state:
+- Game configuration parameters
+- All players' current positions
+- Recent fills with detailed transaction info
+- Historical quotes from all players
+- Market movement timeline showing BBO evolution
+- Current order book state
+
+### Example from Playthrough
+From Round 3, Player 2 (HighLowCheater) sees:
+```
+********** Private Information **********
+My role: HighLowCheater
+Settlement will be: High
+******************************************
+
+********** Player Positions **********
+Player 0 position: [0 contracts, 0 cash]
+Player 1 position: [0 contracts, 0 cash]
+Player 2 position: [0 contracts, 0 cash]
+Player 3 position: [0 contracts, 0 cash]
+**************************************
+```
+
+After their trade executes:
+```
+Player 2 quotes: 7 @ 21 [2 x 4]
+Immediate rewards: tensor([12.,  0., 78.,  0.])
+```
+
+This trade crossed with Player 0's resting order at 26, executing at the quote price (26).

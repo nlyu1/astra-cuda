@@ -40,21 +40,17 @@ class HighLowTrading:
 
     def reset(self):
         self.env.reset()
-        # Manually set up a specific game state for testing
-        # Contract values: 10, 25
-        self.candidate_values = torch.tensor([[10, 25]], device=self.device).int()
+        # Randomly initialize new environment
+        self.candidate_values = torch.randint(1, self.M + 1, (self.N, 2), device=self.device).int()
         self.env.apply_action(self.candidate_values)
-        
-        # High settle (so final value will be 25)
-        self.high_low = torch.tensor([1], device=self.device).int()
+        self.high_low = torch.randint(0, 2, (self.N,), device=self.device).int()
         self.env.apply_action(self.high_low)
 
-        # Permutation: P0->role3 (Customer), P1->role0 (Value), P2->role2 (HighLow), P3->role1 (Value)
-        self.permutation = torch.tensor([[3, 0, 2, 1]], device=self.device).int()
+        self.permutation = torch.argsort(torch.rand(self.N, self.P, device=self.device), dim=1).int()
         self.env.apply_action(self.permutation)
 
-        # Customer target position for P0 only (since only P0 has role 3)
-        self.customer_sizes = torch.tensor([[4]], device=self.device).int()
+        self.customer_sizes = torch.randint(-self.cM, self.cM, (self.N, self.P - 3), device=self.device).int()
+        self.customer_sizes[self.customer_sizes >= 0] += 1
         self.env.apply_action(self.customer_sizes)
 
     def step(self, action):

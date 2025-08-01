@@ -8,38 +8,7 @@ from tqdm import trange
 from copy import deepcopy
 import matplotlib.pyplot as plt
 import wandb 
-from high_low_wrapper import *
 
-# %% 
-
-def high_low_playout_scores(agents, env, num_eval_episodes=1):
-    """
-    Returns average playoff returns of shape [num_eval_episodes, 5]. 
-    Randomizes the ordering of agents in the game. 
-    """
-    eval_agents = [agent.cuda() for agent in agents]
-
-    returns = []
-    for j in range(num_eval_episodes):
-        agent_ordering = np.arange(5).astype(np.int32)
-        np.random.shuffle(agent_ordering)
-        inverse_ordering = np.argsort(agent_ordering)
-
-        with torch.no_grad():
-            while not env.is_terminal():
-                for j in range(5):
-                    actions = eval_agents[agent_ordering[j]].sample_actions(env.observations())
-                    actions = np.stack( # num_envs, 4
-                        [actions['bid_price'], actions['ask_price'], actions['bid_size'], actions['ask_size']],
-                        axis=-1)
-                    env.step(actions)
-        rewards = env.returns()[:, inverse_ordering].mean(0)
-        returns.append(rewards)
-        env.reset()
-    returns = np.concatenate(returns, axis=0).astype(np.float32)
-    return returns
-
-# Feel free to pass in agent. Deepcopy is done under the hood. 
 class Arena:
     """
     Playout scores can be registered freely, while agents can only be sampled after they're registered. 
@@ -64,23 +33,6 @@ class Arena:
         for agent_name, score in zip(agent_names, scores):
             if agent_name in self.agents:
                 self.playout_scores[agent_name].append(score)
-
-    def random_maintainance(self, num_iters=10):
-        chosen_lists = [
-            self.select_topk(5, random_prob=.8)
-            for _ in range(num_iters)]
-        chosen_names = set()
-        for names in chosen_lists:
-            for name in names:
-                chosen_names.add(name)
-        chosen_names = list(chosen_names)
-
-        for chosen_agent_names in chosen_lists:
-            episode_scores = high_low_playout_scores(
-                [self.agents[n] for n in chosen_agent_names],
-                self.eval_env,
-                num_eval_episodes=1)
-            self.register_playout_scores(episode_scores, chosen_agent_names)
 
     def get_mean_score(self, agent):
         if len(self.playout_scores[agent]) == 0:

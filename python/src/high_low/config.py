@@ -18,9 +18,9 @@ class Args:
     ##### Algorithm specific arguments #####
     learning_rate: float = 2.5e-4
     """the learning rate of the optimizer"""
-    num_steps: int = 8
+    num_steps: int = 20
     """the number of steps to run in each environment per policy rollout"""
-    gamma: float = 0.995
+    gamma: float = 1
     """the discount factor gamma"""
     num_minibatches: int = 4
     """the number of mini-batches"""
@@ -49,22 +49,26 @@ class Args:
     """Number of iterations between heavy logging"""
 
     #### Game specification ### 
-    steps_per_player: int = 8
+    steps_per_player: int = 20
     """the number of trading steps per player before game ends"""
-    max_contracts_per_trade: int = 1
+    max_contracts_per_trade: int = 5
     """the maximum number of contracts in a single trade"""
-    customer_max_size: int = 2
+    customer_max_size: int = 5
     """the maximum position size for customers"""
-    max_contract_value: int = 10
+    max_contract_value: int = 30
     """the maximum value a contract can have""" 
     players: int = 5
     """the number of players in the game"""
 
     ##### Environment execution #####
-    env_workers: int = 16
-    """the number of workers. Total envs = envs_per_worker * env_workers"""
-    envs_per_worker: int = 512
+    threads_per_block: int = 64
+    """the number of threads per block"""
+    num_blocks: int = 512
     """the number of environments per worker"""
+    num_markets: int = 1
+    """the number of markets in the game"""
+    device_id: int = 0
+    """the device id to use"""
 
     # to be filled in runtime
     batch_size: int = 0
@@ -79,14 +83,13 @@ class Args:
     def fill_runtime_args(self):
         assert self.num_steps == self.steps_per_player, "Training pipeline handles special case."
 
-        self.num_envs = self.envs_per_worker * self.env_workers
+        self.project_name = f"HighLowTrading_{self.exp_name}"
+        self.num_envs = self.num_blocks * self.threads_per_block
         # This is the number of on-policy samples we collect per learning phase ``
         self.batch_size = int(self.num_envs * self.num_steps)
-        # self.minibatch_size = int(self.batch_size // self.num_minibatches) # Per-gradient step batch size 
-        # assert self.minibatch_size * self.num_minibatches == self.batch_size
         # Number of times we sample from the environment 
         self.total_timesteps = self.num_iterations * self.batch_size
-        print(f'Sampling {self.batch_size} frames per iteration')
+        print(f'Sampling {self.batch_size} frames per iteration across {self.num_envs} environments')
         print(f'Per-gradient step batch size: {self.batch_size / self.num_minibatches}. {self.num_minibatches} gradient steps for {self.update_epochs} updates')
 
         if self.iterations_per_pool_update is None:
@@ -94,10 +97,13 @@ class Args:
 
     def get_game_config(self):
         game_config = {
-            'steps_per_player': self.steps_per_player,           # Number of trading steps per player
-            'max_contracts_per_trade': self.max_contracts_per_trade,     # Maximum contracts in a single trade
-            'customer_max_size': self.customer_max_size,           # Maximum position size for customers
-            'max_contract_value': self.max_contract_value,         # Maximum value a contract can have
-            'players': self.players                      # Total number of players in the game
+            'steps_per_player': self.steps_per_player,
+            'max_contracts_per_trade': self.max_contracts_per_trade,
+            'customer_max_size': self.customer_max_size,
+            'max_contract_value': self.max_contract_value,
+            'players': self.players,
+            'num_markets': self.num_envs,
+            'threads_per_block': self.threads_per_block,
+            'device_id': self.device_id,
         }
         return game_config

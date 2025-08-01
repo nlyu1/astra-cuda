@@ -1,8 +1,6 @@
-# %% Single-agent play against fixed components 
+# %% Single-agent play against fixed opponents
 import random
 import time
-from collections import deque
-from dataclasses import dataclass
 from copy import deepcopy
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -16,11 +14,10 @@ from tqdm import trange
 import sys 
 
 sys.path.append('./utils')
-sys.path.append('./algorithms')
+sys.path.append('./games/high_low')
 
 from timer import Timer 
-from agent import *
-from high_low_wrapper import *
+from agent import HighLowPrivateModel
 from config import Args
 from arena import Arena 
 from logger import HighLowLogger
@@ -51,12 +48,7 @@ game_config: Dict[str, int] = {
 }
 
 device = torch.device('cuda')
-loads = [
-    ('./checkpoints/ppo_bigpoolplay_34.pt', 'starter_33'),
-    ('./checkpoints/ppo_bigpoolplay_34.pt', 'starter_34'),
-    ('./checkpoints/ppo_bigpoolplay_35.pt', 'starter_35'),
-    ('./checkpoints/ppo_bigpoolplay_36.pt', 'starter_36'),
-]
+loads = []
 initial_agents = {}
 for path, name in loads:
     initial_agents[name] = HighLowModel(

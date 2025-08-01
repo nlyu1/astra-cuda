@@ -1,5 +1,4 @@
 import os 
-os.environ["WANDB_ASYNC"] = "true"
 
 import wandb 
 import numpy as np 
