@@ -31,6 +31,7 @@ class Arena:
         self.agents[agent_name].to(self.device)
         
     def register_playout_scores(self, scores, agent_names):
+        scores = scores.cpu()
         for agent_name, score in zip(agent_names, scores):
             if agent_name in self.agents:
                 self.playout_scores[agent_name].append(score)

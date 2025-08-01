@@ -9,7 +9,7 @@ import torch
 torch.backends.cudnn.benchmark = True
 torch.set_float32_matmul_precision('medium')
 import wandb
-from tqdm import trange
+from tqdm import trange, tqdm
 import sys 
 
 sys.path.append('./src')
@@ -112,7 +112,13 @@ global_step, total_iterations = 0, 0
 timer, ticker = Timer(), OneTickTimer()
 agent_name = str(total_iterations) # This is only updated per pool update 
 
-for iteration in trange(args.num_iterations):
+observation_buffer = env.new_observation_buffer()
+reward_buffer = env.new_reward_buffer() # [N, P]
+returns_buffer = env.new_reward_buffer() # [N, P]
+player_reward_buffer = env.new_player_reward_buffer() # [N]
+
+pbar = tqdm(range(args.num_iterations))
+for iteration in pbar: 
     # actor_shared_args['shared_info']['total_iterations'] = total_iterations
     # buf_id = free_q.get()
     buf_id = 0 
@@ -131,9 +137,6 @@ for iteration in trange(args.num_iterations):
         + [npc_agent_names[j - 1] for j in range(player_offset + 1, game_config['players'])])
 
     ### Rollout ### 
-    observation_buffer = env.new_observation_buffer()
-    reward_buffer = env.new_reward_buffer()
-    player_reward_buffer = env.new_player_reward_buffer()
 
     settlement_preds, private_role_preds = [], []
     for step in range(args.num_steps):
@@ -191,30 +194,31 @@ for iteration in trange(args.num_iterations):
 
         if env.terminal():
             # This is the cumulative rewards, for logging. 
-            env_returns = env.returns()
-            tensor_reward_cumulation = torch.from_numpy(player_reward_cumulation).pin_memory().to(device, non_blocking=True)
+            env.fill_returns(returns_buffer)
+            env.fill_rewards_since_last_action(buffers[buf_id].rewards[step], player_offset)
+
             # Reset environment 
             buffers[buf_id].update_late_stats({
-                'rewards': tensor_reward_cumulation.view(-1),
+                'rewards': player_reward_buffer,
                 'dones': torch.ones(args.num_envs).to(device).float()}, step)
-            player_reward_cumulation = None
 
             # Unfortunately, logging must happen before environment is reset
             env_info = env.states.expose_info()
-            logging_inputs = {
-                'returns': env_returns,
-                'offset': player_offset,
-                'settlement_preds': torch.stack(settlement_preds, dim=0).cpu(),
-                'private_role_preds': torch.stack(private_role_preds, dim=0).cpu(),
-                'infos': env_info}
-            # Only incur heavy logging when we're in seat 0 and after a certain interval 
-            heavy_logging_update = (
-                logger.counter - logger.last_heavy_counter > args.iterations_per_heavy_logging 
-                and player_offset == 0)
-            logger.update_stats(logging_inputs, global_step, heavy_updates=heavy_logging_update)
-            pool.register_playout_scores(env_returns.mean(0), round_agent_names)
-            if heavy_logging_update:
-                pool.log_stats()
+            # logging_inputs = {
+            #     'returns': env_returns,
+            #     'offset': player_offset,
+            #     'settlement_preds': torch.stack(settlement_preds, dim=0).cpu(),
+            #     'private_role_preds': torch.stack(private_role_preds, dim=0).cpu(),
+            #     'infos': env_info}
+            # # Only incur heavy logging when we're in seat 0 and after a certain interval 
+            # heavy_logging_update = (
+            #     logger.counter - logger.last_heavy_counter > args.iterations_per_heavy_logging 
+            #     and player_offset == 0)
+            # logger.update_stats(logging_inputs, global_step, heavy_updates=heavy_logging_update)
+            pool.register_playout_scores(returns_buffer.mean(0), round_agent_names)
+            pbar.set_postfix({'mean_score': f'{returns_buffer.mean(0)[player_offset].item():.2f}'})
+            # if heavy_logging_update:
+            #     pool.log_stats()
 
             # Populate buffer's actual private info
             # See `high_low_trading.h` for the definition of the expose_info() function. 
@@ -224,34 +228,34 @@ for iteration in trange(args.num_iterations):
             private_roles_tensor[private_roles_tensor == 0] = 1 # Aggregate good value (0) and bad value (1) into value cheater. 
             # (valueCheater 1, highLow 2, customer 3) -> (valueCheater 0, highLow 1, customer 2)
             
-            buffers[buf_id].actual_private_roles.copy_(private_roles_tensor - 1, non_blocking=True)
-            buffers[buf_id].actual_settlement.copy_(settlement_tensor, non_blocking=True)
+            # buffers[buf_id].actual_private_roles.copy_(private_roles_tensor - 1, non_blocking=True)
+            # buffers[buf_id].actual_settlement.copy_(settlement_tensor, non_blocking=True)
             
             ### Reset environment ###
             env.reset()
         assert (env.current_player() == 0), "Next environment must be ready for player"
 
     #### Fill buffer end. Update trainer ####
-    assert env.is_initial_move_state(), "Environment must have just been reset"
-    running_sps = timer.tick(args.num_envs * args.num_steps)
-    wandb.log({"performance/SPS": running_sps}, step=global_step)
-    rollout_time = ticker.tick()
-    ready_q.put(buf_id)
+    # assert env.is_initial_move_state(), "Environment must have just been reset"
+    # running_sps = timer.tick(args.num_envs * args.num_steps)
+    # wandb.log({"performance/SPS": running_sps}, step=global_step)
+    # rollout_time = ticker.tick()
+    # ready_q.put(buf_id)
 
-    if iteration > 10: # Skip first 10 iterations to avoid noise 
-        learner_logs = deepcopy(actor_shared_args['shared_info']['learner_logs'])
-        learner_logs['performance/RolloutTime'] = rollout_time
-        learner_logs['performance/TrainingWaitTime'] = training_wait_time
-        wandb.log(learner_logs)
-    local_agent.load_state_dict(actor_shared_args['inference_agent'].state_dict())
+    # if iteration > 10: # Skip first 10 iterations to avoid noise 
+    #     learner_logs = deepcopy(actor_shared_args['shared_info']['learner_logs'])
+    #     learner_logs['performance/RolloutTime'] = rollout_time
+    #     learner_logs['performance/TrainingWaitTime'] = training_wait_time
+    #     wandb.log(learner_logs)
+    # local_agent.load_state_dict(actor_shared_args['inference_agent'].state_dict())
 
-    total_iterations += 1
+    # total_iterations += 1
 
-    if total_iterations % args.iterations_per_pool_update == 0:
-        pool.register_agent(local_agent, agent_name)
-        pool.random_maintainance()
-        pool.debug_printout()
-        agent_name = str(total_iterations)
+    # if total_iterations % args.iterations_per_pool_update == 0:
+    #     pool.register_agent(local_agent, agent_name)
+    #     pool.random_maintainance()
+    #     pool.debug_printout()
+    #     agent_name = str(total_iterations)
 run.finish()
 
 def learner_process(learner_shared_args):

@@ -541,17 +541,37 @@ void HighLowTradingState::FillObservationTensor(Player player,
                       torch::ones({num_envs_}).to(torch::kFloat32) * current_round / steps_per_player_);
     offset += 7;
     
-    // All player's quotes and positions
-    torch::Tensor current_round_data = player_contract_over_time_.index({
-        torch::indexing::Slice(), 
-        torch::indexing::Slice(), 
-        current_round, 
-        torch::indexing::Slice()
-    }).reshape({num_envs_, num_players_ * 6});
-    values.index({torch::indexing::Slice(), 
-                  torch::indexing::Slice(offset, offset + 6 * num_players_)}) = 
+    torch::Tensor current_round_data;
+    if ((current_round == 0) || (player == num_players_ - 1)) { 
+      // In the zeroth round, players just see market conditions so far. This also holds for the final player. 
+      current_round_data = player_contract_over_time_.index({
+          torch::indexing::Slice(),
+          torch::indexing::Slice(),
+          current_round,
+          torch::indexing::Slice()
+      }).reshape({num_envs_, num_players_ * 6});
+    } else if (player == 0) {
+      // If first player, should see all of previous round
+      current_round_data = player_contract_over_time_.index({
+          torch::indexing::Slice(),
+          torch::indexing::Slice(),
+          current_round - 1,
+          torch::indexing::Slice()
+      }).reshape({num_envs_, num_players_ * 6});
+    } else {
+      // Wrap around: for player p, see 0..p-1 of current round concatenated with p...P-1 of previous round 
+      current_round_data = torch::cat({
+        player_contract_over_time_.index(
+          {torch::indexing::Slice(), torch::indexing::Slice(0, player), current_round, torch::indexing::Slice()}),
+        player_contract_over_time_.index(
+          {torch::indexing::Slice(), torch::indexing::Slice(player, torch::indexing::None), 
+            current_round - 1, torch::indexing::Slice()})
+      }, 1).reshape({num_envs_, num_players_ * 6});
+    }
+    values.index({torch::indexing::Slice(),
+                  torch::indexing::Slice(offset, offset + 6 * num_players_)}) =
         current_round_data.to(torch::kFloat32);
-    offset += 6 * num_players_;
+    offset += 6 * num_players_;  
     
     // BBOs and last trade prices
     values.index({torch::indexing::Slice(), offset}) = 
