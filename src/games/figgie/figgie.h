@@ -25,6 +25,15 @@ inline constexpr int kDefaultNumMarkets = 32768;
 inline constexpr int kDefaultThreadsPerBlock = 128; 
 inline constexpr int kDefaultDeviceId = 0; 
 
+enum class GamePhase {
+  kChanceValue,
+  kChanceHighLow, 
+  kChancePermutation, 
+  kCustomerSize, 
+  kPlayerTrading, 
+  kTerminal, 
+};
+
 class HighLowTradingGame;
 
 // Expose these for registration. 
