@@ -14,7 +14,7 @@ sys.path.append('./src')
 import numpy as np
 from high_low.config import Args
 from high_low.env import HighLowTrading
-from high_low.agent import HighLowGRUModel
+from python.src.high_low.rnn_agent import HighLowGRUModel
 # %%
 args = Args()
 args.hidden_size = 512

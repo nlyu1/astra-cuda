@@ -24,19 +24,16 @@ const GameType kGameType{/*short_name=*/"high_low_trading",
                          GameType::Dynamics::kSequential,
                          GameType::ChanceMode::kExplicitStochastic,
                          GameType::Information::kImperfectInformation,
-                         GameType::Utility::kGeneralSum, 
+                         GameType::Utility::kZeroSum,
                          GameType::RewardModel::kTerminal,
-                         /*max_num_players=*/10,
+                         /*max_num_players=*/5,
                          /*min_num_players=*/4,
                          /*provides_information_state_string=*/true,
-                         /*provides_information_state_tensor=*/true,
+                         /*provides_information_state_tensor=*/false,
                          /*provides_observation_string=*/true,
                          /*provides_observation_tensor=*/true,
                          /*parameter_specification=*/{
                           {"steps_per_player", GameParameter(kDefaultStepsPerPlayer)},
-                          {"max_contracts_per_trade", GameParameter(kDefaultMaxContractsPerTrade)},
-                          {"customer_max_size", GameParameter(kDefaultCustomerMaxSize)},
-                          {"max_contract_value", GameParameter(kDefaultMaxContractValue)},
                           {"players", GameParameter(kDefaultNumPlayers)},
                           {"num_markets", GameParameter(kDefaultNumMarkets)},
                           {"threads_per_block", GameParameter(kDefaultThreadsPerBlock)},
@@ -45,15 +42,15 @@ const GameType kGameType{/*short_name=*/"high_low_trading",
                          /*default_loadable=*/true};
 
 std::shared_ptr<const Game> Factory(const GameParameters& params) {
-  return std::shared_ptr<const Game>(new HighLowTradingGame(params));
+  return std::shared_ptr<const Game>(new FiggieGame(params));
 }
 
-HighLowTradingState::HighLowTradingState(std::shared_ptr<const Game> game)
+FiggieState::FiggieState(std::shared_ptr<const Game> game)
     : State(game),
-      num_envs_(static_cast<const HighLowTradingGame*>(game.get())->GetNumMarkets()),
-      num_players_(static_cast<const HighLowTradingGame*>(game.get())->GetNumPlayers()),
-      steps_per_player_(static_cast<const HighLowTradingGame*>(game.get())->GetStepsPerPlayer()),
-      device_id_(static_cast<const HighLowTradingGame*>(game.get())->GetDeviceId()),
+      num_envs_(static_cast<const FiggieGame*>(game.get())->GetNumMarkets()),
+      num_players_(static_cast<const FiggieGame*>(game.get())->GetNumPlayers()),
+      steps_per_player_(static_cast<const FiggieGame*>(game.get())->GetStepsPerPlayer()),
+      device_id_(static_cast<const FiggieGame*>(game.get())->GetDeviceId()),
       market_(
         /*num_markets=*/static_cast<const HighLowTradingGame*>(game.get())->GetNumMarkets(), 
         /*max_price_levels=*/static_cast<const HighLowTradingGame*>(game.get())->GetMaxContractValue(),

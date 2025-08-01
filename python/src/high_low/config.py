@@ -34,6 +34,19 @@ class Args:
     max_grad_norm: float = 0.5
     """the maximum norm for the gradient clipping"""
 
+    ##### Model specific arguments #####
+    n_hidden: int = 512
+    """hidden size in FC components of the model"""
+    n_embd: int = 128
+    """attention size"""
+    n_head: int = 2
+    """the number of attention heads in the model"""
+    n_layer: int = 2
+    """number of transformer blocks"""
+    pre_encoder_blocks: int = 2
+    post_decoder_blocks: int = 1
+    """number of residual blocks before and after transformer"""
+
     #### Training-specific arguments ####
     num_iterations: int = 100000000
     """Number of vectorized times to interact with environment per meta-step. 
@@ -63,10 +76,10 @@ class Args:
     ##### Environment execution #####
     threads_per_block: int = 64
     """the number of threads per block"""
-    num_blocks: int = 512
+    num_blocks: int = 256
     """the number of environments per worker"""
-    num_markets: int = 1
-    """the number of markets in the game"""
+    num_markets: int = None
+    """the number of markets in the game. Filled in at runtime"""
     device_id: int = 0
     """the device id to use"""
 
@@ -82,15 +95,17 @@ class Args:
 
     def fill_runtime_args(self):
         assert self.num_steps == self.steps_per_player, "Training pipeline handles special case."
+        assert self.batch_size % self.num_minibatches == 0, "Batch size must be divisible by number of minibatches"
 
         self.project_name = f"HighLowTrading_{self.exp_name}"
         self.num_envs = self.num_blocks * self.threads_per_block
+        self.num_markets = self.num_envs
         # This is the number of on-policy samples we collect per learning phase ``
         self.batch_size = int(self.num_envs * self.num_steps)
         # Number of times we sample from the environment 
         self.total_timesteps = self.num_iterations * self.batch_size
         print(f'Sampling {self.batch_size} frames per iteration across {self.num_envs} environments')
-        print(f'Per-gradient step batch size: {self.batch_size / self.num_minibatches}. {self.num_minibatches} gradient steps for {self.update_epochs} updates')
+        print(f'Per-gradient step batch size: {self.batch_size // self.num_minibatches}. {self.num_minibatches} gradient steps for {self.update_epochs} updates')
 
         if self.iterations_per_pool_update is None:
             self.iterations_per_pool_update = self.num_iterations

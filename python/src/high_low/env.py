@@ -66,6 +66,11 @@ class HighLowTrading:
     
     def observation_shape(self):
         return self.game.observation_tensor_shape()
+
+    def num_features(self):
+        # This is fixing a single timestep
+        assert len(self.game.observation_tensor_shape()) == 2
+        return self.game.observation_tensor_shape()[-1]
     
     def new_observation_buffer(self):
         return torch.zeros(tuple(self.observation_shape()), device=self.device).float()

@@ -485,7 +485,7 @@ std::string HighLowTradingState::ObservationString(Player player, int32_t index)
 }
 
 std::vector<int64_t> HighLowTradingGame::ObservationTensorShape() const {
-  return {static_cast<int64_t>(num_markets_), static_cast<int64_t>(GetNumPlayers() * 6 + 6 + 5)}; 
+  return {static_cast<int64_t>(num_markets_), static_cast<int64_t>(6 + 1 + 6 * GetNumPlayers() + 5)}; 
 }
 
 void HighLowTradingState::FillObservationTensor(Player player,
@@ -529,11 +529,14 @@ void HighLowTradingState::FillObservationTensor(Player player,
                       contract_high_settle_.index({high_low_cheater_mask}).to(torch::kFloat32));
     values.index_put_({customer_mask, offset + 5}, 
                       target_positions_.index({customer_mask, player}).to(torch::kFloat32));
-    offset += 6;
-    
-    // All player's quotes and positions
+
     int current_trade_move = std::max(0, MoveNumber() - GetGame()->MaxChanceNodesInHistory());
     int current_round = current_trade_move / num_players_;
+    values.index_put_({torch::indexing::Slice(), offset + 6}, 
+                      torch::ones({num_envs_}).to(torch::kFloat32) * current_round / steps_per_player_);
+    offset += 7;
+    
+    // All player's quotes and positions
     torch::Tensor current_round_data = player_contract_over_time_.index({
         torch::indexing::Slice(), 
         torch::indexing::Slice(), 

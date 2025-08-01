@@ -48,8 +48,9 @@ class HighLowTradingState : public State {
   // Each player's observation tensor:
   // 1. Player role and private information (6)
   //    - is_valueCheater, is_highLowCheater, is_customer, sin(id), cos(id), private_info
-  // 2. Players' quotes and positions (6 * players): [bid_px, ask_px, bid_sz, ask_sz, contract_position, cash_position]
-  // 3. Market features (6): BBO (4) and last_trade_px
+  // 2. Game progress ratio (1) 
+  // 3. Players' quotes and positions (6 * players): [bid_px, ask_px, bid_sz, ask_sz, contract_position, cash_position]
+  // 4. Market features (5): BBO (4) and last_trade_px
   void FillObservationTensor(Player player, torch::Tensor values) const override;
   std::unique_ptr<State> Clone() const override;
   
