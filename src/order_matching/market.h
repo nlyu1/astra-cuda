@@ -253,6 +253,25 @@ public:
     void Reset();
     
     /**
+     * @brief Selectively clears quotes for specified markets
+     * 
+     * Clears all orders (quotes) for markets where reset_indices is true.
+     * This method selectively resets the order book state for specific markets
+     * while preserving customer portfolios and the global TID counter.
+     * 
+     * For each market where reset_indices[market_id] is true:
+     * - All bid and ask linked lists are cleared (heads and tails set to NULL_INDEX)
+     * - Order slot counter is reset to 0
+     * - Order pool data remains but is effectively invalidated by the cleared linked lists
+     * 
+     * Note: This method does NOT reset customer portfolios or global_tid_counter
+     * 
+     * @param reset_indices Boolean tensor of shape [num_markets] indicating which markets to clear
+     * @throws AstraFatalError if reset_indices dimensions don't match num_markets
+     */
+    void ClearQuotes(torch::Tensor reset_indices);
+    
+    /**
      * @brief Returns a read-only view of customer portfolios
      * 
      * Returns the customer portfolio tensor which tracks the number of contracts
@@ -298,27 +317,24 @@ private:
      */
     void MatchAllMarkets(FillBatch& fills);
     // Price level linked list heads and tails
-    // Shape: [num_markets, price_levels]. Value is order pool index or NULL_INDEX
-    torch::Tensor bid_heads_; // Head of linked list for each bid price level
-    torch::Tensor ask_heads_; // Head of linked list for each ask price level
-    torch::Tensor bid_tails_; // Tail of linked list for each bid price level (for O(1) append)
-    torch::Tensor ask_tails_; // Tail of linked list for each ask price level (for O(1) append)
+    torch::Tensor bid_heads_;         // [num_markets, max_price_levels] int32 - Head of linked list for each bid price level
+    torch::Tensor ask_heads_;         // [num_markets, max_price_levels] int32 - Head of linked list for each ask price level
+    torch::Tensor bid_tails_;         // [num_markets, max_price_levels] int32 - Tail of linked list for each bid price level (for O(1) append)
+    torch::Tensor ask_tails_;         // [num_markets, max_price_levels] int32 - Tail of linked list for each ask price level (for O(1) append)
 
     // Order pool - stores all active orders
-    // Shape: [num_markets, max_active_orders_per_market]
-    torch::Tensor order_prices_;     // uint32 - price of this order
-    torch::Tensor order_sizes_;      // uint32 - remaining size of this order
-    torch::Tensor order_customer_ids_; // uint32 - customer who submitted this order
-    torch::Tensor order_tid_;        // uint32 - time ID of this order
-    torch::Tensor order_is_bid_;     // bool - true for bid, false for ask
-    torch::Tensor order_next_;       // uint32 - next order index in price level linked list
+    torch::Tensor order_prices_;      // [num_markets, max_active_orders_per_market] int32 - price of this order
+    torch::Tensor order_sizes_;       // [num_markets, max_active_orders_per_market] int32 - remaining size of this order
+    torch::Tensor order_customer_ids_; // [num_markets, max_active_orders_per_market] int32 - customer who submitted this order
+    torch::Tensor order_tid_;         // [num_markets, max_active_orders_per_market] int32 - time ID of this order
+    torch::Tensor order_is_bid_;      // [num_markets, max_active_orders_per_market] bool - true for bid, false for ask
+    torch::Tensor order_next_;        // [num_markets, max_active_orders_per_market] int32 - next order index in price level linked list
 
     // Market state
-    torch::Tensor order_next_slots_; // uint32[num_markets] - next available order slot (ring buffer)
-    torch::Tensor fill_counts_;      // uint32[num_markets] - number of fills per market
+    torch::Tensor order_next_slots_;  // [num_markets] int32 - next available order slot (ring buffer)
 
     // Customer states: two indices correspond to number of contracts and amount of cash, respectively
-    torch::Tensor customer_portfolios_; // int32[num_markets, num_customers, 2]
+    torch::Tensor customer_portfolios_; // [num_markets, num_customers, 2] int32
     int32_t global_tid_counter_;    // Global transaction ID counter (host-side)
     
     // System parameters

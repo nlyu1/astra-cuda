@@ -699,6 +699,43 @@ void VecMarket::Reset()
     global_tid_counter_ = 0;
 }
 
+void VecMarket::ClearQuotes(torch::Tensor reset_indices)
+{
+    // Validate input
+    ASTRA_CHECK_EQ(reset_indices.dim(), 1);
+    ASTRA_CHECK_EQ(reset_indices.size(0), num_markets_);
+    ASTRA_CHECK_EQ(reset_indices.dtype(), torch::kBool);
+    
+    auto device = torch::Device(torch::kCUDA, device_id_);
+    if (reset_indices.device() != device) {
+        AstraFatalError("reset_indices tensor must be on device " + std::to_string(device_id_));
+    }
+    
+    // Create a mask tensor that expands reset_indices to match price level dimensions
+    // reset_indices: [num_markets] -> mask: [num_markets, max_price_levels]
+    auto mask = reset_indices.unsqueeze(1).expand({num_markets_, max_price_levels_});
+    
+    // Use masked_fill to set heads and tails to NULL_INDEX where mask is true
+    bid_heads_.masked_fill_(mask, NULL_INDEX);
+    ask_heads_.masked_fill_(mask, NULL_INDEX);
+    bid_tails_.masked_fill_(mask, NULL_INDEX);
+    ask_tails_.masked_fill_(mask, NULL_INDEX);
+    
+    // For order_next, we need to expand the mask to [num_markets, max_orders_per_market]
+    auto order_mask = reset_indices.unsqueeze(1).expand({num_markets_, max_orders_per_market_});
+    order_next_.masked_fill_(order_mask, NULL_INDEX);
+    
+    // Reset order_next_slots for selected markets
+    // masked_fill with 0 where reset_indices is true
+    order_next_slots_.masked_fill_(reset_indices, 0);
+    
+    // Note: We do NOT reset:
+    // - order_prices_, order_sizes_, order_customer_ids_, order_tid_, order_is_bid_ 
+    //   (these are invalidated by clearing the linked lists)
+    // - customer_portfolios_ (as requested)
+    // - global_tid_counter_ (as requested)
+}
+
 void FillBatch::Reset() {
     fill_counts.zero_();
 }
