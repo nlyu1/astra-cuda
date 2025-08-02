@@ -52,7 +52,7 @@ def run_profiling_test():
     args.run_name = f"CPU_PROFILE__{args.exp_name}__{int(time.time())}"
     args.fill_runtime_args()
     # Use full settings but limit iterations
-    args.num_iterations = 100
+    args.num_iterations = 300
     
     print(f"Running CPU profiling with {args.num_envs} environments...")
     print(f"Steps per iteration: {args.num_steps}")
@@ -264,7 +264,7 @@ def analyze_specific_bottlenecks():
     print("\n3. CPU-GPU transfer overhead:")
     test_tensor = torch.randn(1024, 4, device=device)
     start = time.time()
-    for _ in range(100):
+    for _ in range(300):
         _ = test_tensor.cpu()
     elapsed = time.time() - start
     print(f"   Average GPU->CPU transfer time (1024x4 tensor): {elapsed/100*1000:.3f} ms")

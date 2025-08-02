@@ -41,17 +41,10 @@ torch.manual_seed(args.seed);
 # %% Argument post-processing and logging 
 
 device = torch.device(f'cuda:{args.device_id}')
-loads = []
 initial_agents = {}
-for path, name in loads:
-    initial_agents[name] = HighLowTransformerModel(
-        args, env, verbose=False).to(device)
-    initial_agents[name].compile()
-    initial_agents[name].load_state_dict(
-        torch.load(path, map_location=device, weights_only=False)['model_state_dict'])
-for j in range(args.players - 1 - len(loads)):
+for j in range(args.players - 1):
     if args.checkpoint_name is not None: 
-        name = f"{args.checkpoint_name}_j"
+        name = f"{args.checkpoint_name}_copy{j}"
         path = Path("./checkpoints") / (args.checkpoint_name + ".pt")
         weights = torch.load(path, map_location=device, weights_only=False)['model_state_dict']
     else:
@@ -65,8 +58,6 @@ for j in range(args.players - 1 - len(loads)):
 
 num_features = env.num_features()
 pool = Arena(env, initial_agents, device)
-print('Debug printout')
-pool.debug_printout()
 
 buffer = HighLowImpalaBuffer(args, num_features, device)
 

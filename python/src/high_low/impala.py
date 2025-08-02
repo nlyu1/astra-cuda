@@ -195,8 +195,7 @@ class HighLowImpalaTrainer:
                     end = start + num_envs_per_minibatch
                     minibatch_env_indices = batch_env_indices[start:end]
 
-                    # step_results = self._compiled_train_step(
-                    step_results = self._train_step(
+                    step_results = self._compiled_train_step(
                         minibatch_env_indices,
                         obs, logprobs, actions, rewards, dones, 
                         update_dictionary['actual_settlement'],
@@ -215,14 +214,25 @@ class HighLowImpalaTrainer:
                     self.pred_private_roles_losses[logging_counter] = step_results['pred_private_roles_loss']
                     logging_counter += 1
 
+        # Batch all tensor means to reduce GPU-CPU transfers
+        metrics_cpu = torch.stack([
+            self.explained_vars.mean(),
+            self.value_losses.mean(),
+            self.pg_losses.mean(),
+            self.entropy_losses.mean(),
+            self.approx_kls.mean(),
+            self.pred_settlement_losses.mean(),
+            self.pred_private_roles_losses.mean()
+        ]).detach().cpu().numpy()
+        
         return {
-            'metrics/explained_vars': self.explained_vars.mean().item(),
-            'metrics/value_losses': self.value_losses.mean().item(),
-            'metrics/pg_losses': self.pg_losses.mean().item(),
-            'metrics/entropy': -self.entropy_losses.mean().item(),
-            'metrics/approx_kls': self.approx_kls.mean().item(),
-            'metrics/pred_settlement_losses': self.pred_settlement_losses.mean().item(),
-            'metrics/pred_private_roles_losses': self.pred_private_roles_losses.mean().item(),
+            'metrics/explained_vars': float(metrics_cpu[0]),
+            'metrics/value_losses': float(metrics_cpu[1]),
+            'metrics/pg_losses': float(metrics_cpu[2]),
+            'metrics/entropy': float(-metrics_cpu[3]),
+            'metrics/approx_kls': float(metrics_cpu[4]),
+            'metrics/pred_settlement_losses': float(metrics_cpu[5]),
+            'metrics/pred_private_roles_losses': float(metrics_cpu[6]),
         }
 
     def _train_step(self, 
