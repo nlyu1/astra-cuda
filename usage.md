@@ -32,6 +32,8 @@ CUDA_VISIBLE_DEVICES=1 python vtrace_baseline.py --steps_per_player 8 --max_cont
 
 CUDA_VISIBLE_DEVICES=1 python vtrace_baseline.py --steps_per_player 8 --max_contracts_per_trade 1 --customer_max_size 2 --max_contract_value 10 --players 5 --ent_coef 0.02 --num_steps 8 --psettlement_coef 0.1 --proles_coef 0.05 --num_iterations 3000000000 --iterations_per_pool_update 2000 --iterations_per_heavy_logging 2000 --iterations_per_checkpoint 2000 --exp_name smallgame_pool0 --checkpoint_name smallgame_pool0_6000
 
+CUDA_VISIBLE_DEVICES=1 python vtrace_baseline.py --steps_per_player 8 --max_contracts_per_trade 1 --customer_max_size 2 --max_contract_value 10 --players 5 --ent_coef 0.01 --num_steps 8 --psettlement_coef 1. --proles_coef 0.05 --num_iterations 3000000000 --iterations_per_pool_update 2000 --iterations_per_heavy_logging 2000 --iterations_per_checkpoint 2000 --exp_name smallgame_pool1 --checkpoint_name smallgame_pool0_176000
+
 ```
 
 1. [Seed run](wandb.ai/lyuxingjian-na/HighLowTrading_Transformer/runs/l5q8vf04)
@@ -46,7 +48,8 @@ CUDA_VISIBLE_DEVICES=0 python vtrace_baseline.py --ent_coef 0.02 --psettlement_c
 
 Dev run
 ```
-CUDA_VISIBLE_DEVICES=1 python vtrace_baseline.py --steps_per_player 8 --max_contracts_per_trade 1 --customer_max_size 2 --max_contract_value 10 --players 5 --ent_coef 0.05 --num_steps 8 --num_iterations 100 --iterations_per_heavy_logging 1 --iterations_per_checkpoint 1500 --exp_name dev
+CUDA_VISIBLE_DEVICES=1 python vtrace_baseline.py --steps_per_player 8 --max_contracts_per_trade 1 --customer_max_size 2 --max_contract_value 10 --players 5 --ent_coef 0.01 --num_steps 8 --psettlement_coef 1. --proles_coef 0.05 --num_iterations 3000000000 --iterations_per_pool_update 2000 --iterations_per_heavy_logging 2000 --iterations_per_checkpoint 2000 --exp_name dev --checkpoint_name smallgame_pool0_176000
+
 ```
 
 Profile run

@@ -81,3 +81,21 @@ market.GetBBOs(bbos);
 - Price-level arrays for O(1) insertion
 - Ring buffers for order/fill recycling
 - 32-bit TIDs for market-local time ordering
+
+## Reward System Integration
+
+The order matching module integrates with game-specific reward systems. For example, in the High-Low Trading game:
+
+### Immediate Rewards
+Players receive immediate rewards based on:
+1. **Cash changes**: Direct profit/loss from executed trades
+2. **Position progress**: Moving closer to target positions (for customers)
+3. **Self-trade penalty**: Discourages crossing one's own bid-ask spread
+   - Penalty = -(min(bid_size, ask_size) + 1) × max(0, bid_price - ask_price)
+   - Applied only to the player placing crossing orders
+   - The +1 ensures penalty even with zero-sized orders
+
+### Terminal Returns
+Note: The self-trade penalty affects only immediate rewards and is NOT reflected in terminal returns. Terminal returns consist solely of:
+- Final portfolio value: cash + (contracts × settlement_value)
+- Customer penalties: -|position_diff| × max_contract_value (for customers only)
