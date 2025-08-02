@@ -19,7 +19,10 @@ class Arena:
         for k in self.agents:
             self.agents[k].eval()
             self.agents[k].to(self.device)
-        self.playout_scores = defaultdict(list)
+        # Use running statistics instead of storing all values
+        self.score_count = defaultdict(int)
+        self.score_mean = defaultdict(float)
+        self.score_m2 = defaultdict(float)  # For variance calculation
         self.eval_env = env 
 
     def register_agent(self, agent, agent_name):
@@ -34,17 +37,24 @@ class Arena:
         scores = scores.cpu()
         for agent_name, score in zip(agent_names, scores):
             if agent_name in self.agents:
-                self.playout_scores[agent_name].append(score)
+                # Welford's online algorithm for running mean and variance
+                self.score_count[agent_name] += 1
+                delta = score.item() - self.score_mean[agent_name]
+                self.score_mean[agent_name] += delta / self.score_count[agent_name]
+                delta2 = score.item() - self.score_mean[agent_name]
+                self.score_m2[agent_name] += delta * delta2
 
     def get_mean_score(self, agent):
-        if len(self.playout_scores[agent]) == 0:
+        if self.score_count[agent] == 0:
             return 1e10 
-        return np.mean(self.playout_scores[agent])
+        return self.score_mean[agent]
     
     def get_std_score(self, agent):
-        if len(self.playout_scores[agent]) <= 3:
+        if self.score_count[agent] <= 3:
             return 1e10 
-        return np.std(self.playout_scores[agent])
+        # Calculate standard deviation from running statistics
+        variance = self.score_m2[agent] / self.score_count[agent]
+        return np.sqrt(variance)
 
     def debug_printout(self):
         sorted_info = self.get_sorted_info()
