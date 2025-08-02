@@ -18,7 +18,7 @@ class Args:
     ##### Algorithm specific arguments #####
     learning_rate: float = 2.5e-4
     """the learning rate of the optimizer"""
-    num_steps: int = 16
+    num_steps: int = 20
     """the number of steps to run in each environment per policy rollout"""
     gamma: float = 1
     """the discount factor gamma"""

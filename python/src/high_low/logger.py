@@ -3,7 +3,7 @@ import torch
 
 import wandb 
 import numpy as np 
-from plotting import dual_plot, plot_market_and_players
+from plotting_refactored import dual_plot, plot_market_and_players
 from wandb.sdk.wandb_settings import Settings
 
 class HighLowLogger:
@@ -118,12 +118,12 @@ class HighLowLogger:
             acc_fig = dual_plot(
                 {'customer': customer_acc, 'value_cheater': value_cheater_acc, 'high_low': high_low_acc},
                 title='Private role modeling accuracy over time')
-
-            # env_probe_indices = [0, 5, 15, 30, 120, 150, 200, 210, 250, 300, 301, 302, 303, 304, 305]
             
             # Combine all heavy plots into the main log_data dictionary
             log_data["market_fig/market"] = wandb.Plotly(market_fig)
-            log_data["market_fig/pinfo"] = wandb.Plotly(acc_fig)            
+            log_data["market_fig/pinfo"] = wandb.Plotly(acc_fig)     
+
+            # env_probe_indices = [0, 5, 15, 30, 120, 150, 200, 210, 250, 300, 301, 302, 303, 304, 305]
             # probe_plots = {
             #     f"probes/probe{probe}": wandb.Plotly(plot_market_and_players(infos, self.args, env_idx=probe))
             #     for probe in env_probe_indices}

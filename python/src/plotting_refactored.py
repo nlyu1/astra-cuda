@@ -6,6 +6,7 @@ import numpy as np
 import numpy.typing as npt
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+import torch
 
 ArrayLike = Union[List, npt.NDArray]
 
@@ -122,16 +123,27 @@ def plot_market_and_players(infos, args, env_idx=0, fig_size=(450, 600)):
     # Market data is [N, P*T, 3] where columns are [best_bid, best_ask, last_price]
     steps_per_player = args.steps_per_player
     total_timesteps = num_players * steps_per_player
-    market_data = infos['market'][env_idx]  # [P*T, 3]
-    x_steps = np.arange(total_timesteps)
-
+    
+    # Convert tensors to numpy if needed
+    market_tensor = infos['market']
+    if isinstance(market_tensor, torch.Tensor):
+        market_tensor = market_tensor.cpu().numpy()
+    
+    player_tensor = infos['players']
+    if isinstance(player_tensor, torch.Tensor):
+        player_tensor = player_tensor.cpu().numpy()
+        
     # --- 2. Add Plots in the New Order ---
 
     # Plot 1: Market Overview (Prices) -> (1, 1)
     # NULL_INDEX from C++ is 0xFFFFFFFF (4294967295)
     NULL_INDEX = 4294967295
     
-    # Extract market data
+    # Extract market data for the specific environment
+    market_data = market_tensor[env_idx]  # [P*T, 3]
+    x_steps = np.arange(total_timesteps)
+    
+    # Extract columns using tensor/array operations
     best_bids = market_data[:, 0].copy()
     best_asks = market_data[:, 1].copy()
     last_prices = market_data[:, 2].copy()
@@ -142,7 +154,9 @@ def plot_market_and_players(infos, args, env_idx=0, fig_size=(450, 600)):
     last_prices[last_prices == NULL_INDEX] = np.nan
     
     # Get settlement value
-    settlement_value = infos['settlement_values'][env_idx].item()
+    settlement_value = infos['settlement_values'][env_idx]
+    if isinstance(settlement_value, torch.Tensor):
+        settlement_value = settlement_value.item()
     
     market_traces = {
         'bid': best_bids,
@@ -157,21 +171,21 @@ def plot_market_and_players(infos, args, env_idx=0, fig_size=(450, 600)):
         fig.add_trace(go.Scatter(x=x_steps, y=data, name=name, mode="lines", line=dict(color=color)), row=1, col=1)
 
     # Plot 2: Market Trade Volume -> (1, 2)
-    # Extract trade volumes from player data by summing across players for each timestep
-    player_data = infos['players'][env_idx]  # [P, T, 6]
+    # Extract trade volumes from player data
+    player_data = player_tensor[env_idx]  # [P, T, 6]
     # Columns: [bid_px, ask_px, bid_sz, ask_sz, contract_position, cash_position]
     
-    # Create arrays for total volume at each timestep
-    buy_volumes = np.zeros(total_timesteps)
-    sell_volumes = np.zeros(total_timesteps)
-    
+    # Reshape player data to match market timeline [P*T, 6]
+    # We need to interleave players for each timestep
+    player_reshaped = np.zeros((total_timesteps, 6))
     for t in range(steps_per_player):
         for p in range(num_players):
-            timestep_idx = t * num_players + p
-            # Only count volumes up to current player in this round
-            if timestep_idx < total_timesteps:
-                buy_volumes[timestep_idx] = player_data[p, t, 2]  # bid_sz
-                sell_volumes[timestep_idx] = player_data[p, t, 3]  # ask_sz
+            idx = t * num_players + p
+            player_reshaped[idx] = player_data[p, t]
+    
+    # Extract bid and ask sizes
+    buy_volumes = player_reshaped[:, 2]  # bid_sz
+    sell_volumes = player_reshaped[:, 3]  # ask_sz
     
     trade_traces = {
         'buy_size': buy_volumes,
@@ -183,42 +197,63 @@ def plot_market_and_players(infos, args, env_idx=0, fig_size=(450, 600)):
     
     # Plot 3: All Player Positions -> (2, 1)
     player_positions = {}
+    position_x_steps = np.arange(steps_per_player)  # Positions are tracked per round
     for player_idx in range(num_players):
-        pos_data = infos['players'][env_idx, player_idx, :, 4]
-        player_positions[player_idx] = pos_data # Store for this plot
-        fig.add_trace(go.Scatter(x=x_steps, y=pos_data, name=f'P{player_idx} pos'), row=2, col=1)
+        pos_data = player_data[player_idx, :, 4]  # contract_position column
+        player_positions[player_idx] = pos_data
+        fig.add_trace(go.Scatter(x=position_x_steps, y=pos_data, name=f'P{player_idx} pos'), row=2, col=1)
 
     # Plots 4-8: Individual Player Prices -> (2, 2) onwards
-    min_value, max_value, contract_value = infos['contract'][env_idx].tolist()
+    # Reconstruct contract info from available data
+    candidate_values = infos['candidate_values'][env_idx]
+    if isinstance(candidate_values, torch.Tensor):
+        candidate_values = candidate_values.cpu().numpy()
+    
+    min_value = candidate_values.min()
+    max_value = candidate_values.max()
+    contract_value = settlement_value
     settlement_string = f"({min_value},{max_value},{contract_value})"
     bad_value = min_value if contract_value == max_value else max_value
 
-    target_positions = infos['target_positions'][env_idx].astype(int).tolist()
+    target_positions = infos['target_positions'][env_idx]
+    if isinstance(target_positions, torch.Tensor):
+        target_positions = target_positions.cpu().numpy()
+    target_positions = target_positions.astype(int)
+    
     for player_idx in range(num_players):
         plot_idx_0based = player_idx + 3 # Player plots start at the 4th subplot (index 3)
         row = plot_idx_0based // 2 + 1
         col = plot_idx_0based % 2 + 1
 
-        player_info = infos['players'][env_idx, player_idx]
-        player_bids, player_asks = np.copy(player_info[:, 0]), np.copy(player_info[:, 1])
-        player_bidsz, player_asksz = player_info[:, 2], player_info[:, 3]
+        player_info = player_data[player_idx]  # [T, 6]
+        player_bids = player_info[:, 0].copy()
+        player_asks = player_info[:, 1].copy()
+        player_bidsz = player_info[:, 2]
+        player_asksz = player_info[:, 3]
+        
+        # Set bid/ask to edge values when size is 0
         player_bids[player_bidsz == 0] = 0 
         player_asks[player_asksz == 0] = args.max_contract_value
 
         for name, data in {'bid': player_bids, 'ask': player_asks}.items():
             color = 'blue' if name == 'bid' else 'red'
-            fig.add_trace(go.Scatter(x=x_steps, y=data, name=f'P{player_idx} {name}', mode="lines", line=dict(color=color)), row=row, col=col)
+            fig.add_trace(go.Scatter(x=position_x_steps, y=data, name=f'P{player_idx} {name}', mode="lines", line=dict(color=color)), row=row, col=col)
         
-        player_role = infos['info_roles'][env_idx, player_idx]
-        # Update subplot title text, which is stored in fig.layout.annotations
-        player_role = player_role_mapping.get(player_role, "Unknown")
-        if player_role == 'BadValue': 
+        # Get player role
+        info_roles = infos['info_roles'][env_idx]
+        if isinstance(info_roles, torch.Tensor):
+            info_roles = info_roles.cpu().numpy()
+        player_role = info_roles[player_idx]
+        
+        # Update subplot title text
+        role_name = player_role_mapping.get(player_role, "Unknown")
+        if role_name == 'BadValue': 
             appendix = f' (BadValue: {bad_value})'
-        elif player_role == 'GoodValue': 
+        elif role_name == 'GoodValue': 
             appendix = f' (GoodValue: {contract_value})'
-        elif player_role == 'HighLowCheater': 
+        elif role_name == 'HighLowCheater': 
             appendix = f' (HighLowCheater: {"high" if contract_value == max_value else "low"})'
-        elif player_role == 'Customer': 
+        elif role_name == 'Customer': 
             appendix = f' (Customer: {target_positions[player_idx]})'
         else: 
             appendix = ''

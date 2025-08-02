@@ -70,7 +70,10 @@ class HighLowTrading:
         N, P = info_roles.shape
         info_roles[pos_0_mask] = torch.where(first_chosen, 0, 1).repeat_interleave(P).reshape(N, P)[pos_0_mask].int()
         info_roles[pos_1_mask] = torch.where(second_chosen, 0, 1).repeat_interleave(P).reshape(N, P)[pos_1_mask].int()
-        return {'pinfo_targets': pinfo_targets, 'settlement_values': settlement_values, 'info_roles': info_roles}
+        return {'pinfo_targets': pinfo_targets, 
+                'settlement_values': settlement_values, 
+                'candidate_values': self.candidate_values,
+                'info_roles': info_roles}
 
     def step(self, action):
         return self.env.apply_action(action)
