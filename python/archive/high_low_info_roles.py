@@ -28,6 +28,7 @@ from timer import Timer, OneTickTimer
 args = Args()
 args.fill_runtime_args()
 game_config = args.get_game_config()
+print(game_config)
 env = HighLowTrading(game_config)
 
 # %%

@@ -20,21 +20,15 @@ from high_low.env import HighLowTrading
 from high_low.logger import HighLowLogger
 from high_low.impala import HighLowImpalaTrainer, HighLowImpalaBuffer
 from timer import Timer, OneTickTimer
+import tyro
 
 from arena import Arena 
 
-args = Args()
-args.meta_steps = 10
-args.exp_name = 'vtrace_single'
-args.num_iterations = 10000000000000
-
-# impala configs
-args.psettlement_coef = 0.0
-args.proles_coef = 0.00
-args.pdecay_tau = 0.4
+args = tyro.cli(Args)
 
 args.run_name = f"HighLowTradingVTrace__{args.exp_name}__{args.seed}__{int(time.time())}"
 args.fill_runtime_args()
+print(args)
 game_config = args.get_game_config()
 env = HighLowTrading(game_config)
 
@@ -110,11 +104,9 @@ for iteration in pbar:
         for npc_id in range(player_offset):
             assert (env.current_player() == npc_id), f"Environment must be ready for NPC {npc_id}, but {env.current_player()} is acting."
             env.fill_observation_tensor(observation_buffer)
-            # print(f'Player {npc_id} acted upon', observation_buffer[0])
             with torch.autocast(device_type=device.type, dtype=torch.bfloat16):
                 with torch.inference_mode():
                     npc_actions = npc_agents[npc_id].incremental_forward(observation_buffer, step)['action']
-            # print(f'Player {npc_id} action:', npc_actions[0])
             env.step(npc_actions)
         
         #### Agent action ####
@@ -123,13 +115,11 @@ for iteration in pbar:
         assert env.current_player() == player_offset, f"Environment must be ready for player {player_offset}, but {env.current_player()} is acting."
         if step > 0: # Only update if step > 0, since step 0 is the initial state 
             env.fill_rewards_since_last_action(buffer.rewards[step - 1])
-            # print(f'Player {player_offset} reward since last action: {buffer.rewards[step - 1]}')
             buffer.update_late_stats(
                 {'dones': torch.zeros(args.num_envs).to(device).float()}, step - 1)
 
         # observation, action, log_probs, value can be calculated immediately 
         env.fill_observation_tensor(buffer.obs[step])
-        # print(f'Player! {player_offset} observation: {buffer.obs[step][0]}')
         with torch.autocast(device_type=device.type, dtype=torch.bfloat16):
             with torch.inference_mode():
                 forward_results = local_agent.incremental_forward(buffer.obs[step], step)
@@ -151,11 +141,9 @@ for iteration in pbar:
             npc_id = player_id - 1
             assert (env.current_player() == player_id), f"Environment must be ready for NPC {npc_id}, but {env.current_player()} is acting."
             env.fill_observation_tensor(observation_buffer)
-            # print(f'Player {player_id} acted upon', observation_buffer[0])
             with torch.autocast(device_type=device.type, dtype=torch.bfloat16):
                 with torch.inference_mode():
                     npc_actions = npc_agents[npc_id].incremental_forward(observation_buffer, step)['action']
-            # print(f'Player {player_id} action:', npc_actions[0])
             env.step(npc_actions)
 
         if env.terminal():
@@ -177,6 +165,11 @@ for iteration in pbar:
                 'settlement_preds': torch.stack(settlement_preds, dim=0),
                 'private_role_preds': torch.stack(private_role_preds, dim=0),
                 'infos': env_info | env_pinfo_targets}
+            # print('Rewards and returns:', buffer.rewards[:, 0].cpu(), returns_buffer[0, player_offset].cpu())
+            # print('Settlement:', env_pinfo_targets['settlement_values'][0].item(), 
+            #       'info_role:', env_pinfo_targets['info_roles'][0, player_offset].item(), 
+            #       'target position:', env_info['target_positions'][0, player_offset].item())
+            # print('Position over time:', env_info['players'][0, player_offset, :, -2:].cpu().numpy())
             # Only incur heavy logging when we're in seat 0 and after a certain interval 
             heavy_logging_update = (
                 logger.counter - logger.last_heavy_counter > args.iterations_per_heavy_logging 
@@ -187,8 +180,7 @@ for iteration in pbar:
                 pool.log_stats(global_step)
             logger.update_stats(logging_inputs, global_step, heavy_updates=heavy_logging_update)
 
-            # Populate buffer's actual private info
-            # See `env.py` env_pinfo_target method
+            # Populate buffer's actual private info. See `env.py` env_pinfo_target method
             buffer.actual_private_roles.copy_(env_pinfo_targets['pinfo_targets'], non_blocking=True)
             buffer.actual_settlement.copy_(env_pinfo_targets['settlement_values'], non_blocking=True)
             
@@ -203,13 +195,14 @@ for iteration in pbar:
     update_dictionary = buffer.get_update_dictionary()
     trainer_results = trainer.train(update_dictionary)
     wandb.log(trainer_results, step=global_step)
+    trainer.save_checkpoint(iteration)
 
     total_iterations += 1
     if total_iterations % args.iterations_per_pool_update == 0:
         pool.register_agent(local_agent, agent_name)
-        pool.debug_printout()
         agent_name = str(total_iterations)
 
 # Benchmark notes: 
 #    Pure rollout: At 64 T/B * 128 B, 5090 goes at ~2.5 it/s. 4060ti goes at ~1.61 it/s
 #    Rollout + training: ~2 it/s
+# For small game: 

@@ -10,7 +10,7 @@ class Args:
     """seed of the experiment"""
     track: bool = True
     """if toggled, this experiment will be tracked with Weights and Biases"""
-    wandb_project_name: str = "HighLowTrading_IMPALA"
+    wandb_project_name: str = "HighLowTrading_Transformer"
     """the wandb's project name"""
     wandb_entity: str = None
     """the entity (team) of wandb's project"""
@@ -18,7 +18,7 @@ class Args:
     ##### Algorithm specific arguments #####
     learning_rate: float = 2.5e-4
     """the learning rate of the optimizer"""
-    num_steps: int = 8
+    num_steps: int = 16
     """the number of steps to run in each environment per policy rollout"""
     gamma: float = 1
     """the discount factor gamma"""
@@ -31,6 +31,12 @@ class Args:
     """coefficient of the entropy"""
     vf_coef: float = 0.5
     """coefficient of the value function"""
+    psettlement_coef: float = 0.0
+    """coefficient of the settlement prediction loss (smooth-l1)"""
+    proles_coef: float = 0.0
+    """coefficient of the info role prediction loss (cross-entropy)"""
+    pdecay_tau: float = 0.4
+    """We weigh initial predictions of settlement and info roles less heavily. Decaby by 1/2 every pdecay_tau ratio"""
     max_grad_norm: float = 0.5
     """the maximum norm for the gradient clipping"""
 
@@ -48,8 +54,8 @@ class Args:
     """number of residual blocks before and after transformer"""
 
     #### Training-specific arguments ####
-    num_iterations: int = 100000000
-    """Number of vectorized times to interact with environment per meta-step. 
+    num_iterations: int = 10000
+    """Number of vectorized times to interact with environment per 
     Per each iteration, we sample (num_envs * num_steps) frames to form a batch, 
     then split into (num_minibatches) minibatches and update network for (update_epochs) epochs."""
     iterations_per_pool_update: int = 3000
@@ -62,36 +68,35 @@ class Args:
     """Number of iterations between heavy logging"""
 
     #### Game specification ### 
-    # steps_per_player: int = 20
-    # """the number of trading steps per player before game ends"""
-    # max_contracts_per_trade: int = 5
-    # """the maximum number of contracts in a single trade"""
-    # customer_max_size: int = 5
-    # """the maximum position size for customers"""
-    # max_contract_value: int = 30
-    # """the maximum value a contract can have""" 
-    # players: int = 5
-    # """the number of players in the game"""
-
-    steps_per_player: int = 8
+    steps_per_player: int = 20
     """the number of trading steps per player before game ends"""
-    max_contracts_per_trade: int = 1
+    max_contracts_per_trade: int = 5
     """the maximum number of contracts in a single trade"""
-    customer_max_size: int = 2
+    customer_max_size: int = 5
     """the maximum position size for customers"""
-    max_contract_value: int = 10
+    max_contract_value: int = 30
     """the maximum value a contract can have""" 
     players: int = 5
     """the number of players in the game"""
+    # steps_per_player: int = 8
+    # """the number of trading steps per player before game ends"""
+    # max_contracts_per_trade: int = 1
+    # """the maximum number of contracts in a single trade"""
+    # customer_max_size: int = 2
+    # """the maximum position size for customers"""
+    # max_contract_value: int = 10
+    # """the maximum value a contract can have""" 
+    # players: int = 5
+    # """the number of players in the game"""
 
     ##### Environment execution #####
     threads_per_block: int = 64
     """the number of threads per block"""
     num_blocks: int = 128
     """the number of environments per worker"""
-    num_markets: int = None
+    num_markets: int = 0
     """the number of markets in the game. Filled in at runtime"""
-    device_id: int = 1
+    device_id: int = 0
     """the device id to use"""
 
     # to be filled in runtime

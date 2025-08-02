@@ -27,7 +27,7 @@ class HighLowImpalaBuffer:
         # 0, 1, 2 stands for valueCheater, highLow, customer
         self.actual_private_roles = torch.zeros((args.num_envs, args.players)).to(device).long()
 
-        self.last_step = -1 
+        self.last_step = -1
         self.updated_late_stats = False 
         self.length = args.num_steps 
 
@@ -151,7 +151,7 @@ class HighLowImpalaTrainer:
             lr=args.learning_rate,
             eps=1e-5,
         )
-        self.last_checkpoint = -1
+        self.last_checkpoint = 0 
         self.checkpoint_interval = checkpoint_interval
         self._compiled_train_step = torch.compile(self._train_step, mode="default", fullgraph=True)
 

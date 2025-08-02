@@ -18,7 +18,7 @@ class HighLowLogger:
                 save_code=True,
                 dir="/tmp/high_low_ppo_wandb", 
             )
-        self.counter = 1 
+        self.counter = 0 
         self.last_heavy_counter = 0 
 
     def update_stats(self, logging_inputs, global_step, heavy_updates=False):

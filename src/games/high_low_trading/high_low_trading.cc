@@ -302,7 +302,8 @@ void HighLowTradingState::ApplyPlayerTrading(torch::Tensor move) {
   immediate_rewards_ = is_customer * (previous_diff - current_diff) * GetGame()->GetMaxContractValue(); 
   immediate_rewards_.add_(cash_diff); // Add immediate cash value (in-place)
 
-  if (IsTerminal()) {
+  if (trade_move_number == steps_per_player_ * num_players_ - 1) {
+    // Even if there're no more moves, "IsTerminal() == false" at this point since move_number is increased after action is applied
     // At termination, add contract settlement value
     immediate_rewards_.addcmul_( // In-place multiply-add: += contracts * settlement_value
       current_positions_contracts,
