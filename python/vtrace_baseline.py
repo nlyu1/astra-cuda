@@ -42,11 +42,11 @@ torch.manual_seed(args.seed);
 
 device = torch.device(f'cuda:{args.device_id}')
 initial_agents = {}
+path = Path("./checkpoints") / (args.checkpoint_name + ".pt")
+weights = torch.load(path, map_location=device, weights_only=False)['model_state_dict']
 for j in range(args.players - 1):
     if args.checkpoint_name is not None: 
         name = f"{args.checkpoint_name}_copy{j}"
-        path = Path("./checkpoints") / (args.checkpoint_name + ".pt")
-        weights = torch.load(path, map_location=device, weights_only=False)['model_state_dict']
     else:
         name = f"Random{j}"
         weights = None
@@ -62,6 +62,7 @@ pool = Arena(env, initial_agents, device)
 buffer = HighLowImpalaBuffer(args, num_features, device)
 
 local_agent = HighLowTransformerModel(args, env).to(device)
+local_agent.load_state_dict(weights)
 local_agent.compile()
 trainer = HighLowImpalaTrainer(
     args, local_agent, 
@@ -208,7 +209,7 @@ for iteration in pbar:
     trainer.save_checkpoint(iteration)
 
     total_iterations += 1
-    if total_iterations % args.iterations_per_pool_update == 0:
+    if total_iterations % args.iterations_per_pool_update == 0 and total_iterations >= args.iterations_to_first_pool_update:
         pool.register_agent(local_agent, agent_name)
         agent_name = str(total_iterations)
 
