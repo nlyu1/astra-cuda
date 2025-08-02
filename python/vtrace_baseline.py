@@ -215,7 +215,5 @@ for iteration in pbar:
 # Re-enable garbage collection
 gc.enable()
 
-# BenchC notes: 
-#    Pure rollout: At 64 T/B * 128 B, 5090 goes at ~2.5 it/s. 4060ti goes at ~1.61 it/s
-#    Rollout + training: ~2 it/s
-# For small game: 
+# Benchmark notes: 
+#    Training: At 64 T/B * 128 B, 5090 goes at ~3it/s for normal game, and 5070ti goes at ~5it/s for small game

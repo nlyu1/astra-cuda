@@ -250,6 +250,7 @@ void HighLowTradingState::ApplyPlayerTrading(torch::Tensor move) {
   int player_move_number = trade_move_number / num_players_;  // Which round/step this player is in
   ASTRA_CHECK_GE(trade_move_number, 0); 
   ASTRA_CHECK_LT(trade_move_number, steps_per_player_ * num_players_);
+  ASTRA_CHECK_LT(player_move_number, steps_per_player_); // Ensure player_move_number is valid
   ASTRA_CHECK_EQ(move.size(1), 4); // bid_px, ask_px, bid_sz, ask_sz
   
   // Record last positions
@@ -302,10 +303,9 @@ void HighLowTradingState::ApplyPlayerTrading(torch::Tensor move) {
   immediate_rewards_ = is_customer * (previous_diff - current_diff) * GetGame()->GetMaxContractValue(); 
   immediate_rewards_.add_(cash_diff); // Add immediate cash value (in-place)
 
-  // Discourage self trades (crossing bid and asks in general), even if bid and ask sizes are 0
-  immediate_rewards_.add_(
-    - (torch::min(bid_sizes, ask_sizes) + 1) * (bid_prices - ask_prices).clamp(min=0)
-  );
+  // Highly discourage self trades (crossing bid and asks in general), even if bid and ask sizes are 0
+  auto self_trade_penalty = (torch::min(bid_sizes, ask_sizes) + 1) * torch::clamp_min(bid_prices - ask_prices, 0) * GetGame()->GetMaxContractValue();
+  immediate_rewards_.index({torch::indexing::Slice(), player}).add_(-self_trade_penalty.to(immediate_rewards_.dtype()));
 
   if (trade_move_number == steps_per_player_ * num_players_ - 1) {
     // Even if there're no more moves, "IsTerminal() == false" at this point since move_number is increased after action is applied
