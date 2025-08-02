@@ -3,7 +3,8 @@ import torch
 
 import wandb 
 import numpy as np 
-from python.src.plotting import dual_plot, plot_market_and_players
+from src.plotting import dual_plot
+from src.high_low.plotting import plot_market_and_players
 from wandb.sdk.wandb_settings import Settings
 
 class HighLowLogger:
@@ -44,7 +45,7 @@ class HighLowLogger:
         contract_value = infos['settlement_values'].unsqueeze(-1) # [N, 1]
         last_price_diff = (last_price - contract_value).abs()
 
-        buy_volume = infos['players'][:, :, :, 2] # [N, P, T]
+        buy_volume = infos['players'][:, :, :, 2] # [N, P, T]T
         sell_volume = infos['players'][:, :, :, 3] # [N, P, T]
         best_bid = infos['market'][:, :, 0] # [N, P*T]
         best_ask = infos['market'][:, :, 1] # [N, P*T]
@@ -85,7 +86,7 @@ class HighLowLogger:
                 f'final_capture/{s}': is_within_bbo[size_mask, -1].float().mean().item()
             })
 
-        T, B, _ = logging_inputs['settlement_preds'].shape
+        T, B = logging_inputs['settlement_preds'].shape
         settlement_preds = logging_inputs['settlement_preds'] # [T, B]
         private_role_preds = logging_inputs['private_role_preds'] # [T, B, num_players]
         private_role_gt = infos['pinfo_targets'].unsqueeze(0) # [1, B, num_players]
@@ -107,9 +108,18 @@ class HighLowLogger:
         if heavy_updates: 
             customer_size_mask = (customer_size_sum == 0)
             self.last_heavy_counter = self.counter
+            
+            # Expand settlement_diff from [T] to [T*P] timeline: pad with NaNs before player offset, repeat each prediction P times
+            settlement_diff_numpy = settlement_diff.float().cpu().numpy() # [T]
+            extended_settlement_diff = np.concatenate([
+                np.full(offset, np.nan),  # NaN padding before player's first turn
+                np.repeat(settlement_diff_numpy, self.args.players)  # Repeat each prediction P times
+            ])[:self.args.players * self.args.steps_per_player]  # Truncate to T*P length
+            
             market_fig = dual_plot(
-                {'last price diff': last_price_diff[customer_size_mask].float().mean(0).cpu().numpy(),
-                 'spread': spread[customer_size_mask].float().mean(0).cpu().numpy()},
+                {'last price diff': last_price_diff[customer_size_mask].float().mean(0).cpu().numpy(), # [T*P]
+                 'spread': spread[customer_size_mask].float().mean(0).cpu().numpy(), 
+                 'settlement pred diff': extended_settlement_diff},
                  {'capture_ratio': is_within_bbo[customer_size_mask].float().mean(0).cpu().numpy()},
                 title='Last-price diff, spread, and capture ratio over time')
             # Add information for pinfo modeling 

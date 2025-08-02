@@ -168,10 +168,11 @@ for iteration in pbar:
             # Unfortunately, logging must happen before environment is reset
             env_info = env.expose_info()
             env_pinfo_targets = env.get_pinfo_targets()
+            settlement_preds_stacked = torch.stack(settlement_preds, dim=0)
             logging_inputs = {
                 'returns': returns_buffer,
                 'offset': player_offset,
-                'settlement_preds': torch.stack(settlement_preds, dim=0),
+                'settlement_preds': settlement_preds_stacked,
                 'private_role_preds': torch.stack(private_role_preds, dim=0),
                 'infos': env_info | env_pinfo_targets}
             # print('Rewards and returns:', buffer.rewards[:, 0].cpu(), returns_buffer[0, player_offset].cpu())
@@ -214,7 +215,7 @@ for iteration in pbar:
 # Re-enable garbage collection
 gc.enable()
 
-# Benchmark notes: 
+# BenchC notes: 
 #    Pure rollout: At 64 T/B * 128 B, 5090 goes at ~2.5 it/s. 4060ti goes at ~1.61 it/s
 #    Rollout + training: ~2 it/s
 # For small game: 
