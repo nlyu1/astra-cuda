@@ -29,8 +29,8 @@ args.exp_name = 'vtrace_single'
 args.num_iterations = 10000000000000
 
 # impala configs
-args.psettlement_coef = 0.1
-args.proles_coef = 0.05
+args.psettlement_coef = 0.0
+args.proles_coef = 0.00
 args.pdecay_tau = 0.4
 
 args.run_name = f"HighLowTradingVTrace__{args.exp_name}__{args.seed}__{int(time.time())}"

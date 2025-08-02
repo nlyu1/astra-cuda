@@ -18,7 +18,7 @@ class Args:
     ##### Algorithm specific arguments #####
     learning_rate: float = 2.5e-4
     """the learning rate of the optimizer"""
-    num_steps: int = 20
+    num_steps: int = 8
     """the number of steps to run in each environment per policy rollout"""
     gamma: float = 1
     """the discount factor gamma"""
@@ -62,13 +62,24 @@ class Args:
     """Number of iterations between heavy logging"""
 
     #### Game specification ### 
-    steps_per_player: int = 20
+    # steps_per_player: int = 20
+    # """the number of trading steps per player before game ends"""
+    # max_contracts_per_trade: int = 5
+    # """the maximum number of contracts in a single trade"""
+    # customer_max_size: int = 5
+    # """the maximum position size for customers"""
+    # max_contract_value: int = 30
+    # """the maximum value a contract can have""" 
+    # players: int = 5
+    # """the number of players in the game"""
+
+    steps_per_player: int = 8
     """the number of trading steps per player before game ends"""
-    max_contracts_per_trade: int = 5
+    max_contracts_per_trade: int = 1
     """the maximum number of contracts in a single trade"""
-    customer_max_size: int = 5
+    customer_max_size: int = 2
     """the maximum position size for customers"""
-    max_contract_value: int = 30
+    max_contract_value: int = 10
     """the maximum value a contract can have""" 
     players: int = 5
     """the number of players in the game"""
@@ -80,7 +91,7 @@ class Args:
     """the number of environments per worker"""
     num_markets: int = None
     """the number of markets in the game. Filled in at runtime"""
-    device_id: int = 0
+    device_id: int = 1
     """the device id to use"""
 
     # to be filled in runtime
