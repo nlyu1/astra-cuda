@@ -50,9 +50,16 @@ def plot_market_and_players(infos, args, env_idx=0, fig_size=(450, 600)):
     env_params = infos['environment'][env_idx]
     last_price = np.array(market_info[:, 2]) # Don't do in-place operations
     last_price[last_price == 0] = np.nan
+    
+    # Handle null values for bid and ask prices
+    bid_prices = np.array(market_info[:, 0])
+    ask_prices = np.array(market_info[:, 1])
+    bid_prices[bid_prices == -1] = 0
+    ask_prices[ask_prices == -1] = args.max_contract_value
+    
     market_traces = {
-        'bid': market_info[:, 0],
-        'ask': market_info[:, 1],
+        'bid': bid_prices,
+        'ask': ask_prices,
         'last_price': last_price,
         'contract_value': np.full_like(x_steps, env_params[2], dtype=float),
     }
@@ -63,9 +70,15 @@ def plot_market_and_players(infos, args, env_idx=0, fig_size=(450, 600)):
         fig.add_trace(go.Scatter(x=x_steps, y=data, name=name, mode="lines", line=dict(color=color)), row=1, col=1)
 
     # Plot 2: Market Trade Volume -> (1, 2)
+    # Calculate cumulative volumes
+    buy_volume = infos['market'][env_idx, :, 3]
+    sell_volume = infos['market'][env_idx, :, 4]
+    cumulative_buy = np.cumsum(buy_volume)
+    cumulative_sell = np.cumsum(sell_volume)
+    
     trade_traces = {
-        'buy_size': infos['market'][env_idx, :, 3], 
-        'sell_size': infos['market'][env_idx, :, 4]
+        'buy_size': cumulative_buy, 
+        'sell_size': cumulative_sell
     }
     for name, data in trade_traces.items():
         color = 'blue' if name == 'buy_size' else 'red'
@@ -95,8 +108,20 @@ def plot_market_and_players(infos, args, env_idx=0, fig_size=(450, 600)):
         player_bids[player_bidsz == 0] = 0 
         player_asks[player_asksz == 0] = args.max_contract_value
 
-        for name, data in {'bid': player_bids, 'ask': player_asks}.items():
-            color = 'blue' if name == 'bid' else 'red'
+        traces_to_plot = {'bid': player_bids, 'ask': player_asks}
+        
+        if player_idx == 0: # Further plot the settlement prediction for player
+            # Plot this together with bid and ask
+            env_settlement_preds = infos['settlement_preds'][:, env_idx].cpu().numpy()
+            traces_to_plot['settle_pred'] = env_settlement_preds
+
+        for name, data in traces_to_plot.items():
+            if name == 'bid':
+                color = 'blue'
+            elif name == 'ask':
+                color = 'red'
+            else:  # settle_pred
+                color = 'green'
             fig.add_trace(go.Scatter(x=x_steps, y=data, name=f'P{player_idx} {name}', mode="lines", line=dict(color=color)), row=row, col=col)
         
         player_role = infos['info_roles'][env_idx, player_idx]
@@ -147,7 +172,8 @@ def plot_market_and_players(infos, args, env_idx=0, fig_size=(450, 600)):
         fig.update_xaxes(title_text="", row=row, col=col)
         
         if is_vol_plot:
-            fig.update_yaxes(range=[0, args.max_contracts_per_trade], row=row, col=col)
+            # Use auto-range for cumulative volume
+            pass
         elif is_pos_plot:
             pass # Use auto-range for positions
         else: # Market overview and individual player plots

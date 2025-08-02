@@ -89,7 +89,8 @@ class HighLowLogger:
         settlement_preds = logging_inputs['settlement_preds'] # [T, B]
         private_role_preds = logging_inputs['private_role_preds'] # [T, B, num_players]
         private_role_gt = infos['pinfo_targets'].unsqueeze(0) # [1, B, num_players]
-        private_role_acc = (private_role_preds == private_role_gt) # [T, B, num_players]
+        infos['settlement_preds'] = settlement_preds
+        private_role_acc = (private_role_preds == private_role_gt) # [T, B, num_players]G
         non_self_mask = torch.ones((self.args.players,), dtype=bool)
         non_self_mask[offset] = 0
         non_self_acc = private_role_acc[:, :, non_self_mask].float().mean(-1) # [T, B]
