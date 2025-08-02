@@ -60,6 +60,8 @@ class Args:
     then split into (num_minibatches) minibatches and update network for (update_epochs) epochs."""
     iterations_per_pool_update: int = 3000
     """Number of iterations between pool updates. Set to none to do static training."""
+    checkpoint_name: str = None 
+    """Name of the checkpoint to load (e.g. 'name' for 'checkpoints/name.pt'). If None, we start from scratch."""
 
     #### Logging specification ####
     iterations_per_checkpoint: int = 1500

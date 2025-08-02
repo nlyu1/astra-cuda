@@ -3,12 +3,14 @@ import random
 import time
 from copy import deepcopy
 from typing import Any, Dict, List, Optional, Tuple
+import gc
 
 import numpy as np
 import torch
 torch.backends.cudnn.benchmark = True
 torch.set_float32_matmul_precision('medium')
 import wandb
+from pathlib import Path
 from tqdm import trange, tqdm
 import sys 
 
@@ -48,9 +50,18 @@ for path, name in loads:
     initial_agents[name].load_state_dict(
         torch.load(path, map_location=device, weights_only=False)['model_state_dict'])
 for j in range(args.players - 1 - len(loads)):
-    initial_agents[f'Random{j}'] = HighLowTransformerModel(
+    if args.checkpoint_name is not None: 
+        name = f"{args.checkpoint_name}_j"
+        path = Path("./checkpoints") / (args.checkpoint_name + ".pt")
+        weights = torch.load(path, map_location=device, weights_only=False)['model_state_dict']
+    else:
+        name = f"Random{j}"
+        weights = None
+    initial_agents[name] = HighLowTransformerModel(
         args, env, verbose=False).to(device)
-    initial_agents[f'Random{j}'].compile()
+    initial_agents[name].compile()
+    if weights is not None:
+        initial_agents[name].load_state_dict(weights)
 
 num_features = env.num_features()
 pool = Arena(env, initial_agents, device)
@@ -82,8 +93,15 @@ reward_buffer = env.new_reward_buffer() # [N, P]
 returns_buffer = env.new_reward_buffer() # [N, P]
 player_reward_buffer = env.new_player_reward_buffer() # [N]
 
+# Disable garbage collection for performance
+gc.disable()
+
 pbar = tqdm(range(args.num_iterations))
-for iteration in pbar: 
+done_zeros, done_ones = torch.zeros(args.num_envs, device=device).float(), torch.ones(args.num_envs, device=device).float()
+for iteration in pbar:
+    # Manual GC every 50 iterations
+    if iteration > 0 and iteration % 50 == 0:
+        gc.collect() 
     # Pick npc agents and player offset
     player_offset = np.random.randint(0, game_config['players'])
     npc_agent_names = pool.select_topk(game_config['players'] - 1)
@@ -116,7 +134,7 @@ for iteration in pbar:
         if step > 0: # Only update if step > 0, since step 0 is the initial state 
             env.fill_rewards_since_last_action(buffer.rewards[step - 1])
             buffer.update_late_stats(
-                {'dones': torch.zeros(args.num_envs).to(device).float()}, step - 1)
+                {'dones': done_zeros}, step - 1)
 
         # observation, action, log_probs, value can be calculated immediately 
         env.fill_observation_tensor(buffer.obs[step])
@@ -154,7 +172,7 @@ for iteration in pbar:
             # Reset environment 
             buffer.update_late_stats({
                 'rewards': player_reward_buffer,
-                'dones': torch.ones(args.num_envs).to(device).float()}, step)
+                'dones': done_ones}, step)
 
             # Unfortunately, logging must happen before environment is reset
             env_info = env.expose_info()
@@ -201,6 +219,9 @@ for iteration in pbar:
     if total_iterations % args.iterations_per_pool_update == 0:
         pool.register_agent(local_agent, agent_name)
         agent_name = str(total_iterations)
+
+# Re-enable garbage collection
+gc.enable()
 
 # Benchmark notes: 
 #    Pure rollout: At 64 T/B * 128 B, 5090 goes at ~2.5 it/s. 4060ti goes at ~1.61 it/s

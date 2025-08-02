@@ -12,11 +12,11 @@ class VTraceBuffer:
     def __init__(self, args, num_features, device='cuda'):
         self.args = args 
 
-        self.obs = torch.zeros((args.num_steps, args.num_envs, num_features)).to(device)
-        self.actions = torch.zeros((args.num_steps, args.num_envs, 4)).to(device)
-        self.logprobs = torch.zeros((args.num_steps, args.num_envs)).to(device)
-        self.rewards = torch.zeros((args.num_steps, args.num_envs)).to(device)
-        self.dones = torch.zeros((args.num_steps, args.num_envs)).to(device)
+        self.obs = torch.zeros((args.num_steps, args.num_envs, num_features), device=device)
+        self.actions = torch.zeros((args.num_steps, args.num_envs, 4), device=device)
+        self.logprobs = torch.zeros((args.num_steps, args.num_envs), device=device)
+        self.rewards = torch.zeros((args.num_steps, args.num_envs), device=device)
+        self.dones = torch.zeros((args.num_steps, args.num_envs), device=device)
 
         self.last_step = -1 
         self.updated_late_stats = False 

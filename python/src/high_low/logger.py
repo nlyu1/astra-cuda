@@ -3,7 +3,7 @@ import torch
 
 import wandb 
 import numpy as np 
-from plotting_refactored import dual_plot, plot_market_and_players
+from python.src.plotting import dual_plot, plot_market_and_players
 from wandb.sdk.wandb_settings import Settings
 
 class HighLowLogger:
@@ -123,9 +123,12 @@ class HighLowLogger:
             log_data["market_fig/market"] = wandb.Plotly(market_fig)
             log_data["market_fig/pinfo"] = wandb.Plotly(acc_fig)     
 
-            # env_probe_indices = [0, 5, 15, 30, 120, 150, 200, 210, 250, 300, 301, 302, 303, 304, 305]
-            # probe_plots = {
-            #     f"probes/probe{probe}": wandb.Plotly(plot_market_and_players(infos, self.args, env_idx=probe))
-            #     for probe in env_probe_indices}
-            # log_data.update(probe_plots)
+            env_probe_indices = [0, 5, 15, 30, 120, 150, 200, 210, 250, 300, 301, 302, 303, 304, 305]
+            # Filter out indices that are beyond the number of environments
+            num_envs = infos['market'].shape[0]
+            env_probe_indices = [idx for idx in env_probe_indices if idx < num_envs]
+            probe_plots = {
+                f"probes/probe{probe}": wandb.Plotly(plot_market_and_players(infos, self.args, env_idx=probe))
+                for probe in env_probe_indices}
+            log_data.update(probe_plots)
         wandb.log(log_data, step=global_step)

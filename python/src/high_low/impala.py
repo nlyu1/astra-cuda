@@ -17,15 +17,15 @@ class HighLowImpalaBuffer:
     def __init__(self, args, num_features, device='cuda'):
         self.args = args 
 
-        self.obs = torch.zeros((args.num_steps, args.num_envs, num_features)).to(device)
-        self.actions = torch.zeros((args.num_steps, args.num_envs, 4)).to(device)
-        self.logprobs = torch.zeros((args.num_steps, args.num_envs)).to(device)
-        self.rewards = torch.zeros((args.num_steps, args.num_envs)).to(device)
-        self.dones = torch.zeros((args.num_steps, args.num_envs)).to(device)
+        self.obs = torch.zeros((args.num_steps, args.num_envs, num_features), device=device)
+        self.actions = torch.zeros((args.num_steps, args.num_envs, 4), device=device)
+        self.logprobs = torch.zeros((args.num_steps, args.num_envs), device=device)
+        self.rewards = torch.zeros((args.num_steps, args.num_envs), device=device)
+        self.dones = torch.zeros((args.num_steps, args.num_envs), device=device)
 
-        self.actual_settlement = torch.zeros((args.num_envs,)).to(device)
+        self.actual_settlement = torch.zeros((args.num_envs,), device=device)
         # 0, 1, 2 stands for valueCheater, highLow, customer
-        self.actual_private_roles = torch.zeros((args.num_envs, args.players)).to(device).long()
+        self.actual_private_roles = torch.zeros((args.num_envs, args.players), device=device).long()
 
         self.last_step = -1
         self.updated_late_stats = False 
@@ -162,6 +162,17 @@ class HighLowImpalaTrainer:
         pinfo_loss_weights = (0.5 ** (pinfo_loss_weights / args.pdecay_tau)).unsqueeze(1) # Unsqueeze along batch dimension
         self.pinfo_loss_weights = pinfo_loss_weights / pinfo_loss_weights.mean() # Should mean to 1
 
+        self.logging_size = self.args.update_epochs * self.args.num_minibatches
+        self.explained_vars, self.value_losses, self.pg_losses, self.entropy_losses, self.approx_kls, \
+            self.pred_settlement_losses, self.pred_private_roles_losses = (
+            torch.zeros((self.logging_size,), device=device),
+            torch.zeros((self.logging_size,), device=device),
+            torch.zeros((self.logging_size,), device=device),
+            torch.zeros((self.logging_size,), device=device),
+            torch.zeros((self.logging_size,), device=device),
+            torch.zeros((self.logging_size,), device=device),
+            torch.zeros((self.logging_size,), device=device))
+
     def train(self, update_dictionary):
         obs, logprobs, actions, rewards, dones = (
             update_dictionary['obs'],
@@ -171,17 +182,6 @@ class HighLowImpalaTrainer:
             update_dictionary['dones'])
         # Unlike in PPO, we batch sample by environment instead 
         batch_env_indices = torch.arange(self.args.num_envs).to(obs.device)
-
-        logging_size = self.args.update_epochs * self.args.num_minibatches
-        explained_vars, value_losses, pg_losses, entropy_losses, approx_kls, \
-            pred_settlement_losses, pred_private_roles_losses = (
-            torch.zeros((logging_size,)).to(obs.device),
-            torch.zeros((logging_size,)).to(obs.device),
-            torch.zeros((logging_size,)).to(obs.device),
-            torch.zeros((logging_size,)).to(obs.device),
-            torch.zeros((logging_size,)).to(obs.device),
-            torch.zeros((logging_size,)).to(obs.device),
-            torch.zeros((logging_size,)).to(obs.device))
         logging_counter = 0 
 
         # Obs: [T, B, s]. Logprobs: [T, B], Actions: [T, B, 4], Rewards [T, B], Done: [T, B]
@@ -206,23 +206,23 @@ class HighLowImpalaTrainer:
                     self.optimizer.step()
                     self.optimizer.zero_grad()
 
-                    explained_vars[logging_counter] = step_results['explained_vars']
-                    value_losses[logging_counter] = step_results['value_losses']
-                    pg_losses[logging_counter] = step_results['pg_losses']
-                    entropy_losses[logging_counter] = step_results['entropy_losses']
-                    approx_kls[logging_counter] = step_results['approx_kls']
-                    pred_settlement_losses[logging_counter] = step_results['pred_settlement_loss']
-                    pred_private_roles_losses[logging_counter] = step_results['pred_private_roles_loss']
+                    self.explained_vars[logging_counter] = step_results['explained_vars']
+                    self.value_losses[logging_counter] = step_results['value_losses']
+                    self.pg_losses[logging_counter] = step_results['pg_losses']
+                    self.entropy_losses[logging_counter] = step_results['entropy_losses']
+                    self.approx_kls[logging_counter] = step_results['approx_kls']
+                    self.pred_settlement_losses[logging_counter] = step_results['pred_settlement_loss']
+                    self.pred_private_roles_losses[logging_counter] = step_results['pred_private_roles_loss']
                     logging_counter += 1
 
         return {
-            'metrics/explained_vars': explained_vars.mean().item(),
-            'metrics/value_losses': value_losses.mean().item(),
-            'metrics/pg_losses': pg_losses.mean().item(),
-            'metrics/entropy': -entropy_losses.mean().item(),
-            'metrics/approx_kls': approx_kls.mean().item(),
-            'metrics/pred_settlement_losses': pred_settlement_losses.mean().item(),
-            'metrics/pred_private_roles_losses': pred_private_roles_losses.mean().item(),
+            'metrics/explained_vars': self.explained_vars.mean().item(),
+            'metrics/value_losses': self.value_losses.mean().item(),
+            'metrics/pg_losses': self.pg_losses.mean().item(),
+            'metrics/entropy': -self.entropy_losses.mean().item(),
+            'metrics/approx_kls': self.approx_kls.mean().item(),
+            'metrics/pred_settlement_losses': self.pred_settlement_losses.mean().item(),
+            'metrics/pred_private_roles_losses': self.pred_private_roles_losses.mean().item(),
         }
 
     def _train_step(self, 

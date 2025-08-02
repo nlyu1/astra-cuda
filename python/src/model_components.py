@@ -18,13 +18,15 @@ class ResidualBlock(nn.Module):
 
         self.output_size = output_size
         self.features = features
+        
+        # Pre-compute if we need padding
+        self.is_residual = output_size == features
 
-    def forward(self, x):
-        if self.output_size > self.features:
-            residual_x = torch.cat([x, torch.zeros(x.shape[0], self.output_size - self.features).type_as(x)], dim=-1)
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if self.is_residual:
+            return x + self.act(self.ln(self.fc1(x)))
         else:
-            residual_x = x[:, :self.output_size]
-        return residual_x + self.act(self.ln(self.fc1(x)))
+            return self.act(self.ln(self.fc1(x)))
 
 # JIT-compiled fused operations for speed
 @torch.jit.script

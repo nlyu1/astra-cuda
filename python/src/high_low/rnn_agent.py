@@ -99,7 +99,7 @@ class HighLowGRUModel(nn.Module):
         }
 
     def initial_belief(self):
-        return torch.zeros(self.rnn_n_layers, self.B, self.rnn_hidden_size).to(self.device)
+        return torch.zeros(self.rnn_n_layers, self.B, self.rnn_hidden_size, device=self.device)
 
     @torch.jit.export
     @torch.inference_mode()
