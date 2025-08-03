@@ -307,6 +307,14 @@ void HighLowTradingState::ApplyPlayerTrading(torch::Tensor move) {
   auto self_trade_penalty = (torch::min(bid_sizes, ask_sizes) + 1) * torch::clamp_min(bid_prices - ask_prices, 0) * GetGame()->GetMaxContractValue();
   immediate_rewards_.index({torch::indexing::Slice(), player}).add_(-self_trade_penalty.to(immediate_rewards_.dtype()));
 
+  // Highly discourage cheap signaling
+  // If bid_size is 0, then only allow bid_price == 1
+  // If ask_size is 0, then only allow ask_price == max_contract_value
+  auto bid_cheap_signaling_penalty = (bid_sizes == 0).to(torch::kInt32) * (bid_prices != 1).to(torch::kInt32) * GetGame()->GetMaxContractValue(); 
+  auto ask_cheap_signaling_penalty = (ask_sizes == 0).to(torch::kInt32) * (ask_prices != GetGame()->GetMaxContractValue()).to(torch::kInt32) * GetGame()->GetMaxContractValue(); 
+  immediate_rewards_.index({torch::indexing::Slice(), player}).add_(-bid_cheap_signaling_penalty.to(immediate_rewards_.dtype()));
+  immediate_rewards_.index({torch::indexing::Slice(), player}).add_(-ask_cheap_signaling_penalty.to(immediate_rewards_.dtype()));
+
   if (trade_move_number == steps_per_player_ * num_players_ - 1) {
     // Even if there're no more moves, "IsTerminal() == false" at this point since move_number is increased after action is applied
     // At termination, add contract settlement value
