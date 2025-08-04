@@ -37,6 +37,9 @@ class HighLowImpalaBuffer:
     def update(self, updates, step):
         """
         Steps are agent steps. 
+
+        RELIES ON OBSERVATION BUFFER BEING UPDATED BEFORE THIS CALL. 
+        Since environment updates observations in-place, this is not a problem. 
         """
         # Step continuity check 
         assert (step >= 0 and step < self.length), "Step must be within [0, num_steps)"
@@ -79,9 +82,9 @@ def vtrace_losses(
     logprobs: Float[torch.Tensor, "T B"], # Gradient-attached logprobs 
     values: Float[torch.Tensor, "T_plus_1 B"],
     gamma: float = 0.99,
+    gae_lambda: float = 0, # (0, 1) interpolates between (1-step TD, MC) respectively 
     bar_rho: float = 1.0,
-    bar_c: float = 1.0
-): 
+    bar_c: float = 1.0): 
     """Computes V-trace bootstrapped value targets from a batch of trajectories.
 
     This function implements the V-trace algorithm, which provides off-policy
@@ -129,8 +132,21 @@ def vtrace_losses(
     value_loss = torch.nn.functional.smooth_l1_loss(vtrace_values[:-1], cur_values).mean()
 
     # Calculate action losses: vanilla PG on corrected advantage
+    T = rewards.shape[0]
     with torch.no_grad(): 
-        vtrace_advantage = rewards + gamma * (1 - dones) *vtrace_values[1:] - cur_values 
+        last_gae_lambda = 0 
+        vtrace_advantage = torch.zeros_like(rewards)
+        for t in reversed(range(T)):
+            if t == T - 1:
+                next_values = vtrace_values[-1]
+            else:
+                next_values = vtrace_values[t+1]
+            ctd = 1. - dones[t]
+            delta = rewards[t] - cur_values[t] + gamma * next_values * ctd
+            vtrace_advantage[t] = last_gae_lambda = (
+                delta + gamma * gae_lambda * ctd * last_gae_lambda)
+            
+        # vtrace_advantage = rewards + gamma * (1 - dones) *vtrace_values[1:] - cur_values 
         vtrace_advantage = (vtrace_advantage - vtrace_advantage.mean()) / (vtrace_advantage.std() + 1e-8)
     pg_loss = - policy_clip * logprobs * vtrace_advantage 
     pg_loss = pg_loss.mean()
@@ -168,8 +184,9 @@ class HighLowImpalaTrainer:
         self.pinfo_loss_weights = pinfo_loss_weights / pinfo_loss_weights.mean() # Should mean to 1
 
         self.logging_size = self.args.update_epochs * self.args.num_minibatches
-        self.explained_vars, self.value_losses, self.pg_losses, self.entropy_losses, self.approx_kls, \
-            self.pred_settlement_losses, self.pred_private_roles_losses = (
+        self.explained_vars, self.value_losses, self.pg_losses, self.entropy, self.approx_kls, \
+            self.pred_settlement_losses, self.pred_private_roles_losses, self.entropy_coefs = (
+            torch.zeros((self.logging_size,), device=device),
             torch.zeros((self.logging_size,), device=device),
             torch.zeros((self.logging_size,), device=device),
             torch.zeros((self.logging_size,), device=device),
@@ -229,10 +246,11 @@ class HighLowImpalaTrainer:
                     self.explained_vars[logging_counter] = step_results['explained_vars']
                     self.value_losses[logging_counter] = step_results['value_losses']
                     self.pg_losses[logging_counter] = step_results['pg_losses']
-                    self.entropy_losses[logging_counter] = step_results['entropy_losses']
+                    self.entropy[logging_counter] = step_results['entropy']
                     self.approx_kls[logging_counter] = step_results['approx_kls']
                     self.pred_settlement_losses[logging_counter] = step_results['pred_settlement_loss']
                     self.pred_private_roles_losses[logging_counter] = step_results['pred_private_roles_loss']
+                    self.entropy_coefs[logging_counter] = step_results['entropy_coef']
                     logging_counter += 1
 
         # Batch all tensor means to reduce GPU-CPU transfers
@@ -240,20 +258,22 @@ class HighLowImpalaTrainer:
             self.explained_vars.mean(),
             self.value_losses.mean(),
             self.pg_losses.mean(),
-            self.entropy_losses.mean(),
+            self.entropy.mean(),
             self.approx_kls.mean(),
             self.pred_settlement_losses.mean(),
-            self.pred_private_roles_losses.mean()
+            self.pred_private_roles_losses.mean(),
+            self.entropy_coefs.mean()
         ]).detach().cpu().numpy()
         
         return {
             'metrics/explained_vars': float(metrics_cpu[0]),
             'metrics/value_losses': float(metrics_cpu[1]),
             'metrics/pg_losses': float(metrics_cpu[2]),
-            'metrics/entropy': float(-metrics_cpu[3]),
+            'metrics/entropy': float(metrics_cpu[3]),
             'metrics/approx_kls': float(metrics_cpu[4]),
             'metrics/pred_settlement_losses': float(metrics_cpu[5]),
             'metrics/pred_private_roles_losses': float(metrics_cpu[6]),
+            'metrics/entropy_coefs': float(metrics_cpu[7]),
             'metrics/learning_rate': current_lr,
         }
 
@@ -315,11 +335,16 @@ class HighLowImpalaTrainer:
             logprobs[:, minibatch_env_indices],
             new_logprob,
             augmented_values,
-            gamma=self.args.gamma)
+            gamma=self.args.gamma,
+            gae_lambda=self.args.gae_lambda)
 
-        entropy_loss = -entropy.mean()
+        entropy_coef = self.agent.log_entropy_coef.exp()
+        entropy_value = entropy.mean()
+        entropy_loss = -entropy_coef.detach() * entropy_value
+        entropy_coef_loss = entropy_coef * (entropy_value - self.args.target_entropy).detach()
+
         loss = (vtrace_results['policy_loss'] 
-                + self.args.ent_coef * entropy_loss 
+                + entropy_loss + entropy_coef_loss
                 + vtrace_results['value_loss'] * self.args.vf_coef
                 + pred_settlement_loss * self.args.psettlement_coef
                 + pred_private_roles_loss * self.args.proles_coef)
@@ -329,10 +354,11 @@ class HighLowImpalaTrainer:
             'explained_vars': vtrace_results['value_r2'],
             'value_losses': vtrace_results['value_loss'],
             'pg_losses': vtrace_results['policy_loss'],
-            'entropy_losses': -entropy.mean(),
+            'entropy': entropy_value,
             'approx_kls': approx_kl,
             'pred_settlement_loss': pred_settlement_loss,
             'pred_private_roles_loss': pred_private_roles_loss,
+            'entropy_coef': entropy_coef,
         }
 
     def save_checkpoint(self, step):

@@ -30,7 +30,7 @@ class ResidualBlock(nn.Module):
 
 class LearnedPositionalEncoding(nn.Module):
     """Learned positional embeddings for transformer."""
-    def __init__(self, d_model: int, max_len: int = 128):
+    def __init__(self, d_model: int, max_len: int = 512):
         super().__init__()
         self.pos_embedding = nn.Embedding(max_len, d_model)
         self.register_buffer('position_ids', torch.arange(max_len))
@@ -64,7 +64,7 @@ class BetaActor(nn.Module):
         self.actor = nn.Linear(n_hidden, n_actors * 2)
         self.max_kappa = max_kappa
     
-    @torch.compile(fullgraph=True, mode="max-autotune")
+    # @torch.compile(fullgraph=True, mode="max-autotune")
     def forward(self, x):
         output = self.actor(x)
         m_hidden, kappa_hidden = output[:, :self.n_actors], output[:, self.n_actors:]

@@ -36,7 +36,7 @@ class HighLowTransformerModel(nn.Module):
         
         # Input encoder
         self.encoder = ResidualBlock(self.F, self.n_embd)
-        self.pos_encoding = LearnedPositionalEncoding(self.n_embd, max_len=self.T)
+        self.pos_encoding = LearnedPositionalEncoding(self.n_embd, max_len=max(self.T, 512))
         self.pinfo_numfeatures = 2 + 1 + self.P # see pinfo_tensor method in `env.py`
         
         # Transformer core using memory-efficient configurations
@@ -72,7 +72,9 @@ class HighLowTransformerModel(nn.Module):
             nn.Linear(self.n_hidden, 1))
         
         # Pre-generate causal masks for different sequence lengths to avoid dynamic allocation
-        self.register_buffer('causal_mask', nn.Transformer.generate_square_subsequent_mask(self.T, device=self.device))
+        self.register_buffer(
+            'causal_mask', nn.Transformer.generate_square_subsequent_mask(self.T, device=self.device), persistent=False)
+        self.log_entropy_coef = nn.Parameter(torch.zeros(1, device=self.device) - 2) # ~0.13 entropy coef 
 
         if verbose:
             B, F = env.observation_shape()
@@ -87,7 +89,7 @@ class HighLowTransformerModel(nn.Module):
             print(f"Trainable parameters: {trainable_params:,}")
             print(f"Model size: {total_params * 4 / 1024**2:.2f} MB (assuming float32)")
 
-    @torch.compile(fullgraph=True, mode="max-autotune", dynamic=True)
+    # @torch.compile(fullgraph=True, mode="max-autotune")
     def extract_action_params(self, features):
         """
         Features: [B', D]. Generates unscaled normalizations and scales appropriately. 
@@ -104,7 +106,7 @@ class HighLowTransformerModel(nn.Module):
             'ask_sz_alpha': alphas[:, 3],
             'ask_sz_beta': betas[:, 3]}
     
-    @torch.compile(fullgraph=True, mode="max-autotune")
+    # @torch.compile(fullgraph=True, mode="max-autotune")
     def _action_logprobs(self, action_params, actions):
         """
         action_params: {'bid_px_mean', 'bid_px_std', ...} -> [B']
@@ -160,7 +162,7 @@ class HighLowTransformerModel(nn.Module):
             'values': values,
             'logprobs': logprobs.reshape(T, B),
             'entropy': entropy.reshape(T, B),
-            'pinfo_preds': pinfo_preds
+            'pinfo_preds': pinfo_preds, 
         }
 
     @torch.inference_mode()
@@ -222,7 +224,7 @@ class HighLowTransformerModel(nn.Module):
     def reset_context(self):
         self.context = self.initial_context()
 
-    @torch.compile(mode="max-autotune", dynamic=True)
+    @torch.compile(mode="max-autotune")
     def _incremental_core(self, context: torch.Tensor) -> torch.Tensor:
         """
         Sample actions for a single timestep given augmented context. 

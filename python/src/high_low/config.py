@@ -27,8 +27,8 @@ class Args:
     update_epochs: int = 1
     """the K epochs to update the policy.
     `num_minibatches * update_epochs` trades between sampling efficiency and training stability."""
-    ent_coef: float = 0.1
-    """coefficient of the entropy"""
+    target_entropy: float = -2.
+    """target entropy for soft-entropy regularization"""
     vf_coef: float = 0.5
     """coefficient of the value function"""
     psettlement_coef: float = 0.0
@@ -63,6 +63,8 @@ class Args:
     """Only start updating the pool after this many iterations."""
     checkpoint_name: str = None 
     """Name of the checkpoint to load (e.g. 'name' for 'checkpoints/name.pt'). If None, we start from scratch."""
+    gae_lambda: float = 0.0
+    """lambda parameter for GAE. (0, 1) interpolates between (1-step TD, MC) respectively. Heavily suggested to be 0."""
 
     #### Logging specification ####
     iterations_per_checkpoint: int = 1500

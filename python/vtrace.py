@@ -4,11 +4,15 @@ import time
 from copy import deepcopy
 from typing import Any, Dict, List, Optional, Tuple
 import gc
+import os
+os.environ["TORCHINDUCTOR_CACHE_DIR"] = os.path.expanduser("~/.cache/torch_compile")
+os.environ["TORCH_COMPILE_CACHE_DIR"] = os.path.expanduser("~/.cache/torch_compile")
 
 import numpy as np
 import torch
 torch.backends.cudnn.benchmark = True
 torch.set_float32_matmul_precision('medium')
+torch._dynamo.config.cache_size_limit = 256 # Enable more aggressive caching
 import wandb
 from pathlib import Path
 from tqdm import tqdm
@@ -54,7 +58,7 @@ for j in range(args.players - 1):
     initial_agents[name] = HighLowTransformerModel(
         args, env, verbose=False).to(device)
     if args.checkpoint_name is not None:   
-        initial_agents[name].load_state_dict(weights)
+        initial_agents[name].load_state_dict(weights, strict=False)
 
 num_features = env.num_features()
 pool = Arena(env, initial_agents, device)
@@ -63,7 +67,7 @@ buffer = HighLowImpalaBuffer(args, num_features, device)
 
 local_agent = HighLowTransformerModel(args, env).to(device)
 if args.checkpoint_name is not None:
-    local_agent.load_state_dict(weights)
+    local_agent.load_state_dict(weights, strict=False)
 trainer = HighLowImpalaTrainer(
     args, local_agent, 
     checkpoint_interval=args.iterations_per_checkpoint,
@@ -222,6 +226,3 @@ for iteration in pbar:
 
 # Re-enable garbage collection
 gc.enable()
-
-# Benchmark notes: 
-#    Training: At 64 T/B * 128 B, 5090 goes at ~3it/s for normal game, and 5070ti goes at ~5it/s for small game

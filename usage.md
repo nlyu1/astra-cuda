@@ -79,14 +79,24 @@ Updates:
     - Encoder should be ResidualBlock, not Linear, to enable stable training (probably normalization-related). 
     - Tried fp8. Doesn't help with speed. 
     - Halved the batch size to keep number of iterations reasonable. 
+4. Added gae option to v-trace loss for less myopic updates. 
+
+Profiling
+```
+python profile_vtrace.py
+```
 
 ## Seed run
 
-1. [Small game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/vsz0nhek)
-2. [Normal game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/nbux1boz)
+1. [Small game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/2zlb4h93)
+2. [Normal game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/0watx14k)
 
 ```
-CUDA_VISIBLE_DEVICES=1 python vtrace.py --learning_rate 3e-4 --steps_per_player 8 --max_contracts_per_trade 1 --customer_max_size 2 --max_contract_value 10 --players 5 --ent_coef 0.05 --num_steps 8 --num_iterations 3010 --iterations_per_pool_update 3000 --iterations_per_heavy_logging 3000 --iterations_per_checkpoint 3000 --exp_name smalldecencritic_seedpool
+CUDA_VISIBLE_DEVICES=1 python vtrace.py --learning_rate 3e-4 --steps_per_player 8 --max_contracts_per_trade 1 --customer_max_size 2 --max_contract_value 10 --players 5 --target_entropy -2 --num_steps 8 --num_iterations 3010 --iterations_per_pool_update 3000 --iterations_per_heavy_logging 3000 --iterations_per_checkpoint 3000 --exp_name smalldecencritic_seedpool
 
-CUDA_VISIBLE_DEVICES=0 python vtrace.py --learning_rate 3e-4 --ent_coef 0.05 --num_iterations 3010 --iterations_per_heavy_logging 3000 --iterations_per_checkpoint 3000 --iterations_per_pool_update 3000 --exp_name normaldecencritic_seedpool
+CUDA_VISIBLE_DEVICES=0 python vtrace.py --learning_rate 3e-4 --target_entropy -2 --num_iterations 3010 --iterations_per_heavy_logging 3000 --iterations_per_checkpoint 3000 --iterations_per_pool_update 3000 --exp_name normaldecencritic_seedpool
+
+# Try loading from an earlier experiment with less timesteps
+# Try loading with a greater gae_lambda since model is already stable
+CUDA_VISIBLE_DEVICES=1 python vtrace.py --learning_rate 3e-4 --ent_coef 0.05 --num_iterations 3010 --iterations_per_heavy_logging 3000 --iterations_per_checkpoint 3000 --iterations_per_pool_update 3000 --exp_name normalgame_loading_exp__ --checkpoint_name smalldecencritic_seedpool_3000 --gae_lambda 0.0
 ```
