@@ -71,6 +71,7 @@ class HighLowImpalaBuffer:
             'actual_private_roles': self.actual_private_roles,
         }
 
+@torch.compile(mode='max-autotune', fullgraph=True)
 def vtrace_losses(
     rewards: Float[torch.Tensor, "T B"],
     dones: Bool[torch.Tensor, "T B"],
@@ -140,7 +141,6 @@ def vtrace_losses(
         'value_r2': value_r2,
     }
     return result 
-compiled_vtrace_losses = torch.compile(vtrace_losses, mode='max-autotune-no-cudagraphs', fullgraph=True)
     
 
 class HighLowImpalaTrainer:
@@ -207,10 +207,11 @@ class HighLowImpalaTrainer:
         num_envs_per_minibatch = self.args.num_envs // self.args.num_minibatches
         assert num_envs_per_minibatch * self.args.num_minibatches == self.args.num_envs
 
-        with torch.autocast(device_type=obs.device.type, dtype=torch.bfloat16):
+        with torch.autocast(device_type=obs.device.type, dtype=torch.bfloat16, cache_enabled=True):
             for _ in range(self.args.update_epochs):
                 batch_env_indices = torch.randperm(self.args.num_envs).to(obs.device)
                 for start in range(0, self.args.num_envs, num_envs_per_minibatch):
+                    torch.compiler.cudagraph_mark_step_begin() # Mark iterations to enable cuda-graph in compilation
                     end = start + num_envs_per_minibatch
                     minibatch_env_indices = batch_env_indices[start:end]
 
@@ -308,7 +309,7 @@ class HighLowImpalaTrainer:
         augmented_values = torch.cat([ # [T+1, B]
             values, torch.zeros_like(values[-1])[None, :]])                 
         
-        vtrace_results = compiled_vtrace_losses(
+        vtrace_results = vtrace_losses(
             rewards[:, minibatch_env_indices],
             dones[:, minibatch_env_indices],
             logprobs[:, minibatch_env_indices],

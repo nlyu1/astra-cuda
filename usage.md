@@ -69,16 +69,20 @@ CUDA_VISIBLE_DEVICES=1 python vtrace.py --steps_per_player 8 --max_contracts_per
 
 # Added decentralized critic and continuous parameterization
 
-Decentralized critic initially makes training more unstable (since observation features and function body are shared), but ultimately leads to greater explained variance. Might also be because of the newly added intermediate rewards (no self-trades & no cheap signaling). 
+Updates:
 
-- Update: this was because I tried to use a double-head architecture for decentralized critic which pushed useless gradients to the policy trunk. 
-
-Added lr warmup; the inject-at-end private info policy stabilizes traning. 
+1. Decentralized critic head with late information injection. 
+    - Trying to combine critic by applying it as a separate batch deteriorates performance
+2. Continuous beta-sampling: allows finetuning weights on variable maximum trade sizes and lengths. 
+    - Beta-ST (straight-through) action parameterization. Model predicts normalized beta-distribution location and spread parameters. 
+3. Full-on, bigger transformer model. 
+    - Encoder should be ResidualBlock, not Linear, to enable stable training (probably normalization-related). 
+    - Tried fp8. Doesn't help. 
 
 ## Seed run
 
-1. [Small game](https://wandb.ai/lyuxingjian-na/HighLowTrading_Transformer/runs/vnsahkfr)
-2. [Normal run](https://wandb.ai/lyuxingjian-na/HighLowTrading_Transformer/runs/q6ggd0ah)
+1. [Small game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/j1wf9zvj)
+2. [Normal game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/bemtld9g)
 
 ```
 CUDA_VISIBLE_DEVICES=1 python vtrace.py --learning_rate 3e-4 --steps_per_player 8 --max_contracts_per_trade 1 --customer_max_size 2 --max_contract_value 10 --players 5 --ent_coef 0.05 --num_steps 8 --num_iterations 3010 --iterations_per_pool_update 3000 --iterations_per_heavy_logging 3000 --iterations_per_checkpoint 3000 --exp_name smalldecencritic_seedpool

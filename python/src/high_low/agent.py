@@ -9,7 +9,6 @@ import sys
 sys.path.append('../')
 from model_components import ResidualBlock, LearnedPositionalEncoding, BetaActor
 
-
 class HighLowTransformerModel(nn.Module):
     """
     Transformer-based model for High-Low Trading that replaces GRU with parallel attention.
@@ -68,6 +67,7 @@ class HighLowTransformerModel(nn.Module):
         self.critic = nn.Sequential(
             ResidualBlock(self.n_embd + self.pinfo_numfeatures, self.n_hidden),
             ResidualBlock(self.n_hidden, self.n_hidden),
+            ResidualBlock(self.n_hidden, self.n_hidden),
             nn.Linear(self.n_hidden, 1))
         
         # Pre-generate causal masks for different sequence lengths to avoid dynamic allocation
@@ -86,7 +86,7 @@ class HighLowTransformerModel(nn.Module):
             print(f"Trainable parameters: {trainable_params:,}")
             print(f"Model size: {total_params * 4 / 1024**2:.2f} MB (assuming float32)")
 
-    @torch.compile(fullgraph=True, mode="max-autotune-no-cudagraphs", dynamic=True)
+    @torch.compile(fullgraph=True, mode="max-autotune", dynamic=True)
     def extract_action_params(self, features):
         """
         Features: [B', D]. Generates unscaled normalizations and scales appropriately. 
@@ -138,7 +138,7 @@ class HighLowTransformerModel(nn.Module):
         encoded = self.encoder(x.view(T*B, F)).view(T, B, self.n_embd)
         encoded = self.pos_encoding(encoded) # [T, B, D]
         # [T, B, D]. causal_mask shape [T, T] with -inf on strict upper-diagonal
-        features = self.transformer(encoded, mask=self.causal_mask, is_causal=True).view(T*B, self.n_embd)
+        features = self.transformer(encoded, mask=self.causal_mask, is_causal=True).view(T * B, self.n_embd) # [T * B, D]
         critic_features = torch.cat([
             features.view(T, B, self.n_embd),
             pinfo_tensor.expand(T, B, self.pinfo_numfeatures)
@@ -183,33 +183,33 @@ class HighLowTransformerModel(nn.Module):
             logprobs: [B]
             context: [T_sofar+1, B, D]
         """
-        with torch.autocast(device_type=self.device.type, dtype=torch.bfloat16):
-            assert x.shape[1] == self.F, f"Expected observation feature dim {self.F}, got {x.shape[1]}"
-            assert prev_context.numel() == 0 or prev_context.shape[2] == self.n_embd, f"Expected context embedding dim {self.n_embd}, got {prev_context.shape[2]}"
-            
-            B, F = x.shape
-            encoded = self.encoder(x).view(1, B, self.n_embd)
-            
-            if prev_context.numel() == 0: # First timestep
-                context = encoded
-            else: # Concatenate with previous context
-                context = torch.cat([prev_context, encoded], dim=0)
-            features = self._incremental_core(context)
-            action_params = self.extract_action_params(features)
-            bid_px = BetaActor.sample(action_params['bid_px_alpha'], action_params['bid_px_beta'], 1, self.M)
-            ask_px = BetaActor.sample(action_params['ask_px_alpha'], action_params['ask_px_beta'], 1, self.M)
-            bid_sz = BetaActor.sample(action_params['bid_sz_alpha'], action_params['bid_sz_beta'], 0, self.S)
-            ask_sz = BetaActor.sample(action_params['ask_sz_alpha'], action_params['ask_sz_beta'], 0, self.S)
+        # with torch.autocast(device_type=self.device.type, dtype=torch.bfloat16):
+        assert x.shape[1] == self.F, f"Expected observation feature dim {self.F}, got {x.shape[1]}"
+        assert prev_context.numel() == 0 or prev_context.shape[2] == self.n_embd, f"Expected context embedding dim {self.n_embd}, got {prev_context.shape[2]}"
+        
+        B, F = x.shape
+        encoded = self.encoder(x).view(1, B, self.n_embd)
+        
+        if prev_context.numel() == 0: # First timestep
+            context = encoded
+        else: # Concatenate with previous context
+            context = torch.cat([prev_context, encoded], dim=0)
+        features = self._incremental_core(context)
+        action_params = self.extract_action_params(features)
+        bid_px = BetaActor.sample(action_params['bid_px_alpha'], action_params['bid_px_beta'], 1, self.M)
+        ask_px = BetaActor.sample(action_params['ask_px_alpha'], action_params['ask_px_beta'], 1, self.M)
+        bid_sz = BetaActor.sample(action_params['bid_sz_alpha'], action_params['bid_sz_beta'], 0, self.S)
+        ask_sz = BetaActor.sample(action_params['ask_sz_alpha'], action_params['ask_sz_beta'], 0, self.S)
 
-            logprobs, _entropy = self._action_logprobs(action_params, torch.stack([bid_px, ask_px, bid_sz, ask_sz], dim=-1))
-            pinfo_preds = {k: self.pinfo_model[k](features) for k in self.pinfo_model}
-            pinfo_preds['private_roles'] = pinfo_preds['private_roles'].reshape(B, self.P, 3)
-            pinfo_preds['settle_price'] = pinfo_preds['settle_price'].reshape(B)
-            return {
-                'action': torch.stack([bid_px, ask_px, bid_sz, ask_sz], dim=-1), 
-                'logprobs': logprobs, 
-                'pinfo_preds': pinfo_preds,
-                'context': context}
+        logprobs, _entropy = self._action_logprobs(action_params, torch.stack([bid_px, ask_px, bid_sz, ask_sz], dim=-1))
+        pinfo_preds = {k: self.pinfo_model[k](features) for k in self.pinfo_model}
+        pinfo_preds['private_roles'] = pinfo_preds['private_roles'].reshape(B, self.P, 3)
+        pinfo_preds['settle_price'] = pinfo_preds['settle_price'].reshape(B)
+        return {
+            'action': torch.stack([bid_px, ask_px, bid_sz, ask_sz], dim=-1), 
+            'logprobs': logprobs, 
+            'pinfo_preds': pinfo_preds,
+            'context': context}
 
     def initial_context(self):
         """Returns initial context (empty tensor for compatibility)."""
@@ -218,7 +218,7 @@ class HighLowTransformerModel(nn.Module):
     def reset_context(self):
         self.context = self.initial_context()
 
-    @torch.compile(mode="max-autotune-no-cudagraphs", dynamic=True, )
+    @torch.compile(mode="max-autotune", dynamic=True)
     def _incremental_core(self, context: torch.Tensor) -> torch.Tensor:
         """
         Sample actions for a single timestep given augmented context. 

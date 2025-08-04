@@ -53,7 +53,6 @@ for j in range(args.players - 1):
         name = f"Random{j}"
     initial_agents[name] = HighLowTransformerModel(
         args, env, verbose=False).to(device)
-    initial_agents[name].compile()
     if args.checkpoint_name is not None:   
         initial_agents[name].load_state_dict(weights)
 
@@ -65,7 +64,6 @@ buffer = HighLowImpalaBuffer(args, num_features, device)
 local_agent = HighLowTransformerModel(args, env).to(device)
 if args.checkpoint_name is not None:
     local_agent.load_state_dict(weights)
-local_agent.compile()
 trainer = HighLowImpalaTrainer(
     args, local_agent, 
     checkpoint_interval=args.iterations_per_checkpoint,
@@ -73,8 +71,6 @@ trainer = HighLowImpalaTrainer(
 npc_agents = [
     HighLowTransformerModel(args, env, verbose=False).to(device)
     for _ in range(game_config['players'] - 1)]
-for agent in npc_agents:
-    agent.compile()
 
 # %%
 
@@ -117,12 +113,13 @@ for iteration in pbar:
     settlement_preds, private_role_preds = [], []
     buffer.pinfo_tensor = env.pinfo_tensor()
     for step in range(args.num_steps):
+        torch.compiler.cudagraph_mark_step_begin() # Mark iterations to enable cuda-graph in compilation
         global_step += args.num_envs 
 
         for npc_id in range(player_offset):
             assert (env.current_player() == npc_id), f"Environment must be ready for NPC {npc_id}, but {env.current_player()} is acting."
             env.fill_observation_tensor(observation_buffer)
-            with torch.autocast(device_type=device.type, dtype=torch.bfloat16):
+            with torch.autocast(device_type=device.type, dtype=torch.bfloat16, cache_enabled=True):
                 with torch.inference_mode():
                     npc_actions = npc_agents[npc_id].incremental_forward(observation_buffer, step)['action']
             env.step(npc_actions)
@@ -139,7 +136,7 @@ for iteration in pbar:
         # observation, action, log_probs, value can be calculated immediately 
         # Fill observation tensor outside of inference mode to avoid issues with CUDA graph compilation
         env.fill_observation_tensor(buffer.obs[step])
-        with torch.autocast(device_type=device.type, dtype=torch.bfloat16):
+        with torch.autocast(device_type=device.type, dtype=torch.bfloat16, cache_enabled=True):
             with torch.inference_mode():
                 forward_results = local_agent.incremental_forward(buffer.obs[step], step)
         action, log_probs = forward_results['action'], forward_results['logprobs']
@@ -160,7 +157,7 @@ for iteration in pbar:
             npc_id = player_id - 1
             assert (env.current_player() == player_id), f"Environment must be ready for NPC {npc_id}, but {env.current_player()} is acting."
             env.fill_observation_tensor(observation_buffer)
-            with torch.autocast(device_type=device.type, dtype=torch.bfloat16):
+            with torch.autocast(device_type=device.type, dtype=torch.bfloat16, cache_enabled=True):
                 with torch.inference_mode():
                     npc_actions = npc_agents[npc_id].incremental_forward(observation_buffer, step)['action']
             env.step(npc_actions)

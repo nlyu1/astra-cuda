@@ -10,13 +10,13 @@ class Args:
     """seed of the experiment"""
     track: bool = True
     """if toggled, this experiment will be tracked with Weights and Biases"""
-    wandb_project_name: str = "HighLowTrading_Transformer"
+    wandb_project_name: str = "HighLowTrading"
     """the wandb's project name"""
     wandb_entity: str = None
     """the entity (team) of wandb's project"""
 
     ##### Algorithm specific arguments #####
-    learning_rate: float = 3e-4
+    learning_rate: float = 2e-4
     """the learning rate of the optimizer"""
     num_steps: int = 16
     """the number of steps to run in each environment per policy rollout"""
@@ -49,7 +49,7 @@ class Args:
     """attention size"""
     n_head: int = 8
     """the number of attention heads in the model"""
-    n_layer: int = 5
+    n_layer: int = 6
     """number of transformer blocks"""
 
     #### Training-specific arguments ####
@@ -95,7 +95,7 @@ class Args:
     ##### Environment execution #####
     threads_per_block: int = 64
     """the number of threads per block"""
-    num_blocks: int = 128
+    num_blocks: int = 64
     """the number of environments per worker"""
     num_markets: int = 0
     """the number of markets in the game. Filled in at runtime"""
@@ -119,8 +119,8 @@ class Args:
         self.project_name = f"HighLowTrading_{self.exp_name}"
         self.num_envs = self.num_blocks * self.threads_per_block
         self.num_markets = self.num_envs
-        # This is the number of on-policy samples we collect per learning phase ``
-        self.batch_size = int(self.num_envs * self.num_steps)
+        # This is the number of on-policy samples we collect per learning phase; does not fold in the num_steps dimension (transformer handles that separately)``
+        self.batch_size = self.num_envs
         # Number of times we sample from the environment 
         self.total_timesteps = self.num_iterations * self.batch_size
         print(f'Sampling {self.batch_size} frames per iteration across {self.num_envs} environments')
