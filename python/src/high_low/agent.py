@@ -54,6 +54,7 @@ class HighLowTransformerModel(nn.Module):
             encoder_layer,
             num_layers=self.n_layer,
             enable_nested_tensor=False)
+        self.transformer_norm = nn.LayerNorm(self.n_embd)
         
         # Action heads
         self.actors = BetaActor(self.n_embd, 4)
@@ -137,8 +138,11 @@ class HighLowTransformerModel(nn.Module):
         T, B, F = x.shape
         encoded = self.encoder(x.view(T*B, F)).view(T, B, self.n_embd)
         encoded = self.pos_encoding(encoded) # [T, B, D]
+        # print('Encoded:', encoded.min().item(), encoded.max().item())
         # [T, B, D]. causal_mask shape [T, T] with -inf on strict upper-diagonal
         features = self.transformer(encoded, mask=self.causal_mask, is_causal=True).view(T * B, self.n_embd) # [T * B, D]
+        features = self.transformer_norm(features)
+        # print('Features:', features.min().item(), features.max().item())
         critic_features = torch.cat([
             features.view(T, B, self.n_embd),
             pinfo_tensor.expand(T, B, self.pinfo_numfeatures)
@@ -228,6 +232,7 @@ class HighLowTransformerModel(nn.Module):
         T_ctx = context.size(0)
         mask = nn.Transformer.generate_square_subsequent_mask(T_ctx, device=context.device)
         features = self.transformer(context, mask=mask, is_causal=True)[-1] # [B, D]
+        features = self.transformer_norm(features)
         return features # [B, D]
 
     def forward(self, x, pinfo_tensor, actions=None):

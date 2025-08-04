@@ -81,8 +81,8 @@ Updates:
 
 ## Seed run
 
-1. [Small game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/j1wf9zvj)
-2. [Normal game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/bemtld9g)
+1. [Small game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/vsz0nhek)
+2. [Normal game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/nbux1boz)
 
 ```
 CUDA_VISIBLE_DEVICES=1 python vtrace.py --learning_rate 3e-4 --steps_per_player 8 --max_contracts_per_trade 1 --customer_max_size 2 --max_contract_value 10 --players 5 --ent_coef 0.05 --num_steps 8 --num_iterations 3010 --iterations_per_pool_update 3000 --iterations_per_heavy_logging 3000 --iterations_per_checkpoint 3000 --exp_name smalldecencritic_seedpool

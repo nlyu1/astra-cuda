@@ -51,7 +51,7 @@ Supports discrete, bounded sampling.
 """
 
 class BetaActor(nn.Module):
-    def __init__(self, n_hidden, n_actors):
+    def __init__(self, n_hidden, n_actors, max_kappa=20):
         """
         Model outputs the location and dispersion parameters of the beta distribution. 
         Beta(alpha, beta) where alpha = k*m, beta=k*(1-m)
@@ -62,15 +62,23 @@ class BetaActor(nn.Module):
         self.n_hidden = n_hidden
         self.n_actors = n_actors
         self.actor = nn.Linear(n_hidden, n_actors * 2)
+        self.max_kappa = max_kappa
     
     @torch.compile(fullgraph=True, mode="max-autotune")
     def forward(self, x):
         output = self.actor(x)
         m_hidden, kappa_hidden = output[:, :self.n_actors], output[:, self.n_actors:]
-        kappa = nn.functional.softplus(kappa_hidden) # Determines how localized the beta distribution is
-        m = nn.functional.sigmoid(m_hidden) # Determines the mean of the beta distribution
+        # print('m_hidden:', m_hidden.min().item(), m_hidden.max().item())
+        # print('kappa_hidden:', kappa_hidden.min().item(), kappa_hidden.max().item())
+        kappa = self.max_kappa - nn.functional.softplus(
+            self.max_kappa - nn.functional.softplus(kappa_hidden))
+        m = nn.functional.sigmoid(torch.tanh(m_hidden / 6.9) * 6.9) # Determines the mean of the beta distribution. sigmoid(6.9) ~ 0.999
         alpha = kappa * m
         beta = kappa * (1 - m)
+        # print('m:', m.min().item(), m.max().item())
+        # print('kappa:', kappa.min().item(), kappa.max().item())
+        # print('alpha:', alpha.min().item(), alpha.max().item())
+        # print('beta:', beta.min().item(), beta.max().item())
         return alpha, beta
     
     @classmethod 

@@ -49,7 +49,7 @@ class Args:
     """attention size"""
     n_head: int = 8
     """the number of attention heads in the model"""
-    n_layer: int = 6
+    n_layer: int = 5
     """number of transformer blocks"""
 
     #### Training-specific arguments ####
