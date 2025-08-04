@@ -344,7 +344,9 @@ class HighLowImpalaTrainer:
         entropy_coef = self.agent.log_entropy_coef.exp()
         entropy_value = entropy.mean()
         entropy_loss = -entropy_coef.detach() * entropy_value
-        entropy_coef_loss = - entropy_coef * torch.relu(self.args.target_entropy - entropy_value).detach()
+        # Prove firm support to let entropy go above dictated value, and very soft incentive for entropy_coef to decrease
+        entropy_coef_loss = - entropy_coef * nn.functional.leaky_relu(
+            self.args.target_entropy - entropy_value, negative_slope=0.05).detach()
 
         loss = (vtrace_results['policy_loss'] 
                 + entropy_loss + entropy_coef_loss

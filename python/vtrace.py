@@ -102,7 +102,7 @@ for iteration in pbar:
     # Manual GC every 50 iterations
     if iteration > 0 and iteration % 50 == 0:
         gc.collect() 
-    self_play = random.random() < 0.5
+    self_play = random.random() < args.self_play_prob
     # Pick npc agents and player offset
     player_offset = np.random.randint(0, game_config['players'])
     npc_agent_names = pool.select_topk(game_config['players'] - 1)
