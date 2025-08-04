@@ -137,6 +137,7 @@ for iteration in pbar:
                 {'dones': done_zeros}, step - 1)
 
         # observation, action, log_probs, value can be calculated immediately 
+        # Fill observation tensor outside of inference mode to avoid issues with CUDA graph compilation
         env.fill_observation_tensor(buffer.obs[step])
         with torch.autocast(device_type=device.type, dtype=torch.bfloat16):
             with torch.inference_mode():

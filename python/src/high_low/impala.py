@@ -154,8 +154,11 @@ class HighLowImpalaTrainer:
         )
         self.last_checkpoint = 0 
         self.checkpoint_interval = checkpoint_interval
-        self._compiled_train_step = torch.compile(self._train_step, mode="default", fullgraph=True)
-        # self._compiled_train_step = self._train_step
+        
+        # Initialize warmup scheduler
+        self.current_step = 0
+        self.warmup_steps = args.warmup_steps
+        self.base_lr = args.learning_rate
 
         # Weights for private loss: [0, ..., 1] across different time steps
         # Decay by half every (tau) ratio away from horizon. 
@@ -175,6 +178,16 @@ class HighLowImpalaTrainer:
             torch.zeros((self.logging_size,), device=device),
             torch.zeros((self.logging_size,), device=device))
 
+    def _update_learning_rate(self):
+        """Update learning rate based on warmup schedule."""
+        if self.current_step < self.warmup_steps:
+            # Linear warmup from 0 to base_lr
+            lr = self.base_lr * (self.current_step / self.warmup_steps)
+        else:
+            # Use base learning rate after warmup
+            lr = self.base_lr
+        return lr
+
     def train(self, update_dictionary):
         obs, logprobs, actions, rewards, dones = (
             update_dictionary['obs'],
@@ -184,7 +197,11 @@ class HighLowImpalaTrainer:
             update_dictionary['dones'])
         # Unlike in PPO, we batch sample by environment instead 
         batch_env_indices = torch.arange(self.args.num_envs).to(obs.device)
-        logging_counter = 0 
+        logging_counter = 0
+        
+        # Update learning rate based on warmup schedule
+        current_lr = self._update_learning_rate()
+        self.current_step += 1 
 
         # Obs: [T, B, s]. Logprobs: [T, B], Actions: [T, B, 4], Rewards [T, B], Done: [T, B]
         num_envs_per_minibatch = self.args.num_envs // self.args.num_minibatches
@@ -197,7 +214,7 @@ class HighLowImpalaTrainer:
                     end = start + num_envs_per_minibatch
                     minibatch_env_indices = batch_env_indices[start:end]
 
-                    step_results = self._compiled_train_step(
+                    step_results = self._train_step(
                         minibatch_env_indices,
                         obs, logprobs, actions, rewards, dones, 
                         update_dictionary['actual_settlement'],
@@ -236,8 +253,10 @@ class HighLowImpalaTrainer:
             'metrics/approx_kls': float(metrics_cpu[4]),
             'metrics/pred_settlement_losses': float(metrics_cpu[5]),
             'metrics/pred_private_roles_losses': float(metrics_cpu[6]),
+            'metrics/learning_rate': current_lr,
         }
 
+    @torch.compile(mode="max-autotune-no-cudagraphs", fullgraph=True)
     def _train_step(self, 
                     minibatch_env_indices,
                     obs, logprobs, actions, rewards, dones, 
@@ -332,5 +351,10 @@ class HighLowImpalaTrainer:
                 'python': random.getstate(),
                 'numpy': np.random.get_state(),
                 'torch': torch.get_rng_state(),
+            },
+            'warmup_state': {
+                'current_step': self.current_step,
+                'warmup_steps': self.warmup_steps,
+                'base_lr': self.base_lr,
             }
         }, checkpoint_path)

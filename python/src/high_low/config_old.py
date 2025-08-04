@@ -22,9 +22,9 @@ class Args:
     """the number of steps to run in each environment per policy rollout"""
     gamma: float = 1
     """the discount factor gamma"""
-    num_minibatches: int = 8
+    num_minibatches: int = 4
     """the number of mini-batches"""
-    update_epochs: int = 2
+    update_epochs: int = 1
     """the K epochs to update the policy.
     `num_minibatches * update_epochs` trades between sampling efficiency and training stability."""
     ent_coef: float = 0.1
@@ -39,7 +39,7 @@ class Args:
     """We weigh initial predictions of settlement and info roles less heavily. Decaby by 1/2 every pdecay_tau ratio"""
     max_grad_norm: float = 0.5
     """the maximum norm for the gradient clipping"""
-    warmup_steps: int = 800
+    warmup_steps: int = 500
     """number of steps for linear learning rate warmup"""
 
     ##### Model specific arguments #####

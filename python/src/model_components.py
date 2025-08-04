@@ -28,31 +28,77 @@ class ResidualBlock(nn.Module):
         else:
             return self.act(self.ln(self.fc1(x)))
 
-# JIT-compiled fused operations for speed
-@torch.jit.script
-def fused_gelu_residual(x: torch.Tensor, linear_weight: torch.Tensor, 
-                        linear_bias: torch.Tensor, ln_weight: torch.Tensor, 
-                        ln_bias: torch.Tensor, residual: torch.Tensor) -> torch.Tensor:
-    """Fused Linear -> LayerNorm -> GELU -> Residual operation."""
-    out = F.linear(x, linear_weight, linear_bias)
-    out = F.layer_norm(out, (out.shape[-1],), ln_weight, ln_bias)
-    out = F.gelu(out, approximate='tanh')  # Faster approximation
-    return out + residual
-
-
-class OptimizedResidualBlock(nn.Module):
-    """Optimized residual block with fused operations."""
-    def __init__(self, features: int, output_size: int):
+class LearnedPositionalEncoding(nn.Module):
+    """Learned positional embeddings for transformer."""
+    def __init__(self, d_model: int, max_len: int = 128):
         super().__init__()
-        self.fc = layer_init(nn.Linear(features, output_size))
-        self.ln = nn.LayerNorm(output_size)
-        
-        # Pre-compute residual projection if needed
-        self.need_projection = features != output_size
-        if self.need_projection:
-            self.residual_proj = nn.Linear(features, output_size, bias=False)
-        
+        self.pos_embedding = nn.Embedding(max_len, d_model)
+        self.register_buffer('position_ids', torch.arange(max_len))
+
     def forward(self, x):
-        residual = self.residual_proj(x) if self.need_projection else x
-        return fused_gelu_residual(x, self.fc.weight, self.fc.bias,
-                                  self.ln.weight, self.ln.bias, residual)
+        seq_length = x.size(0) # x: [T, B, D]
+        # Get embeddings [T, 1, D]
+        position_embeddings = self.pos_embedding(self.position_ids[:seq_length]).unsqueeze(1)
+        return x + position_embeddings
+    
+
+from torch.distributions.beta import Beta
+"""
+Ingredients for beta-ST (straight through) estimation. 
+
+Model outputs continuous parameters of the beta distribution. 
+Supports discrete, bounded sampling. 
+"""
+
+class BetaActor(nn.Module):
+    def __init__(self, n_hidden, n_actors):
+        """
+        Model outputs the location and dispersion parameters of the beta distribution. 
+        Beta(alpha, beta) where alpha = k*m, beta=k*(1-m)
+        k: dispersion parameter unbounded in [0, inf]. Parameterized by softplus(k_hidden)
+        m: location parameter bounded in [0, 1]. Parameterized by sigmoid(m_hidden)
+        """
+        super().__init__()
+        self.n_hidden = n_hidden
+        self.n_actors = n_actors
+        self.actor = nn.Linear(n_hidden, n_actors * 2)
+    
+    @torch.compile(fullgraph=True, mode="max-autotune")
+    def forward(self, x):
+        output = self.actor(x)
+        m_hidden, kappa_hidden = output[:, :self.n_actors], output[:, self.n_actors:]
+        kappa = nn.functional.softplus(kappa_hidden) # Determines how localized the beta distribution is
+        m = nn.functional.sigmoid(m_hidden) # Determines the mean of the beta distribution
+        alpha = kappa * m
+        beta = kappa * (1 - m)
+        return alpha, beta
+    
+    @classmethod 
+    def sample(cls, alpha, beta, min_val, max_val, eps=1e-3):
+        """
+        alpha, beta: [batch_size, n_actors]
+        min_val, max_val: float. 
+        eps: float. Prevents rounded result exceeding [min_val, max_val]
+
+        Samples from the (alpha-beta) parameterized beta distribution, then 
+        rescales to ~[min_val - 0.5, max_val + 0.5] and rounds to int. 
+        """
+        dist = Beta(alpha, beta)
+        result = (dist.sample() * (max_val - min_val + (1 - eps)) + (min_val - 0.5 + eps)).round().int()
+        return result 
+    
+    @classmethod
+    def logp_entropy(cls, x, alpha, beta, min_val, max_val):
+        """
+        x: [batch_size, n_actors] resulting from `sample`. Between [min_val, max_val]
+        alpha, beta: [batch_size, n_actors]
+        min_val, max_val: float. 
+
+        Returns: logprobs, entropy of shape [batch_size] 
+
+        Renormalizes x to (0, 1) and computes logprobs and entropy. 
+        """
+        dist = Beta(alpha, beta)
+        normalized_x = (x - (min_val - 0.5)) / ((max_val - min_val + 1))
+        logprobs = dist.log_prob(normalized_x)
+        return logprobs, dist.entropy()

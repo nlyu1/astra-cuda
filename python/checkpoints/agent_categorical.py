@@ -5,10 +5,25 @@ torch.backends.cudnn.benchmark = True  # Enable cudnn autotuner
 
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.distributions.categorical import Categorical
 import sys 
 sys.path.append('../')
-from model_components import ResidualBlock, LearnedPositionalEncoding, BetaActor
+from model_components import layer_init, OptimizedResidualBlock, ResidualBlock
+from typing import Dict
+import warnings
 
+class LearnedPositionalEncoding(nn.Module):
+    """Learned positional embeddings for transformer."""
+    def __init__(self, d_model: int, max_len: int = 128):
+        super().__init__()
+        self.pos_embedding = nn.Embedding(max_len, d_model)
+        self.register_buffer('position_ids', torch.arange(max_len))
+
+    def forward(self, x):
+        seq_length = x.size(0) # x: [T, B, D]
+        # Get embeddings [T, 1, D]
+        position_embeddings = self.pos_embedding(self.position_ids[:seq_length]).unsqueeze(1)
+        return x + position_embeddings
 
 class HighLowTransformerModel(nn.Module):
     """
@@ -73,7 +88,11 @@ class HighLowTransformerModel(nn.Module):
             *[ResidualBlock(self.n_hidden, self.n_hidden) for _ in range(post_blocks - 1)])
         
         # Action heads
-        self.actors = BetaActor(self.n_hidden, 4)
+        self.actors = nn.ModuleDict({
+            "bid_price": layer_init(nn.Linear(self.n_hidden, self.M)),
+            "ask_price": layer_init(nn.Linear(self.n_hidden, self.M)),
+            "bid_size": layer_init(nn.Linear(self.n_hidden, 1 + self.S)),
+            "ask_size": layer_init(nn.Linear(self.n_hidden, 1 + self.S))})
         
         # Private information prediction heads
         self.pinfo_model = nn.ModuleDict({
@@ -84,8 +103,11 @@ class HighLowTransformerModel(nn.Module):
         self.critic = nn.Sequential(
             ResidualBlock(self.n_hidden + self.pinfo_numfeatures, self.n_hidden),
             ResidualBlock(self.n_hidden, self.n_hidden),
-            nn.Linear(self.n_hidden, 1))
+            nn.Linear(self.n_hidden, 1)
+        )
         
+        # For compilation
+        self._compiled_batch_forward = None
         # Pre-generate causal masks for different sequence lengths to avoid dynamic allocation
         self.register_buffer('causal_mask', nn.Transformer.generate_square_subsequent_mask(self.T, device=self.device))
 
@@ -101,40 +123,7 @@ class HighLowTransformerModel(nn.Module):
             print(f"Total parameters: {total_params:,}")
             print(f"Trainable parameters: {trainable_params:,}")
             print(f"Model size: {total_params * 4 / 1024**2:.2f} MB (assuming float32)")
-
-    @torch.compile(fullgraph=True, mode="max-autotune-no-cudagraphs", dynamic=True)
-    def extract_action_params(self, features):
-        """
-        Features: [B', D]. Generates unscaled normalizations and scales appropriately. 
-        """
-        # Means are normalized between 0 and 1. 
-        alphas, betas = self.actors(features)
-        return {
-            'bid_px_alpha': alphas[:, 0],
-            'bid_px_beta': betas[:, 0],
-            'ask_px_alpha': alphas[:, 1],
-            'ask_px_beta': betas[:, 1],
-            'bid_sz_alpha': alphas[:, 2],
-            'bid_sz_beta': betas[:, 2],
-            'ask_sz_alpha': alphas[:, 3],
-            'ask_sz_beta': betas[:, 3]}
     
-    @torch.compile(fullgraph=True, mode="max-autotune")
-    def _action_logprobs(self, action_params, actions):
-        """
-        action_params: {'bid_px_mean', 'bid_px_std', ...} -> [B']
-        actions: [B', 4]
-
-        Returns: logprobs and entropy of shape [B']
-        """
-        bid_px, ask_px, bid_sz, ask_sz = actions.reshape(-1, 4).unbind(dim=-1)
-        bidpx_lp, bidpx_ent = BetaActor.logp_entropy(bid_px, action_params['bid_px_alpha'], action_params['bid_px_beta'], 1, self.M) # [T*B]
-        askpx_lp, askpx_ent = BetaActor.logp_entropy(ask_px, action_params['ask_px_alpha'], action_params['ask_px_beta'], 1, self.M) # [T*B]
-        bidsz_lp, bidsz_ent = BetaActor.logp_entropy(bid_sz, action_params['bid_sz_alpha'], action_params['bid_sz_beta'], 0, self.S) # [T*B]
-        asksz_lp, asksz_ent = BetaActor.logp_entropy(ask_sz, action_params['ask_sz_alpha'], action_params['ask_sz_beta'], 0, self.S) # [T*B]
-        return (bidpx_lp + askpx_lp + bidsz_lp + asksz_lp), (bidpx_ent + askpx_ent + bidsz_ent + asksz_ent)
-    
-    @torch.compile(fullgraph=True, mode="max-autotune")
     def _batch_forward(self, x, pinfo_tensor, actions):
         """
         Fully parallel forward pass across all timesteps.
@@ -151,28 +140,39 @@ class HighLowTransformerModel(nn.Module):
             pinfo_preds / settle_price: [T, B]
         """
         T, B, F = x.shape
+        bid_px, ask_px, bid_sz, ask_sz = actions.unbind(dim=-1) #[T, B] each
         encoded = self.encoder(x.view(T*B, F)).view(T, B, self.n_embd)
         encoded = self.pos_encoding(encoded) # [T, B, D]
         # [T, B, D]. causal_mask shape [T, T] with -inf on strict upper-diagonal
         h = self.transformer(encoded, mask=self.causal_mask, is_causal=True) 
         features = self.decoder(h.view(T * B, self.n_embd)) # [T * B, D]
+        dists = {k: Categorical(logits=self.actors[k](features)) for k in self.actors}
         critic_features = torch.cat([
             features.view(T, B, self.n_hidden),
             pinfo_tensor.expand(T, B, self.pinfo_numfeatures)
         ], dim=-1).reshape(T*B, self.n_hidden + self.pinfo_numfeatures)
         values = self.critic(critic_features).reshape(T, B)
 
-        action_params = self.extract_action_params(features)
-        logprobs, entropy = self._action_logprobs(action_params, actions.view(T*B, 4))
+        # Compute log probabilities
+        actions_for_logprobs = {
+            'bid_price': bid_px - 1,  # Zero-indexed
+            'ask_price': ask_px - 1,
+            'bid_size': bid_sz,
+            'ask_size': ask_sz}
 
+        logprobs = sum(
+            dists[k].log_prob(actions_for_logprobs[k].reshape(T * B)) 
+            for k in dists
+        ).reshape(T, B)
+        entropy = sum(d.entropy() for d in dists.values()).reshape(T, B)
         pinfo_preds = {k: self.pinfo_model[k](features) for k in self.pinfo_model}
         pinfo_preds['private_roles'] = pinfo_preds['private_roles'].reshape(T, B, self.P, 3)
         pinfo_preds['settle_price'] = pinfo_preds['settle_price'].reshape(T, B)
         
         return {
             'values': values,
-            'logprobs': logprobs.reshape(T, B),
-            'entropy': entropy.reshape(T, B),
+            'logprobs': logprobs,
+            'entropy': entropy,
             'pinfo_preds': pinfo_preds
         }
 
@@ -211,19 +211,21 @@ class HighLowTransformerModel(nn.Module):
                 context = encoded
             else: # Concatenate with previous context
                 context = torch.cat([prev_context, encoded], dim=0)
-            features = self._incremental_core(context)
-            action_params = self.extract_action_params(features)
-            bid_px = BetaActor.sample(action_params['bid_px_alpha'], action_params['bid_px_beta'], 1, self.M)
-            ask_px = BetaActor.sample(action_params['ask_px_alpha'], action_params['ask_px_beta'], 1, self.M)
-            bid_sz = BetaActor.sample(action_params['bid_sz_alpha'], action_params['bid_sz_beta'], 0, self.S)
-            ask_sz = BetaActor.sample(action_params['ask_sz_alpha'], action_params['ask_sz_beta'], 0, self.S)
-
-            logprobs, _entropy = self._action_logprobs(action_params, torch.stack([bid_px, ask_px, bid_sz, ask_sz], dim=-1))
+            features = self._compiled_incremental_core(context)
+            dists = {k: Categorical(logits=self.actors[k](features)) for k in self.actors}
+            actions = {k: dists[k].sample().int() for k in dists}
+            action_tensor = torch.stack([
+                actions['bid_price'] + 1,
+                actions['ask_price'] + 1,
+                actions['bid_size'],
+                actions['ask_size'],
+            ], dim=-1)
+            logprobs = sum(dists[k].log_prob(actions[k]) for k in dists) 
             pinfo_preds = {k: self.pinfo_model[k](features) for k in self.pinfo_model}
             pinfo_preds['private_roles'] = pinfo_preds['private_roles'].reshape(B, self.P, 3)
             pinfo_preds['settle_price'] = pinfo_preds['settle_price'].reshape(B)
             return {
-                'action': torch.stack([bid_px, ask_px, bid_sz, ask_sz], dim=-1), 
+                'action': action_tensor.int(), 
                 'logprobs': logprobs, 
                 'pinfo_preds': pinfo_preds,
                 'context': context}
@@ -235,7 +237,6 @@ class HighLowTransformerModel(nn.Module):
     def reset_context(self):
         self.context = self.initial_context()
 
-    @torch.compile(mode="max-autotune-no-cudagraphs", dynamic=True, )
     def _incremental_core(self, context: torch.Tensor) -> torch.Tensor:
         """
         Sample actions for a single timestep given augmented context. 
@@ -249,6 +250,24 @@ class HighLowTransformerModel(nn.Module):
         return features # [B, D]
 
     def forward(self, x, pinfo_tensor, actions=None):
-        assert x.shape[0] == self.T and x.shape[2] == self.F, f"Expected observation shape[0, 2] {self.T, self.F}, got {x.shape}"
-        assert actions.shape[0] == self.T and actions.shape[2] == 4, f"Expected action shape[0, 2] {self.T, 4}, got {actions.shape}"
-        return self._batch_forward(x, pinfo_tensor, actions)
+        if self._compiled_batch_forward is not None:
+            assert x.shape[0] == self.T and x.shape[2] == self.F, f"Expected observation shape[0, 2] {self.T, self.F}, got {x.shape}"
+            assert actions.shape[0] == self.T and actions.shape[2] == 4, f"Expected action shape[0, 2] {self.T, 4}, got {actions.shape}"
+            return self._compiled_batch_forward(x, pinfo_tensor, actions)
+        else:
+            raise RuntimeError("Model not compiled. Call compile() first.")
+
+    def compile(self, mode: str = "max-autotune", fullgraph: bool = True):
+        """Compile the batch forward method for faster execution."""
+        self._compiled_batch_forward = torch.compile(
+            self._batch_forward, 
+            mode='default', # Doesn't work with max-autotune
+            fullgraph=fullgraph)
+        
+        # Compile sample_actions with dynamic shapes support
+        self._compiled_incremental_core = torch.compile(
+            self._incremental_core,
+            mode=mode,
+            fullgraph=fullgraph,
+            dynamic=True  # Enable dynamic shape support
+        )
