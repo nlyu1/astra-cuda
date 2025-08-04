@@ -63,7 +63,7 @@ class BetaActor(nn.Module):
         self.n_actors = n_actors
         self.actor = nn.Linear(n_hidden, n_actors * 2)
     
-    @torch.compile(fullgraph=True, mode="max-autotune")
+    # @torch.compile(fullgraph=True, mode="max-autotune")
     def forward(self, x):
         output = self.actor(x)
         m_hidden, kappa_hidden = output[:, :self.n_actors], output[:, self.n_actors:]

@@ -140,7 +140,7 @@ def vtrace_losses(
         'value_r2': value_r2,
     }
     return result 
-compiled_vtrace_losses = torch.compile(vtrace_losses, mode='default', fullgraph=True)
+compiled_vtrace_losses = torch.compile(vtrace_losses, mode='max-autotune-no-cudagraphs', fullgraph=True)
     
 
 class HighLowImpalaTrainer:

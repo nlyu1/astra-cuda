@@ -16,15 +16,15 @@ class Args:
     """the entity (team) of wandb's project"""
 
     ##### Algorithm specific arguments #####
-    learning_rate: float = 2.5e-4
+    learning_rate: float = 3e-4
     """the learning rate of the optimizer"""
-    num_steps: int = 20
+    num_steps: int = 16
     """the number of steps to run in each environment per policy rollout"""
     gamma: float = 1
     """the discount factor gamma"""
-    num_minibatches: int = 8
+    num_minibatches: int = 4
     """the number of mini-batches"""
-    update_epochs: int = 2
+    update_epochs: int = 1
     """the K epochs to update the policy.
     `num_minibatches * update_epochs` trades between sampling efficiency and training stability."""
     ent_coef: float = 0.1
@@ -44,16 +44,13 @@ class Args:
 
     ##### Model specific arguments #####
     n_hidden: int = 512
-    """hidden size in FC components of the model"""
-    n_embd: int = 128
+    """hidden size in FC components of the model (mostly for decentralized critic)"""
+    n_embd: int = 256
     """attention size"""
-    n_head: int = 4
+    n_head: int = 8
     """the number of attention heads in the model"""
-    n_layer: int = 3
+    n_layer: int = 5
     """number of transformer blocks"""
-    pre_encoder_blocks: int = 2
-    post_decoder_blocks: int = 1
-    """number of residual blocks before and after transformer"""
 
     #### Training-specific arguments ####
     num_iterations: int = 10000
@@ -74,7 +71,7 @@ class Args:
     """Number of iterations between heavy logging"""
 
     #### Game specification ### 
-    steps_per_player: int = 20
+    steps_per_player: int = 16
     """the number of trading steps per player before game ends"""
     max_contracts_per_trade: int = 5
     """the maximum number of contracts in a single trade"""

@@ -19,8 +19,6 @@ class HighLowTransformerModel(nn.Module):
     - n_head: Number of attention heads
     - n_layer: Number of transformer blocks
     - dropout: Dropout rate for regularization
-    - pre_encoder_blocks: Number of residual blocks before transformer
-    - post_decoder_blocks: Number of residual blocks after transformer
     """
     def __init__(self, args, env, verbose=True):
         super().__init__()
@@ -37,16 +35,8 @@ class HighLowTransformerModel(nn.Module):
         self.n_embd = args.n_embd
         self.n_layer = args.n_layer
         
-        # Pre/post processing blocks
-        pre_blocks = args.pre_encoder_blocks
-        post_blocks = args.post_decoder_blocks
-        
         # Input encoder
-        assert pre_blocks >= 2, "Pre-encoder blocks must be at least 2"
-        self.encoder = nn.Sequential(
-            ResidualBlock(self.F, self.n_hidden),
-            *[ResidualBlock(self.n_hidden, self.n_hidden) for _ in range(pre_blocks - 2)],
-            ResidualBlock(self.n_hidden, self.n_embd))
+        self.encoder = ResidualBlock(self.F, self.n_embd)
         self.pos_encoding = LearnedPositionalEncoding(self.n_embd, max_len=self.T)
         self.pinfo_numfeatures = 2 + 1 + self.P # see pinfo_tensor method in `env.py`
         
@@ -64,25 +54,19 @@ class HighLowTransformerModel(nn.Module):
         self.transformer = nn.TransformerEncoder(
             encoder_layer,
             num_layers=self.n_layer,
-            enable_nested_tensor=False)  # Disable for SDPA efficiency
-        
-        # Output decoder
-        assert post_blocks >= 1, "Post-decoder blocks must be at least 1"
-        self.decoder = nn.Sequential(
-            ResidualBlock(self.n_embd, self.n_hidden),
-            *[ResidualBlock(self.n_hidden, self.n_hidden) for _ in range(post_blocks - 1)])
+            enable_nested_tensor=False)
         
         # Action heads
-        self.actors = BetaActor(self.n_hidden, 4)
+        self.actors = BetaActor(self.n_embd, 4)
         
         # Private information prediction heads
         self.pinfo_model = nn.ModuleDict({
-            'settle_price': nn.Linear(self.n_hidden, 1),
-            'private_roles': nn.Linear(self.n_hidden, self.P * 3)})
+            'settle_price': nn.Linear(self.n_embd, 1),
+            'private_roles': nn.Linear(self.n_embd, self.P * 3)})
         
         # Value head
         self.critic = nn.Sequential(
-            ResidualBlock(self.n_hidden + self.pinfo_numfeatures, self.n_hidden),
+            ResidualBlock(self.n_embd + self.pinfo_numfeatures, self.n_hidden),
             ResidualBlock(self.n_hidden, self.n_hidden),
             nn.Linear(self.n_hidden, 1))
         
@@ -154,12 +138,11 @@ class HighLowTransformerModel(nn.Module):
         encoded = self.encoder(x.view(T*B, F)).view(T, B, self.n_embd)
         encoded = self.pos_encoding(encoded) # [T, B, D]
         # [T, B, D]. causal_mask shape [T, T] with -inf on strict upper-diagonal
-        h = self.transformer(encoded, mask=self.causal_mask, is_causal=True) 
-        features = self.decoder(h.view(T * B, self.n_embd)) # [T * B, D]
+        features = self.transformer(encoded, mask=self.causal_mask, is_causal=True).view(T*B, self.n_embd)
         critic_features = torch.cat([
-            features.view(T, B, self.n_hidden),
+            features.view(T, B, self.n_embd),
             pinfo_tensor.expand(T, B, self.pinfo_numfeatures)
-        ], dim=-1).reshape(T*B, self.n_hidden + self.pinfo_numfeatures)
+        ], dim=-1).reshape(T*B, self.n_embd + self.pinfo_numfeatures)
         values = self.critic(critic_features).reshape(T, B)
 
         action_params = self.extract_action_params(features)
@@ -244,8 +227,7 @@ class HighLowTransformerModel(nn.Module):
         context = self.pos_encoding(context)
         T_ctx = context.size(0)
         mask = nn.Transformer.generate_square_subsequent_mask(T_ctx, device=context.device)
-        h = self.transformer(context, mask=mask, is_causal=True)[-1] # [B, D]
-        features = self.decoder(h)
+        features = self.transformer(context, mask=mask, is_causal=True)[-1] # [B, D]
         return features # [B, D]
 
     def forward(self, x, pinfo_tensor, actions=None):
