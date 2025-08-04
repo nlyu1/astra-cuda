@@ -238,10 +238,13 @@ class HighLowImpalaTrainer:
                         update_dictionary['actual_settlement'],
                         update_dictionary['actual_private_roles'],
                         update_dictionary['pinfo_tensor'])
-                    step_results['loss'].backward()
-                    nn.utils.clip_grad_norm_(self.agent.parameters(), self.args.max_grad_norm)
-                    self.optimizer.step()
-                    self.optimizer.zero_grad()
+                    if step_results['approx_kls'] < self.args.update_kl_threshold: # Never update on too 
+                        step_results['loss'].backward()
+                        nn.utils.clip_grad_norm_(self.agent.parameters(), self.args.max_grad_norm)
+                        self.optimizer.step()
+                        self.optimizer.zero_grad()
+                    else:
+                        print('Skipping update on too-high KL. Careful here')
 
                     self.explained_vars[logging_counter] = step_results['explained_vars']
                     self.value_losses[logging_counter] = step_results['value_losses']
@@ -341,7 +344,7 @@ class HighLowImpalaTrainer:
         entropy_coef = self.agent.log_entropy_coef.exp()
         entropy_value = entropy.mean()
         entropy_loss = -entropy_coef.detach() * entropy_value
-        entropy_coef_loss = entropy_coef * (entropy_value - self.args.target_entropy).detach()
+        entropy_coef_loss = - entropy_coef * torch.relu(self.args.target_entropy - entropy_value).detach()
 
         loss = (vtrace_results['policy_loss'] 
                 + entropy_loss + entropy_coef_loss

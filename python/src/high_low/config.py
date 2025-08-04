@@ -16,19 +16,23 @@ class Args:
     """the entity (team) of wandb's project"""
 
     ##### Algorithm specific arguments #####
-    learning_rate: float = 2e-4
+    learning_rate: float = 3e-4
     """the learning rate of the optimizer"""
     num_steps: int = 16
     """the number of steps to run in each environment per policy rollout"""
     gamma: float = 1
     """the discount factor gamma"""
+    gae_lambda: float = 0.0
+    """lambda parameter for GAE. (0, 1) interpolates between (1-step TD, MC) respectively. Heavily suggested to be 0."""
+    update_kl_threshold: float = 10
+    """the threshold for updating the policy. If the KL is greater than this threshold, the update is skipped"""
     num_minibatches: int = 4
     """the number of mini-batches"""
     update_epochs: int = 1
     """the K epochs to update the policy.
     `num_minibatches * update_epochs` trades between sampling efficiency and training stability."""
     target_entropy: float = -2.
-    """target entropy for soft-entropy regularization"""
+    """target entropy for soft-entropy regularization, measured in natural units. Entropy bonus is not observed above this value."""
     vf_coef: float = 0.5
     """coefficient of the value function"""
     psettlement_coef: float = 0.0
@@ -39,6 +43,7 @@ class Args:
     """We weigh initial predictions of settlement and info roles less heavily. Decaby by 1/2 every pdecay_tau ratio"""
     max_grad_norm: float = 0.5
     """the maximum norm for the gradient clipping"""
+
     warmup_steps: int = 800
     """number of steps for linear learning rate warmup"""
 
@@ -63,11 +68,9 @@ class Args:
     """Only start updating the pool after this many iterations."""
     checkpoint_name: str = None 
     """Name of the checkpoint to load (e.g. 'name' for 'checkpoints/name.pt'). If None, we start from scratch."""
-    gae_lambda: float = 0.0
-    """lambda parameter for GAE. (0, 1) interpolates between (1-step TD, MC) respectively. Heavily suggested to be 0."""
 
     #### Logging specification ####
-    iterations_per_checkpoint: int = 1500
+    iterations_per_checkpoint: int = 3000
     """Number of iterations between checkpoints"""
     iterations_per_heavy_logging: int = 1000
     """Number of iterations between heavy logging"""
@@ -83,16 +86,8 @@ class Args:
     """the maximum value a contract can have""" 
     players: int = 5
     """the number of players in the game"""
-    # steps_per_player: int = 8
-    # """the number of trading steps per player before game ends"""
-    # max_contracts_per_trade: int = 1
-    # """the maximum number of contracts in a single trade"""
-    # customer_max_size: int = 2
-    # """the maximum position size for customers"""
-    # max_contract_value: int = 10
-    # """the maximum value a contract can have""" 
-    # players: int = 5
-    # """the number of players in the game"""
+    game_setting: int = 0
+    """Convenient game settings to use. 0: big game, 1: small game"""
 
     ##### Environment execution #####
     threads_per_block: int = 64
@@ -115,6 +110,21 @@ class Args:
     """the number of environments (computed in runtime)"""
 
     def fill_runtime_args(self):
+        if self.game_setting == 0:
+            self.steps_per_player = self.num_steps = 16
+            self.max_contracts_per_trade = 5
+            self.customer_max_size = 5
+            self.max_contract_value = 30
+            self.players = 5
+        elif self.game_setting == 1:
+            self.steps_per_player = self.num_steps = 8
+            self.max_contracts_per_trade = 1
+            self.customer_max_size = 2
+            self.max_contract_value = 10
+            self.players = 5
+        elif self.game_setting is not None:
+            raise ValueError(f"Invalid game setting: {self.game_setting}")
+        
         assert self.num_steps == self.steps_per_player, "Training pipeline handles special case."
         assert self.batch_size % self.num_minibatches == 0, "Batch size must be divisible by number of minibatches"
 
@@ -140,6 +150,5 @@ class Args:
             'players': self.players,
             'num_markets': self.num_envs,
             'threads_per_block': self.threads_per_block,
-            'device_id': self.device_id,
-        }
+            'device_id': self.device_id}
         return game_config

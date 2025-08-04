@@ -88,15 +88,11 @@ python profile_vtrace.py
 
 ## Seed run
 
-1. [Small game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/2zlb4h93)
-2. [Normal game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/0watx14k)
+1. [Small game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/tfvk71zk)
+2. [Normal game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/yecjaha8?nw=nwuserlyuxingjian)
 
 ```
-CUDA_VISIBLE_DEVICES=1 python vtrace.py --learning_rate 3e-4 --steps_per_player 8 --max_contracts_per_trade 1 --customer_max_size 2 --max_contract_value 10 --players 5 --target_entropy -2 --num_steps 8 --num_iterations 3010 --iterations_per_pool_update 3000 --iterations_per_heavy_logging 3000 --iterations_per_checkpoint 3000 --exp_name smalldecencritic_seedpool
+CUDA_VISIBLE_DEVICES=1 python vtrace.py --game_setting 1 --target_entropy -4 --num_steps 8 --num_iterations 3010 --iterations_per_pool_update 3000 --iterations_per_checkpoint 3000 --exp_name smalldecencritic_seedpool
 
-CUDA_VISIBLE_DEVICES=0 python vtrace.py --learning_rate 3e-4 --target_entropy -2 --num_iterations 3010 --iterations_per_heavy_logging 3000 --iterations_per_checkpoint 3000 --iterations_per_pool_update 3000 --exp_name normaldecencritic_seedpool
-
-# Try loading from an earlier experiment with less timesteps
-# Try loading with a greater gae_lambda since model is already stable
-CUDA_VISIBLE_DEVICES=1 python vtrace.py --learning_rate 3e-4 --ent_coef 0.05 --num_iterations 3010 --iterations_per_heavy_logging 3000 --iterations_per_checkpoint 3000 --iterations_per_pool_update 3000 --exp_name normalgame_loading_exp__ --checkpoint_name smalldecencritic_seedpool_3000 --gae_lambda 0.0
+CUDA_VISIBLE_DEVICES=0 python vtrace.py --game_setting 0 --target_entropy -2 --num_iterations 3010 --iterations_per_checkpoint 3000 --iterations_per_pool_update 3000 --exp_name normaldecencritic_seedpool
 ```

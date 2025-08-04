@@ -112,22 +112,18 @@ class Arena:
                 sorted_info['names'][j],
                 float(sorted_info['means'][j]),
                 float(sorted_info['stds'][j]),
-                float(sorted_info['choose_prob'][j])
-            )
+                float(sorted_info['choose_prob'][j]))
 
         bar_ret = wandb.plot.bar(
             tbl, "agent", "mean",
-            title="Average returns",
-        )
+            title="Average returns")
 
         bar_prob = wandb.plot.bar(
             tbl, "agent", "sampling_prob",
-            title=f"Sampling probability",
-        )
+            title=f"Sampling probability")
         log_data = {
             "arena/average_returns": bar_ret,
-            "arena/sampling_probability": bar_prob
-        }
+            "arena/sampling_probability": bar_prob}
         
         if global_step is not None:
             wandb.log(log_data, step=global_step)

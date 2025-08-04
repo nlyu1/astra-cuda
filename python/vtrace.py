@@ -91,6 +91,7 @@ observation_buffer = env.new_observation_buffer()
 reward_buffer = env.new_reward_buffer() # [N, P]
 returns_buffer = env.new_reward_buffer() # [N, P]
 player_reward_buffer = env.new_player_reward_buffer() # [N]
+self_play = True 
 
 # Disable garbage collection for performance
 gc.disable()
@@ -101,11 +102,15 @@ for iteration in pbar:
     # Manual GC every 50 iterations
     if iteration > 0 and iteration % 50 == 0:
         gc.collect() 
+    self_play = random.random() < 0.5
     # Pick npc agents and player offset
     player_offset = np.random.randint(0, game_config['players'])
     npc_agent_names = pool.select_topk(game_config['players'] - 1)
     for j, agent in enumerate(npc_agents):
-        agent.load_state_dict(pool.agents[npc_agent_names[j]].state_dict())
+        if self_play:
+            agent.load_state_dict(local_agent.state_dict())
+        else:
+            agent.load_state_dict(pool.agents[npc_agent_names[j]].state_dict())
         agent.reset_context()
     local_agent.reset_context()
     round_agent_names = ( # Used for registering pool result 
@@ -179,28 +184,23 @@ for iteration in pbar:
 
             # Unfortunately, logging must happen before environment is reset
             env_info = env.expose_info()
-            env_pinfo_targets = env.get_pinfo_targets()
-            settlement_preds_stacked = torch.stack(settlement_preds, dim=0)
-            logging_inputs = {
-                'returns': returns_buffer,
-                'offset': player_offset,
-                'settlement_preds': settlement_preds_stacked,
-                'private_role_preds': torch.stack(private_role_preds, dim=0),
-                'infos': env_info | env_pinfo_targets}
-            # print('Rewards and returns:', buffer.rewards[:, 0].cpu(), returns_buffer[0, player_offset].cpu())
-            # print('Settlement:', env_pinfo_targets['settlement_values'][0].item(), 
-            #       'info_role:', env_pinfo_targets['info_roles'][0, player_offset].item(), 
-            #       'target position:', env_info['target_positions'][0, player_offset].item())
-            # print('Position over time:', env_info['players'][0, player_offset, :, -2:].cpu().numpy())
-            # Only incur heavy logging when we're in seat 0 and after a certain interval 
-            heavy_logging_update = (
-                logger.counter - logger.last_heavy_counter > args.iterations_per_heavy_logging 
-                and player_offset == 0)
-            pool.register_playout_scores(returns_buffer.mean(0), round_agent_names) 
-            pbar.set_postfix({'mean_score': f'{returns_buffer.mean(0)[player_offset].item():.2f}'})
-            if heavy_logging_update:
-                pool.log_stats(global_step)
-            logger.update_stats(logging_inputs, global_step, heavy_updates=heavy_logging_update)
+            env_pinfo_targets = env.get_pinfo_targets() 
+            if not self_play: # Only log when not self-playing
+                settlement_preds_stacked = torch.stack(settlement_preds, dim=0)
+                logging_inputs = {
+                    'returns': returns_buffer,
+                    'offset': player_offset,
+                    'settlement_preds': settlement_preds_stacked,
+                    'private_role_preds': torch.stack(private_role_preds, dim=0),
+                    'infos': env_info | env_pinfo_targets}
+                # Only incur heavy logging when we're in seat 0 and after a certain interval 
+                heavy_logging_update = (
+                    logger.counter - logger.last_heavy_counter > args.iterations_per_heavy_logging 
+                    and player_offset == 0)
+                pool.register_playout_scores(returns_buffer.mean(0), round_agent_names) 
+                if heavy_logging_update:
+                    pool.log_stats(global_step)
+                logger.update_stats(logging_inputs, global_step, heavy_updates=heavy_logging_update)
 
             # Populate buffer's actual private info. See `env.py` env_pinfo_target method
             buffer.actual_private_roles.copy_(env_pinfo_targets['pinfo_targets'], non_blocking=True)
