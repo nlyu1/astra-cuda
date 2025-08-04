@@ -77,7 +77,8 @@ Updates:
     - Beta-ST (straight-through) action parameterization. Model predicts normalized beta-distribution location and spread parameters. 
 3. Full-on, bigger transformer model. 
     - Encoder should be ResidualBlock, not Linear, to enable stable training (probably normalization-related). 
-    - Tried fp8. Doesn't help. 
+    - Tried fp8. Doesn't help with speed. 
+    - Halved the batch size to keep number of iterations reasonable. 
 
 ## Seed run
 
