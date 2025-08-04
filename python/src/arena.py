@@ -69,7 +69,7 @@ class Arena:
     def select_topk(self, k): 
         sorted_info = self.get_sorted_info()
         chosen_names = np.random.choice(
-            sorted_info['names'], k, replace=False, p=sorted_info['choose_prob'])
+            sorted_info['names'], k, replace=True, p=sorted_info['choose_prob'])
         return chosen_names 
     
     def get_sorted_info(self):

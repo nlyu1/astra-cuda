@@ -45,6 +45,11 @@ class HighLowTransformerModel(nn.Module):
         self.M = args.max_contract_value
         self.S = args.max_contracts_per_trade
         self.device = torch.device(f'cuda:{args.device_id}')
+
+        self.pinfo_numfeatures = 2 + 1 + self.P # see pinfo_tensor method in `env.py`
+        self.register_buffer( # Placeholder for policy forward 
+            'pinfo_placeholder',
+            torch.zeros(self.pinfo_numfeatures, device=self.device))
         
         # Transformer hyperparameters
         self.n_hidden = args.n_hidden
@@ -59,7 +64,7 @@ class HighLowTransformerModel(nn.Module):
         # Input encoder
         assert pre_blocks >= 2, "Pre-encoder blocks must be at least 2"
         self.encoder = nn.Sequential(
-            ResidualBlock(self.F, self.n_hidden),
+            ResidualBlock(self.F + self.pinfo_numfeatures, self.n_hidden),
             *[ResidualBlock(self.n_hidden, self.n_hidden) for _ in range(pre_blocks - 2)],
             ResidualBlock(self.n_hidden, self.n_embd))
         self.pos_encoding = LearnedPositionalEncoding(self.n_embd, max_len=self.T)
@@ -119,11 +124,12 @@ class HighLowTransformerModel(nn.Module):
             print(f"Trainable parameters: {trainable_params:,}")
             print(f"Model size: {total_params * 4 / 1024**2:.2f} MB (assuming float32)")
     
-    def _batch_forward(self, x, actions):
+    def _batch_forward(self, x, pinfo_tensor, actions):
         """
         Fully parallel forward pass across all timesteps.
         
         x: [T, B, F]
+        pinfo_tensor: [B, Pinfo_numfeatures]. Automatically expanded to all timesteps. 
         actions: [T, B, 4] type long
         
         Returns:
@@ -135,12 +141,22 @@ class HighLowTransformerModel(nn.Module):
         """
         T, B, F = x.shape
         bid_px, ask_px, bid_sz, ask_sz = actions.unbind(dim=-1) #[T, B] each
-        encoded = self.encoder(x.view(T*B, F)).view(T, B, self.n_embd)
-        encoded = self.pos_encoding(encoded) # [T, B, D]
-        # [T, B, D]. causal_mask shape [T, T] with -inf on strict upper-diagonal
+        # Double the batch size to extract policy and values ine one batch
+        augmented_x = torch.cat([
+            torch.cat([x, self.pinfo_placeholder.expand(T, B, -1)], dim=-1),
+            torch.cat([x, pinfo_tensor.expand(T, -1, -1)], dim=-1)
+        ], dim=1)
+
+        encoded = self.encoder(augmented_x.view(T*2*B, F + self.pinfo_numfeatures)).view(T, 2*B, self.n_embd)
+        encoded = self.pos_encoding(encoded) # [T, 2*B, D]
+        # [T, 2*B, D]. causal_mask shape [T, T] with -inf on strict upper-diagonal
         h = self.transformer(encoded, mask=self.causal_mask, is_causal=True) 
-        features = self.decoder(h.view(T * B, self.n_embd)) # [T * B, D]
-        dists = {k: Categorical(logits=self.actors[k](features)) for k in self.actors}
+        features = self.decoder(h.view(T * 2 * B, self.n_embd)) # [T * 2 * B, D]
+
+        # Split features into policy and value
+        policy_features = features[:T*B]
+        value_features = features[T*B:]
+        dists = {k: Categorical(logits=self.actors[k](policy_features)) for k in self.actors}
 
         # Compute log probabilities
         actions_for_logprobs = {
@@ -154,8 +170,8 @@ class HighLowTransformerModel(nn.Module):
             for k in dists
         ).reshape(T, B)
         entropy = sum(d.entropy() for d in dists.values()).reshape(T, B)
-        values = self.critic(features).reshape(T, B)
-        pinfo_preds = {k: self.pinfo_model[k](features) for k in self.pinfo_model}
+        values = self.critic(value_features).reshape(T, B)
+        pinfo_preds = {k: self.pinfo_model[k](value_features) for k in self.pinfo_model}
         pinfo_preds['private_roles'] = pinfo_preds['private_roles'].reshape(T, B, self.P, 3)
         pinfo_preds['settle_price'] = pinfo_preds['settle_price'].reshape(T, B)
         
@@ -195,7 +211,8 @@ class HighLowTransformerModel(nn.Module):
             assert prev_context.numel() == 0 or prev_context.shape[2] == self.n_embd, f"Expected context embedding dim {self.n_embd}, got {prev_context.shape[2]}"
             
             B, F = x.shape
-            encoded = self.encoder(x).view(1, B, self.n_embd)
+            x_augmented = torch.cat([x, self.pinfo_placeholder.expand(B, -1)], dim=-1)
+            encoded = self.encoder(x_augmented).view(1, B, self.n_embd)
             
             if prev_context.numel() == 0: # First timestep
                 context = encoded
@@ -239,13 +256,14 @@ class HighLowTransformerModel(nn.Module):
         features = self.decoder(h)
         return features # [B, D]
 
-    def forward(self, x, actions=None):
-        if self._compiled_batch_forward is not None:
-            assert x.shape[0] == self.T and x.shape[2] == self.F, f"Expected observation shape[0, 2] {self.T, self.F}, got {x.shape}"
-            assert actions.shape[0] == self.T and actions.shape[2] == 4, f"Expected action shape[0, 2] {self.T, 4}, got {actions.shape}"
-            return self._compiled_batch_forward(x, actions)
-        else:
-            raise RuntimeError("Model not compiled. Call compile() first.")
+    def forward(self, x, pinfo_tensor, actions=None):
+        assert x.shape[0] == self.T and x.shape[2] == self.F, f"Expected observation shape[0, 2] {self.T, self.F}, got {x.shape}"
+        assert actions.shape[0] == self.T and actions.shape[2] == 4, f"Expected action shape[0, 2] {self.T, 4}, got {actions.shape}"
+        # if self._compiled_batch_forward is not None:
+        #     return self._compiled_batch_forward(x, actions, pinfo_tensor)
+        # else:
+        #     raise RuntimeError("Model not compiled. Call compile() first.")
+        return self._batch_forward(x, pinfo_tensor, actions)
 
     def compile(self, mode: str = "max-autotune", fullgraph: bool = True):
         """Compile the batch forward method for faster execution."""

@@ -74,7 +74,15 @@ class HighLowTrading:
                 'settlement_values': settlement_values, 
                 'candidate_values': self.candidate_values,
                 'info_roles': info_roles}
-
+    
+    def pinfo_tensor(self):
+        # If this is changed, should also change buffer dimension in impala.py, and input dimensions in `agent.py`
+        return torch.cat([
+            self.candidate_values, # [N, 2]
+            self.high_low.unsqueeze(-1), # [N, 1]
+            self.permutation, # [N, P]
+        ], dim=-1)
+    
     def step(self, action):
         return self.env.apply_action(action)
 

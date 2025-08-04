@@ -66,6 +66,7 @@ class HighLowImpalaBuffer:
             'actions': self.actions,
             'rewards': self.rewards,
             'dones': self.dones,
+            'pinfo_tensor': self.pinfo_tensor,
             'actual_settlement': self.actual_settlement,
             'actual_private_roles': self.actual_private_roles,
         }
@@ -154,6 +155,7 @@ class HighLowImpalaTrainer:
         self.last_checkpoint = 0 
         self.checkpoint_interval = checkpoint_interval
         self._compiled_train_step = torch.compile(self._train_step, mode="default", fullgraph=True)
+        # self._compiled_train_step = self._train_step
 
         # Weights for private loss: [0, ..., 1] across different time steps
         # Decay by half every (tau) ratio away from horizon. 
@@ -199,7 +201,8 @@ class HighLowImpalaTrainer:
                         minibatch_env_indices,
                         obs, logprobs, actions, rewards, dones, 
                         update_dictionary['actual_settlement'],
-                        update_dictionary['actual_private_roles'])
+                        update_dictionary['actual_private_roles'],
+                        update_dictionary['pinfo_tensor'])
                     step_results['loss'].backward()
                     nn.utils.clip_grad_norm_(self.agent.parameters(), self.args.max_grad_norm)
                     self.optimizer.step()
@@ -238,11 +241,12 @@ class HighLowImpalaTrainer:
     def _train_step(self, 
                     minibatch_env_indices,
                     obs, logprobs, actions, rewards, dones, 
-                    actual_settlement, actual_private_roles):
+                    actual_settlement, actual_private_roles, pinfo_tensor):
         """
         T = num_steps, B = [num_envs_per_batch]
         obs: [T, B, ...]
         actions: [T, B, 4]
+        pinfo_tensor: [B, Pinfo_numfeatures]
         log_probs, rewards, dones: [T, B]
         actual_settlement: [B]
         actual_private_roles: [B, num_players]
@@ -254,6 +258,7 @@ class HighLowImpalaTrainer:
         # [T, b, 4] -> [T*b, 4]
         outputs = self.agent(
             obs[:, minibatch_env_indices],
+            pinfo_tensor[minibatch_env_indices], # [B, Pinfo_numfeatures]
             actions[:, minibatch_env_indices])
         # _, new_logprob, entropy, values
         new_logprob, entropy, values = outputs['logprobs'], outputs['entropy'], outputs['values']

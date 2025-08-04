@@ -37,7 +37,7 @@ CUDA_VISIBLE_DEVICES=1 python vtrace_baseline.py --steps_per_player 8 --max_cont
 
 CUDA_VISIBLE_DEVICES=1 python vtrace_baseline.py --steps_per_player 8 --max_contracts_per_trade 1 --customer_max_size 2 --max_contract_value 10 --players 5 --ent_coef 0.008 --num_steps 8 --psettlement_coef 1. --proles_coef 0.1 --num_iterations 3000000000 --iterations_per_pool_update 2000 --iterations_per_heavy_logging 2000 --iterations_per_checkpoint 2000 --exp_name smallgame_pool1 --checkpoint_name smallgame_pool0_180000
 
-CUDA_VISIBLE_DEVICES=1 python vtrace_baseline.py --steps_per_player 8 --max_contracts_per_trade 1 --customer_max_size 2 --max_contract_value 10 --players 5 --ent_coef 0.003 --num_steps 8 --psettlement_coef 1. --proles_coef 0.5 --learning_rate 1.5e-4 --num_iterations 3000000000 --iterations_per_pool_update 2000 --iterations_per_heavy_logging 2000 --iterations_per_checkpoint 2000 --exp_name smallgame_pool2 --checkpoint_name smallgame_pool2_54000 --iterations_to_first_pool_update 6000
+CUDA_VISIBLE_DEVICES=1 python vtrace_baseline.py --steps_per_player 8 --max_contracts_per_trade 1 --customer_max_size 2 --max_contract_value 10 --players 5 --ent_coef 0.003 --num_steps 8 --psettlement_coef 1. --proles_coef 0.5 --learning_rate 1.5e-4 --num_iterations 3000000000 --iterations_per_pool_update 2000 --iterations_per_heavy_logging 2000 --iterations_per_checkpoint 2000 --exp_name smallgame_pool3 --checkpoint_name smallgame_pool2_54000 --iterations_to_first_pool_update 6000
 ```
 
 Full, normal game experiments
@@ -64,10 +64,23 @@ CUDA_VISIBLE_DEVICES=0 python vtrace_baseline.py --ent_coef 0.005 --learning_rat
 
 Dev run
 ```
-CUDA_VISIBLE_DEVICES=1 python vtrace_baseline.py --steps_per_player 8 --max_contracts_per_trade 1 --customer_max_size 2 --max_contract_value 10 --players 5 --ent_coef 0.01 --num_steps 8 --psettlement_coef 1. --proles_coef 0.05 --num_iterations 3000000000 --iterations_per_pool_update 2000 --iterations_per_heavy_logging 100 --iterations_per_checkpoint 2000 --exp_name dev --checkpoint_name smallgame_pool0_180000
+CUDA_VISIBLE_DEVICES=1 python vtrace_baseline.py --steps_per_player 8 --max_contracts_per_trade 1 --customer_max_size 2 --max_contract_value 10 --players 5 --ent_coef 0.01 --num_steps 8 --psettlement_coef 1. --proles_coef 0.05 --num_iterations 3000000000 --iterations_per_pool_update 2000 --iterations_per_heavy_logging 100 --iterations_per_checkpoint 2000 --exp_name dev
 ```
 
 Profile run
 ```
 CUDA_VISIBLE_DEVICES=1 python profile_cpu_bottlenecks.py --steps_per_player 8 --max_contracts_per_trade 1 --customer_max_size 2 --max_contract_value 10 --players 5 --ent_coef 0.05 --num_steps 8 --num_iterations 100 --iterations_per_heavy_logging 1 --iterations_per_checkpoint 1500 --exp_name dev
+```
+
+# Added decentralized critic 
+
+## Seed run
+
+1. [Small game](https://wandb.ai/lyuxingjian-na/HighLowTrading_Transformer/runs/0c138b6w)
+2. [Normal run](https://wandb.ai/lyuxingjian-na/HighLowTrading_Transformer/runs/5iq3yi1n)
+
+```
+CUDA_VISIBLE_DEVICES=1 python vtrace.py --steps_per_player 8 --max_contracts_per_trade 1 --customer_max_size 2 --max_contract_value 10 --players 5 --ent_coef 0.05 --num_steps 8 --num_iterations 3010 --iterations_per_heavy_logging 500 --iterations_per_checkpoint 3000 --exp_name smalldecencritic
+
+CUDA_VISIBLE_DEVICES=0 python vtrace.py --ent_coef 0.05 --num_iterations 5010 --iterations_per_heavy_logging 500 --iterations_per_checkpoint 5000 --iterations_per_pool_update 5000 --exp_name normalgame_seedpool
 ```

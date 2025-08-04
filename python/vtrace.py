@@ -11,7 +11,7 @@ torch.backends.cudnn.benchmark = True
 torch.set_float32_matmul_precision('medium')
 import wandb
 from pathlib import Path
-from tqdm import trange, tqdm
+from tqdm import tqdm
 import sys 
 
 sys.path.append('./src')
@@ -42,18 +42,19 @@ torch.manual_seed(args.seed);
 
 device = torch.device(f'cuda:{args.device_id}')
 initial_agents = {}
-path = Path("./checkpoints") / (args.checkpoint_name + ".pt")
-weights = torch.load(path, map_location=device, weights_only=False)['model_state_dict']
+if args.checkpoint_name is not None:
+    path = Path("./checkpoints") / (args.checkpoint_name + ".pt")
+    weights = torch.load(path, map_location=device, weights_only=False)['model_state_dict']
+    print(f"Loading checkpoint {args.checkpoint_name} from {path}")
 for j in range(args.players - 1):
     if args.checkpoint_name is not None: 
         name = f"{args.checkpoint_name}_copy{j}"
     else:
         name = f"Random{j}"
-        weights = None
     initial_agents[name] = HighLowTransformerModel(
         args, env, verbose=False).to(device)
     initial_agents[name].compile()
-    if weights is not None:
+    if args.checkpoint_name is not None:   
         initial_agents[name].load_state_dict(weights)
 
 num_features = env.num_features()
@@ -62,12 +63,18 @@ pool = Arena(env, initial_agents, device)
 buffer = HighLowImpalaBuffer(args, num_features, device)
 
 local_agent = HighLowTransformerModel(args, env).to(device)
-local_agent.load_state_dict(weights)
+if args.checkpoint_name is not None:
+    local_agent.load_state_dict(weights)
 local_agent.compile()
 trainer = HighLowImpalaTrainer(
     args, local_agent, 
     checkpoint_interval=args.iterations_per_checkpoint,
     device=device)
+npc_agents = [
+    HighLowTransformerModel(args, env, verbose=False).to(device)
+    for _ in range(game_config['players'] - 1)]
+for agent in npc_agents:
+    agent.compile()
 
 # %%
 
@@ -97,8 +104,8 @@ for iteration in pbar:
     # Pick npc agents and player offset
     player_offset = np.random.randint(0, game_config['players'])
     npc_agent_names = pool.select_topk(game_config['players'] - 1)
-    npc_agents = [pool.agents[name] for name in npc_agent_names]
-    for agent in npc_agents:
+    for j, agent in enumerate(npc_agents):
+        agent.load_state_dict(pool.agents[npc_agent_names[j]].state_dict())
         agent.reset_context()
     local_agent.reset_context()
     round_agent_names = ( # Used for registering pool result 
@@ -108,6 +115,7 @@ for iteration in pbar:
 
     ### Rollout ### 
     settlement_preds, private_role_preds = [], []
+    buffer.pinfo_tensor = env.pinfo_tensor()
     for step in range(args.num_steps):
         global_step += args.num_envs 
 
@@ -164,7 +172,8 @@ for iteration in pbar:
             # Reset environment 
             buffer.update_late_stats({
                 'rewards': player_reward_buffer,
-                'dones': done_ones}, step)
+                'dones': done_ones,
+            }, step)
 
             # Unfortunately, logging must happen before environment is reset
             env_info = env.expose_info()
