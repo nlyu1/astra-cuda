@@ -1,6 +1,6 @@
 # %%
 import random
-from collections import defaultdict
+from collections import defaultdict, deque
 
 import torch
 import numpy as np
@@ -13,16 +13,18 @@ class Arena:
     """
     Playout scores can be registered freely, while agents can only be sampled after they're registered. 
     """
-    def __init__(self, env, initial_agents, device):
+    def __init__(self, env, initial_agents, device, deque_buffer_size=100):
         self.device = device 
         self.agents = {k: deepcopy(v) for k, v in initial_agents.items()}
         for k in self.agents:
             self.agents[k].eval()
             self.agents[k].to(self.device)
-        # Use running statistics instead of storing all values
-        self.score_count = defaultdict(int)
-        self.score_mean = defaultdict(float)
-        self.score_m2 = defaultdict(float)  # For variance calculation
+        # Use deque to store recent scores with fixed buffer size
+        self.deque_buffer_size = deque_buffer_size
+        self.score_history = defaultdict(lambda: deque(maxlen=deque_buffer_size))
+        # Cache mean and std for efficiency
+        self.score_mean = defaultdict(lambda: 1e4)
+        self.score_std = defaultdict(lambda: 1e4)
         self.eval_env = env 
 
     def register_agent(self, agent, agent_name):
@@ -37,24 +39,24 @@ class Arena:
         scores = scores.cpu()
         for agent_name, score in zip(agent_names, scores):
             if agent_name in self.agents:
-                # Welford's online algorithm for running mean and variance
-                self.score_count[agent_name] += 1
-                delta = score.item() - self.score_mean[agent_name]
-                self.score_mean[agent_name] += delta / self.score_count[agent_name]
-                delta2 = score.item() - self.score_mean[agent_name]
-                self.score_m2[agent_name] += delta * delta2
+                # Append score to deque (automatically removes oldest if at capacity)
+                self.score_history[agent_name].append(score.item())
+                # Update cached statistics
+                if len(self.score_history[agent_name]) == 0:
+                    self.score_mean[agent_name] = 1e4
+                    self.score_std[agent_name] = 1e4
+                else:
+                    self.score_mean[agent_name] = np.mean(self.score_history[agent_name])
+                    if len(self.score_history[agent_name]) <= 3:
+                        self.score_std[agent_name] = 1e4
+                    else:
+                        self.score_std[agent_name] = np.std(self.score_history[agent_name])
 
     def get_mean_score(self, agent):
-        if self.score_count[agent] == 0:
-            return 1e10 
         return self.score_mean[agent]
     
     def get_std_score(self, agent):
-        if self.score_count[agent] <= 3:
-            return 1e10 
-        # Calculate standard deviation from running statistics
-        variance = self.score_m2[agent] / self.score_count[agent]
-        return np.sqrt(variance)
+        return self.score_std[agent]
 
     def debug_printout(self):
         sorted_info = self.get_sorted_info()
@@ -82,7 +84,7 @@ class Arena:
         ranks = np.empty_like(means, dtype=int)
         ranks[np.argsort(-means)] = np.arange(len(means))
         
-        normalize_offset = 3
+        normalize_offset = 2
         rank_prob    = 1 / (ranks + 1 + normalize_offset)
         rank_prob    = rank_prob / rank_prob.sum()
 

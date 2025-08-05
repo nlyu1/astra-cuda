@@ -50,15 +50,14 @@ if args.checkpoint_name is not None:
     path = Path("./checkpoints") / (args.checkpoint_name + ".pt")
     weights = torch.load(path, map_location=device, weights_only=False)['model_state_dict']
     print(f"Loading checkpoint {args.checkpoint_name} from {path}")
-for j in range(args.players - 1):
-    if args.checkpoint_name is not None: 
-        name = f"{args.checkpoint_name}_copy{j}"
-    else:
-        name = f"Random{j}"
-    initial_agents[name] = HighLowTransformerModel(
-        args, env, verbose=False).to(device)
-    if args.checkpoint_name is not None:   
-        initial_agents[name].load_state_dict(weights, strict=False)
+if args.checkpoint_name is not None: 
+    name = f"{args.checkpoint_name}"
+else:
+    name = f"Random{j}"
+initial_agents[name] = HighLowTransformerModel(
+    args, env, verbose=False).to(device)
+if args.checkpoint_name is not None:   
+    initial_agents[name].load_state_dict(weights, strict=False)
 
 num_features = env.num_features()
 pool = Arena(env, initial_agents, device)

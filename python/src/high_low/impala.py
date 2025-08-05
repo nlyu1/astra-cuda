@@ -238,13 +238,13 @@ class HighLowImpalaTrainer:
                         update_dictionary['actual_settlement'],
                         update_dictionary['actual_private_roles'],
                         update_dictionary['pinfo_tensor'])
-                    if step_results['approx_kls'] < self.args.update_kl_threshold: # Never update on too 
-                        step_results['loss'].backward()
-                        nn.utils.clip_grad_norm_(self.agent.parameters(), self.args.max_grad_norm)
-                        self.optimizer.step()
-                        self.optimizer.zero_grad()
-                    else:
+                    if step_results['approx_kls'] > self.args.update_kl_threshold: # Never update on too 
+                        step_results['loss'] *= 0 
                         print('Skipping update on too-high KL. Careful here')
+                    step_results['loss'].backward()
+                    nn.utils.clip_grad_norm_(self.agent.parameters(), self.args.max_grad_norm)
+                    self.optimizer.step()
+                    self.optimizer.zero_grad()
 
                     self.explained_vars[logging_counter] = step_results['explained_vars']
                     self.value_losses[logging_counter] = step_results['value_losses']
@@ -346,7 +346,7 @@ class HighLowImpalaTrainer:
         entropy_loss = -entropy_coef.detach() * entropy_value
         # Prove firm support to let entropy go above dictated value, and very soft incentive for entropy_coef to decrease
         entropy_coef_loss = - entropy_coef * nn.functional.leaky_relu(
-            self.args.target_entropy - entropy_value, negative_slope=0.05).detach()
+            self.args.target_entropy - entropy_value, negative_slope=0.01).detach()
 
         loss = (vtrace_results['policy_loss'] 
                 + entropy_loss + entropy_coef_loss
@@ -359,11 +359,11 @@ class HighLowImpalaTrainer:
             'explained_vars': vtrace_results['value_r2'],
             'value_losses': vtrace_results['value_loss'],
             'pg_losses': vtrace_results['policy_loss'],
-            'entropy': entropy_value,
+            'entropy': entropy_value.detach(),
             'approx_kls': approx_kl,
             'pred_settlement_loss': pred_settlement_loss,
             'pred_private_roles_loss': pred_private_roles_loss,
-            'entropy_coef': entropy_coef,
+            'entropy_coef': entropy_coef.detach(),
         }
 
     def save_checkpoint(self, step):

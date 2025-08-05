@@ -92,7 +92,18 @@ python profile_vtrace.py
 2. [Normal game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/6tz5e171)
 
 ```
-CUDA_VISIBLE_DEVICES=1 python vtrace.py --game_setting 1 --target_entropy -4 --num_steps 8 --num_iterations 3010 --iterations_per_pool_update 3000 --iterations_per_checkpoint 3000 --exp_name smalldecencritic_seedpool
+CUDA_VISIBLE_DEVICES=1 python vtrace.py --game_setting 1 --target_entropy -4 --num_iterations 3010 --iterations_per_pool_update 3000 --iterations_per_checkpoint 3000 --exp_name smalldecencritic_seedpool
 
 CUDA_VISIBLE_DEVICES=0 python vtrace.py --game_setting 0 --target_entropy -2 --num_iterations 3010 --iterations_per_checkpoint 3000 --iterations_per_pool_update 3000 --exp_name normaldecencritic_seedpool
+```
+
+## First bootstrap run
+
+
+1. [Small game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/05vji420).
+2. [Normal game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/2voctjmx)
+```
+CUDA_VISIBLE_DEVICES=1 python vtrace.py --game_setting 1 --target_entropy -4.5 --psettlement_coef 0.1 --proles_coef 0.05 --num_iterations 300000000 --exp_name smalldecencritic_pool0_dev --checkpoint_name smalldecencritic_seedpool_selfplay_3000
+
+CUDA_VISIBLE_DEVICES=0 python vtrace.py --game_setting 0 --target_entropy -3 --psettlement_coef 0.1 --proles_coef 0.05  --num_iterations 300000000 --exp_name normaldecencritic_seedpool_pool0 --checkpoint_name normaldecencritic_seedpool_selfplay_3000
 ```
