@@ -99,11 +99,32 @@ CUDA_VISIBLE_DEVICES=0 python vtrace.py --game_setting 0 --target_entropy -2 --n
 
 ## First bootstrap run
 
-
-1. [Small game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/05vji420).
-2. [Normal game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/2voctjmx)
+1. [Small game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/eykrxu1c)
+2. [Normal game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/3txveluf)
 ```
-CUDA_VISIBLE_DEVICES=1 python vtrace.py --game_setting 1 --target_entropy -4.5 --psettlement_coef 0.1 --proles_coef 0.05 --num_iterations 300000000 --exp_name smalldecencritic_pool0_dev --checkpoint_name smalldecencritic_seedpool_selfplay_3000
+CUDA_VISIBLE_DEVICES=1 python vtrace.py --game_setting 1 --target_entropy -5.5 --psettlement_coef 0.1 --proles_coef 0.05 --num_iterations 300000000 --exp_name smalldecencritic_pool0_dev --checkpoint_name smalldecencritic_seedpool_selfplay_3000
 
 CUDA_VISIBLE_DEVICES=0 python vtrace.py --game_setting 0 --target_entropy -3 --psettlement_coef 0.1 --proles_coef 0.05  --num_iterations 300000000 --exp_name normaldecencritic_seedpool_pool0 --checkpoint_name normaldecencritic_seedpool_selfplay_3000
+```
+
+Interesting, entropy always seem saturated. 
+
+## Second bootstrap run
+
+1. [Small game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/6r4ru7oa)
+2. [Normal game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/ynt5oo4g)
+```
+CUDA_VISIBLE_DEVICES=1 python vtrace.py --game_setting 1 --learning_rate 1e-4 --target_entropy -8 --psettlement_coef 1 --proles_coef 0.5 --num_iterations 300000000 --exp_name smalldecencritic_pool1 --checkpoint_name smalldecencritic_pool0_dev_87000
+
+CUDA_VISIBLE_DEVICES=0 python vtrace.py --game_setting 0 --learning_rate 1e-4 --target_entropy -5.5 --psettlement_coef 1 --proles_coef 0.5  --num_iterations 300000000 --exp_name normaldecencritic_pool1 --checkpoint_name normaldecencritic_seedpool_pool0_72000
+```
+
+## Third bootstrap run
+
+1. [Small game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/8sxccqkx)
+2. [Normal game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/ajyxw7tx)
+```
+CUDA_VISIBLE_DEVICES=1 python vtrace.py --game_setting 1 --learning_rate 1e-4 --target_entropy -11.5 --psettlement_coef 1 --proles_coef 1 --num_iterations 300000000 --exp_name smalldecencritic_pool2 --checkpoint_name smalldecencritic_pool1_30000
+
+CUDA_VISIBLE_DEVICES=0 python vtrace.py --game_setting 0 --learning_rate 1e-4 --target_entropy -9.0 --psettlement_coef 1 --proles_coef 1  --num_iterations 300000000 --exp_name normaldecencritic_pool2 --checkpoint_name normaldecencritic_pool1_30000
 ```

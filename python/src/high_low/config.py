@@ -66,7 +66,7 @@ class Args:
     """Number of iterations between pool updates. Set to none to do static training."""
     iterations_to_first_pool_update: int = 0 
     """Only start updating the pool after this many iterations."""
-    self_play_prob: float = 0.5
+    self_play_prob: float = 0.0
     """Probability of self-playing (having fixed copies of self being opponent instead of pool-selected opponents)"""
     checkpoint_name: str = None 
     """Name of the checkpoint to load (e.g. 'name' for 'checkpoints/name.pt'). If None, we start from scratch."""

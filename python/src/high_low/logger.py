@@ -100,7 +100,7 @@ class HighLowLogger:
         settlement_price = contract_value.view(1, -1) # [1, B]
         settlement_diff = (settlement_preds - settlement_price).abs().mean(-1) # [T]
         log_data['acc/self_acc'] = self_acc.mean().item()
-        for pivot in [0.2, 0.4, 0.6, 0.8, 1.0]:
+        for pivot in [0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.875, 1.0]:
             idx = int(pivot * (settlement_preds.shape[0] - 1))
             log_data[f'settlement_pred_diff/{idx+1}'] = settlement_diff[idx].mean().item()
             log_data[f'acc/non_self_acc{idx+1}'] = non_self_acc[idx].mean().item()
