@@ -203,6 +203,9 @@ class HighLowImpalaTrainer:
         else:
             # Use base learning rate after warmup
             lr = self.base_lr
+
+        for param_group in self.optimizer.param_groups:
+            param_group['lr'] = lr
         return lr
 
     def train(self, update_dictionary):
@@ -240,6 +243,7 @@ class HighLowImpalaTrainer:
                         update_dictionary['pinfo_tensor'])
                     if step_results['approx_kls'] > self.args.update_kl_threshold: # Never update on too 
                         step_results['loss'] *= 0 
+                        step_results['approx_kls'] *= 0
                         print('Skipping update on too-high KL. Careful here')
                     step_results['loss'].backward()
                     nn.utils.clip_grad_norm_(self.agent.parameters(), self.args.max_grad_norm)

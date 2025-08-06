@@ -128,3 +128,26 @@ CUDA_VISIBLE_DEVICES=1 python vtrace.py --game_setting 1 --learning_rate 1e-4 --
 
 CUDA_VISIBLE_DEVICES=0 python vtrace.py --game_setting 0 --learning_rate 1e-4 --target_entropy -9.0 --psettlement_coef 1 --proles_coef 1  --num_iterations 300000000 --exp_name normaldecencritic_pool2 --checkpoint_name normaldecencritic_pool1_30000
 ```
+
+## Fourth bootstrap run (self-play)
+
+Further lower entropy and enable self-play; also enable long-lookahead value rollouts with higher lambda. Fixed bug -- lr warmup was not correctly implemented. Self-play deteriorates performance against pool mixture
+
+1. [Small game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/39t6c5gr)
+2. [Normal game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/tu1zch60)
+```
+CUDA_VISIBLE_DEVICES=1 python vtrace.py --game_setting 1 --learning_rate 1e-4 --target_entropy -17 --psettlement_coef 1 --proles_coef 1 --num_iterations 300000000 --iterations_per_pool_update 5000 --iterations_per_checkpoint 5000 --exp_name smalldecencritic_pool3 --checkpoint_name smalldecencritic_pool2_60000 --self_play_prob 0.5 --gae_lambda 0.9
+
+CUDA_VISIBLE_DEVICES=0 python vtrace.py --game_setting 0 --learning_rate 1e-4 --target_entropy -15 --psettlement_coef 1 --proles_coef 1  --num_iterations 300000000 --iterations_per_pool_update 5000 --iterations_per_checkpoint 5000  --exp_name normaldecencritic_pool3 --checkpoint_name normaldecencritic_pool2_51000 --self_play_prob 0.5 --gae_lambda 0.8
+```
+
+Controlled experiment: no self-play
+
+0, [Small game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/olbw1j7b)
+1. [Normal game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/ebsfus9n)
+
+```
+CUDA_VISIBLE_DEVICES=1 python vtrace.py --game_setting 1 --learning_rate 1e-4 --target_entropy -17 --psettlement_coef 1 --proles_coef 1 --num_iterations 300000000 --iterations_per_pool_update 5000 --iterations_per_checkpoint 5000 --exp_name smalldecencritic_poolnsp3 --checkpoint_name smalldecencritic_pool2_60000 --gae_lambda 0.9
+
+CUDA_VISIBLE_DEVICES=0 python vtrace.py --game_setting 0 --learning_rate 1e-4 --target_entropy -15 --psettlement_coef 1 --proles_coef 1  --num_iterations 300000000 --iterations_per_pool_update 5000 --iterations_per_checkpoint 5000  --exp_name normaldecencritic_poolnsp3 --checkpoint_name normaldecencritic_pool2_51000 --gae_lambda 0.8
+```

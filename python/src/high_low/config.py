@@ -44,7 +44,7 @@ class Args:
     max_grad_norm: float = 0.5
     """the maximum norm for the gradient clipping"""
 
-    warmup_steps: int = 800
+    warmup_steps: int = 750
     """number of steps for linear learning rate warmup"""
 
     ##### Model specific arguments #####
