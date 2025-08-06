@@ -242,9 +242,9 @@ class HighLowImpalaTrainer:
                         update_dictionary['actual_private_roles'],
                         update_dictionary['pinfo_tensor'])
                     if step_results['approx_kls'] > self.args.update_kl_threshold: # Never update on too 
-                        step_results['loss'] *= 0 
-                        step_results['approx_kls'] *= 0
-                        print('Skipping update on too-high KL. Careful here')
+                        # step_results['loss'] *= 0 
+                        step_results['approx_kls'] = self.args.update_kl_threshold
+                        # print('Skipping update on too-high KL. Careful here')
                     step_results['loss'].backward()
                     nn.utils.clip_grad_norm_(self.agent.parameters(), self.args.max_grad_norm)
                     self.optimizer.step()

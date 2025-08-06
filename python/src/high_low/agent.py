@@ -57,7 +57,7 @@ class HighLowTransformerModel(nn.Module):
         self.transformer_norm = nn.LayerNorm(self.n_embd)
         
         # Action heads
-        self.actors = BetaActor(self.n_embd, 4)
+        self.actors = BetaActor(self.n_embd, 4, max_kappa=max(self.M, self.S) ** 2)
         
         # Private information prediction heads
         self.pinfo_model = nn.ModuleDict({
@@ -112,14 +112,14 @@ class HighLowTransformerModel(nn.Module):
         action_params: {'bid_px_mean', 'bid_px_std', ...} -> [B']
         actions: [B', 4]
 
-        Returns: logprobs and entropy of shape [B']
+        Returns: logprobs and entropy of shape [B', 4]
         """
         bid_px, ask_px, bid_sz, ask_sz = actions.reshape(-1, 4).unbind(dim=-1)
         bidpx_lp, bidpx_ent = BetaActor.logp_entropy(bid_px, action_params['bid_px_alpha'], action_params['bid_px_beta'], 1, self.M) # [T*B]
         askpx_lp, askpx_ent = BetaActor.logp_entropy(ask_px, action_params['ask_px_alpha'], action_params['ask_px_beta'], 1, self.M) # [T*B]
         bidsz_lp, bidsz_ent = BetaActor.logp_entropy(bid_sz, action_params['bid_sz_alpha'], action_params['bid_sz_beta'], 0, self.S) # [T*B]
         asksz_lp, asksz_ent = BetaActor.logp_entropy(ask_sz, action_params['ask_sz_alpha'], action_params['ask_sz_beta'], 0, self.S) # [T*B]
-        return (bidpx_lp + askpx_lp + bidsz_lp + asksz_lp), (bidpx_ent + askpx_ent + bidsz_ent + asksz_ent)
+        return torch.stack([bidpx_lp, askpx_lp, bidsz_lp, asksz_lp], dim=-1), torch.stack([bidpx_ent, askpx_ent, bidsz_ent, asksz_ent], dim=-1)
     
     @torch.compile(fullgraph=True, mode="max-autotune")
     def _batch_forward(self, x, pinfo_tensor, actions):
@@ -153,6 +153,7 @@ class HighLowTransformerModel(nn.Module):
 
         action_params = self.extract_action_params(features)
         logprobs, entropy = self._action_logprobs(action_params, actions.view(T*B, 4))
+        logprobs, entropy = logprobs.sum(-1), entropy.sum(-1)
 
         pinfo_preds = {k: self.pinfo_model[k](features) for k in self.pinfo_model}
         pinfo_preds['private_roles'] = pinfo_preds['private_roles'].reshape(T, B, self.P, 3)
@@ -173,10 +174,7 @@ class HighLowTransformerModel(nn.Module):
             assert self.context.shape[0] == step, f"Context must be of length {step}, but got {self.context.shape[0]}"
         outputs = self.incremental_forward_with_context(x, self.context)
         self.context = outputs['context']
-        return {
-            'action': outputs['action'], 
-            'logprobs': outputs['logprobs'], 
-            'pinfo_preds': outputs['pinfo_preds']}
+        return outputs
 
     @torch.inference_mode()
     def incremental_forward_with_context(self, x, prev_context):
@@ -207,13 +205,18 @@ class HighLowTransformerModel(nn.Module):
         bid_sz = BetaActor.sample(action_params['bid_sz_alpha'], action_params['bid_sz_beta'], 0, self.S)
         ask_sz = BetaActor.sample(action_params['ask_sz_alpha'], action_params['ask_sz_beta'], 0, self.S)
 
-        logprobs, _entropy = self._action_logprobs(action_params, torch.stack([bid_px, ask_px, bid_sz, ask_sz], dim=-1))
+        logprobs_by_category, entropy_by_category = self._action_logprobs(
+            action_params, torch.stack([bid_px, ask_px, bid_sz, ask_sz], dim=-1))
         pinfo_preds = {k: self.pinfo_model[k](features) for k in self.pinfo_model}
         pinfo_preds['private_roles'] = pinfo_preds['private_roles'].reshape(B, self.P, 3)
         pinfo_preds['settle_price'] = pinfo_preds['settle_price'].reshape(B)
         return {
             'action': torch.stack([bid_px, ask_px, bid_sz, ask_sz], dim=-1), 
-            'logprobs': logprobs, 
+            'action_params': action_params,
+            'logprobs': logprobs_by_category.sum(-1), 
+            'entropy': entropy_by_category.sum(-1),
+            'logprobs_by_category': logprobs_by_category,
+            'entropy_by_category': entropy_by_category,
             'pinfo_preds': pinfo_preds,
             'context': context}
 

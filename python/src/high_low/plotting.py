@@ -8,6 +8,120 @@ import torch
 
 ArrayLike = Union[List, npt.NDArray]
 
+def plot_action_distributions(action_params, max_contract_value, max_contracts_per_trade, title=""):
+    """
+    Creates a 2x2 subplot grid showing the beta distributions for bid/ask prices and sizes.
+    
+    Args:
+        action_params (dict): Dictionary containing alpha/beta parameters for each action
+                             Keys: 'bid_px_alpha', 'bid_px_beta', 'ask_px_alpha', 'ask_px_beta',
+                                   'bid_sz_alpha', 'bid_sz_beta', 'ask_sz_alpha', 'ask_sz_beta'
+        max_contract_value (int): Maximum contract value for price distributions
+        max_contracts_per_trade (int): Maximum contracts per trade for size distributions
+    
+    Returns:
+        fig: Plotly figure with 2x2 subplot grid
+    """
+    from scipy.stats import beta as scipy_beta
+    
+    # Create 2x2 subplot grid
+    subplot_titles = ["Bid Price", "Ask Price", "Bid Size", "Ask Size"]
+    fig = make_subplots(
+        rows=2, cols=2,
+        subplot_titles=subplot_titles,
+        vertical_spacing=0.12,
+        horizontal_spacing=0.1)
+    
+    # Define parameters for each subplot
+    subplots_config = [
+        ('bid_px', 1, max_contract_value, 1, 1),  # (prefix, min_val, max_val, row, col)
+        ('ask_px', 1, max_contract_value, 1, 2),
+        ('bid_sz', 0, max_contracts_per_trade, 2, 1),
+        ('ask_sz', 0, max_contracts_per_trade, 2, 2)
+    ]
+    entropy_sum = 0
+    for prefix, min_val, max_val, row, col in subplots_config:
+        # Extract alpha and beta values
+        alpha = action_params[f'{prefix}_alpha'].item() if hasattr(action_params[f'{prefix}_alpha'], 'item') else action_params[f'{prefix}_alpha']
+        beta = action_params[f'{prefix}_beta'].item() if hasattr(action_params[f'{prefix}_beta'], 'item') else action_params[f'{prefix}_beta']
+        
+        # Calculate kappa and m
+        kappa = alpha + beta
+        m = alpha / (alpha + beta)
+        
+        # Create continuous PDF
+        x_continuous = np.linspace(0, 1, 1000)
+        y_continuous = scipy_beta.pdf(x_continuous, alpha, beta)
+        entropy = scipy_beta.entropy(alpha, beta)
+        entropy_sum += entropy
+        x_continuous_scaled = x_continuous * (max_val - min_val + 1) + (min_val - 0.5)
+        
+        # Calculate discrete probabilities using straight-through estimator
+        discrete_values = np.arange(min_val, max_val + 1)
+        discrete_probs = []
+        
+        for val in discrete_values:
+            normalized_x = (val - (min_val - 0.5)) / (max_val - min_val + 1)
+            prob = scipy_beta.pdf(normalized_x, alpha, beta) / (max_val - min_val + 1)
+            discrete_probs.append(prob)
+        
+        # Add continuous PDF line
+        fig.add_trace(
+            go.Scatter(
+                x=x_continuous_scaled,
+                y=y_continuous / (max_val - min_val + 1),
+                mode='lines',
+                name='Beta PDF',
+                line=dict(color='blue', width=2),
+                showlegend=False
+            ),
+            row=row, col=col
+        )
+        
+        # Add discrete probability bars
+        fig.add_trace(
+            go.Bar(
+                x=discrete_values,
+                y=discrete_probs,
+                name='Discrete Prob',
+                marker=dict(color='lightblue', opacity=0.7),
+                width=0.8,
+                showlegend=False
+            ),
+            row=row, col=col
+        )
+        
+        # Update subplot title with parameters
+        subplot_idx = (row - 1) * 2 + (col - 1)
+        fig.layout.annotations[subplot_idx].update(
+            text=f'{subplot_titles[subplot_idx]}<br>(α={alpha:.2f}, β={beta:.2f}, κ={kappa:.2f}, m={m:.3f}, H={entropy:.2f})'
+        )
+        
+        # Update axes for this subplot
+        fig.update_xaxes(
+            range=[min_val - 1, max_val + 1],
+            dtick=1 if (max_val - min_val) <= 10 else None,
+            row=row, col=col
+        )
+        fig.update_yaxes(
+            row=row, col=col
+        )
+    
+    # Update overall layout
+    fig.update_layout(
+        height=600,
+        width=1200,  # Increased from 800 to 1200
+        showlegend=False,
+        template="plotly_white",
+        title={
+            'text': f"{title} (H={entropy_sum:.2f})",
+            'x': 0.5,
+            'xanchor': 'center'
+        }
+    )
+    
+    return fig
+
 def plot_market_and_players(infos, args, env_idx=0, fig_size=(450, 600)):
     """
     Generates a compact 4x2 subplot grid in a specific order for market analysis.

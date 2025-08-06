@@ -55,8 +55,12 @@ class BetaActor(nn.Module):
         """
         Model outputs the location and dispersion parameters of the beta distribution. 
         Beta(alpha, beta) where alpha = k*m, beta=k*(1-m)
-        k: dispersion parameter unbounded in [0, inf]. Parameterized by softplus(k_hidden)
-        m: location parameter bounded in [0, 1]. Parameterized by sigmoid(m_hidden)
+        k: concentration parameter unbounded in [0, inf]. Parameterized by softplus(k_hidden). Higher k means higher concentration. 
+        m: location parameter bounded in [0, 1]. Parameterized by sigmoid(m_hidden). 
+
+        The std of beta distribution is sqrt(m(1-m) / (k + 1)). 
+        So, to have max-(min across m) std of ~0.5 / scale, we need 0.5 / sqrt(k+1) = 0.5 / scale, or max_kappa ~= scale ** 2
+        For example, for discretization of ~30 values, we need max_kappa ~= 900. 
         """
         super().__init__()
         self.n_hidden = n_hidden
