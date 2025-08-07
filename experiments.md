@@ -164,3 +164,19 @@ CUDA_VISIBLE_DEVICES=1 python vtrace.py --game_setting 1 --learning_rate 1e-4 --
 
 CUDA_VISIBLE_DEVICES=0 python vtrace.py --game_setting 0 --learning_rate 1e-4 --target_entropy -22.5 --psettlement_coef 1 --proles_coef 1  --num_iterations 300000000 --iterations_per_pool_update 3000 --iterations_per_checkpoint 3000  --exp_name normaldecencritic_poolnsp4 --checkpoint_name normaldecencritic_poolnsp3_45000 --gae_lambda 0.8
 ```
+
+
+# Modified action type
+
+## Seed run
+
+1. [Small game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/t3diu0ft)
+    - log(10 * 10 * 2 * 2) is 
+2. [Normal game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/6tz5e171)
+    - For reference: log(30 * 30 * 5 * 5) is 10
+
+```
+CUDA_VISIBLE_DEVICES=1 python vtrace.py --game_setting 1 --target_entropy 5 --num_iterations 3010 --iterations_per_pool_update 3000 --iterations_per_checkpoint 3000 --exp_name small_seedpool
+
+CUDA_VISIBLE_DEVICES=0 python vtrace.py --game_setting 0 --target_entropy 3 --num_iterations 3010 --iterations_per_checkpoint 3000 --iterations_per_pool_update 3000 --exp_name normal_seedpool
+```

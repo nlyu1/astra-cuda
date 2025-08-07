@@ -74,7 +74,7 @@ class HighLowImpalaBuffer:
             'actual_private_roles': self.actual_private_roles,
         }
 
-@torch.compile(mode='max-autotune', fullgraph=True)
+# @torch.compile(mode='max-autotune', fullgraph=True)
 def vtrace_losses(
     rewards: Float[torch.Tensor, "T B"],
     dones: Bool[torch.Tensor, "T B"],
@@ -242,9 +242,9 @@ class HighLowImpalaTrainer:
                         update_dictionary['actual_private_roles'],
                         update_dictionary['pinfo_tensor'])
                     if step_results['approx_kls'] > self.args.update_kl_threshold: # Never update on too 
-                        # step_results['loss'] *= 0 
+                        step_results['loss'] *= 0 
                         step_results['approx_kls'] = self.args.update_kl_threshold
-                        # print('Skipping update on too-high KL. Careful here')
+                        print('Skipping update on too-high KL. Careful here')
                     step_results['loss'].backward()
                     nn.utils.clip_grad_norm_(self.agent.parameters(), self.args.max_grad_norm)
                     self.optimizer.step()
@@ -284,7 +284,7 @@ class HighLowImpalaTrainer:
             'metrics/learning_rate': current_lr,
         }
 
-    @torch.compile(mode="max-autotune-no-cudagraphs", fullgraph=True)
+    # @torch.compile(mode="max-autotune-no-cudagraphs", fullgraph=True)
     def _train_step(self, 
                     minibatch_env_indices,
                     obs, logprobs, actions, rewards, dones, 

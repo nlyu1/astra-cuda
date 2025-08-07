@@ -51,6 +51,10 @@ Supports discrete, bounded sampling.
 """
 
 class BetaActor(nn.Module):
+    """
+    TODO: beta-straight through has serious problems at the tails. Replace log_prob 
+        with actual cdf of the discretization when torch.special.betainc is available. 
+    """
     def __init__(self, n_hidden, n_actors, max_kappa=20):
         """
         Model outputs the location and dispersion parameters of the beta distribution. 

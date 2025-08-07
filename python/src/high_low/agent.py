@@ -7,7 +7,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import sys 
 sys.path.append('../')
-from model_components import ResidualBlock, LearnedPositionalEncoding, BetaActor
+from model_components import ResidualBlock, LearnedPositionalEncoding
+from discrete_actor import DiscreteActor
 
 class HighLowTransformerModel(nn.Module):
     """
@@ -49,15 +50,16 @@ class HighLowTransformerModel(nn.Module):
             batch_first=False,
             norm_first=True)  # Pre-norm architecture
         
-        # Configure encoder for memory efficiency
         self.transformer = nn.TransformerEncoder(
             encoder_layer,
             num_layers=self.n_layer,
             enable_nested_tensor=False)
         self.transformer_norm = nn.LayerNorm(self.n_embd)
         
-        # Action heads
-        self.actors = BetaActor(self.n_embd, 4, max_kappa=max(self.M, self.S) ** 2)
+        self.actors = DiscreteActor(
+            self.n_embd, 4, 
+            min_values=torch.tensor([1, 1, 0, 0], device=self.device),
+            max_values=torch.tensor([self.M, self.M, self.S, self.S], device=self.device))
         
         # Private information prediction heads
         self.pinfo_model = nn.ModuleDict({
@@ -76,6 +78,8 @@ class HighLowTransformerModel(nn.Module):
             'causal_mask', nn.Transformer.generate_square_subsequent_mask(self.T, device=self.device), persistent=False)
         self.log_entropy_coef = nn.Parameter(torch.zeros(1, device=self.device) - 2) # ~0.13 entropy coef 
 
+        self.register_buffer('uniform_buffer', torch.empty(0, device=self.device), persistent=False)
+
         if verbose:
             B, F = env.observation_shape()
             T = args.steps_per_player
@@ -89,39 +93,14 @@ class HighLowTransformerModel(nn.Module):
             print(f"Trainable parameters: {trainable_params:,}")
             print(f"Model size: {total_params * 4 / 1024**2:.2f} MB (assuming float32)")
 
-    # @torch.compile(fullgraph=True, mode="max-autotune")
-    def extract_action_params(self, features):
-        """
-        Features: [B', D]. Generates unscaled normalizations and scales appropriately. 
-        """
-        # Means are normalized between 0 and 1. 
-        alphas, betas = self.actors(features)
-        return {
-            'bid_px_alpha': alphas[:, 0],
-            'bid_px_beta': betas[:, 0],
-            'ask_px_alpha': alphas[:, 1],
-            'ask_px_beta': betas[:, 1],
-            'bid_sz_alpha': alphas[:, 2],
-            'bid_sz_beta': betas[:, 2],
-            'ask_sz_alpha': alphas[:, 3],
-            'ask_sz_beta': betas[:, 3]}
+    def _populate_uniform_buffer(self, shape):
+        """Resize buffer if needed"""
+        if self.uniform_buffer.shape != shape:
+            self.uniform_buffer = torch.empty(shape, device=self.device)
+        self.uniform_buffer.uniform_()
+        return self.uniform_buffer
     
     # @torch.compile(fullgraph=True, mode="max-autotune")
-    def _action_logprobs(self, action_params, actions):
-        """
-        action_params: {'bid_px_mean', 'bid_px_std', ...} -> [B']
-        actions: [B', 4]
-
-        Returns: logprobs and entropy of shape [B', 4]
-        """
-        bid_px, ask_px, bid_sz, ask_sz = actions.reshape(-1, 4).unbind(dim=-1)
-        bidpx_lp, bidpx_ent = BetaActor.logp_entropy(bid_px, action_params['bid_px_alpha'], action_params['bid_px_beta'], 1, self.M) # [T*B]
-        askpx_lp, askpx_ent = BetaActor.logp_entropy(ask_px, action_params['ask_px_alpha'], action_params['ask_px_beta'], 1, self.M) # [T*B]
-        bidsz_lp, bidsz_ent = BetaActor.logp_entropy(bid_sz, action_params['bid_sz_alpha'], action_params['bid_sz_beta'], 0, self.S) # [T*B]
-        asksz_lp, asksz_ent = BetaActor.logp_entropy(ask_sz, action_params['ask_sz_alpha'], action_params['ask_sz_beta'], 0, self.S) # [T*B]
-        return torch.stack([bidpx_lp, askpx_lp, bidsz_lp, asksz_lp], dim=-1), torch.stack([bidpx_ent, askpx_ent, bidsz_ent, asksz_ent], dim=-1)
-    
-    @torch.compile(fullgraph=True, mode="max-autotune")
     def _batch_forward(self, x, pinfo_tensor, actions):
         """
         Fully parallel forward pass across all timesteps.
@@ -140,20 +119,18 @@ class HighLowTransformerModel(nn.Module):
         T, B, F = x.shape
         encoded = self.encoder(x.view(T*B, F)).view(T, B, self.n_embd)
         encoded = self.pos_encoding(encoded) # [T, B, D]
-        # print('Encoded:', encoded.min().item(), encoded.max().item())
         # [T, B, D]. causal_mask shape [T, T] with -inf on strict upper-diagonal
         features = self.transformer(encoded, mask=self.causal_mask, is_causal=True).view(T * B, self.n_embd) # [T * B, D]
         features = self.transformer_norm(features)
-        # print('Features:', features.min().item(), features.max().item())
         critic_features = torch.cat([
             features.view(T, B, self.n_embd),
             pinfo_tensor.expand(T, B, self.pinfo_numfeatures)
         ], dim=-1).reshape(T*B, self.n_embd + self.pinfo_numfeatures)
         values = self.critic(critic_features).reshape(T, B)
 
-        action_params = self.extract_action_params(features)
-        logprobs, entropy = self._action_logprobs(action_params, actions.view(T*B, 4))
-        logprobs, entropy = logprobs.sum(-1), entropy.sum(-1)
+        logp_entropy = self.actors.logp_entropy(features, actions.view(T*B, 4))
+        logprobs = logp_entropy['logprobs'].sum(-1).reshape(T, B) # Sum over action types [bid_px, ask_px, bid_sz, ask_sz]
+        entropy = logp_entropy['entropy'].sum(-1).reshape(T, B)
 
         pinfo_preds = {k: self.pinfo_model[k](features) for k in self.pinfo_model}
         pinfo_preds['private_roles'] = pinfo_preds['private_roles'].reshape(T, B, self.P, 3)
@@ -163,8 +140,7 @@ class HighLowTransformerModel(nn.Module):
             'values': values,
             'logprobs': logprobs.reshape(T, B),
             'entropy': entropy.reshape(T, B),
-            'pinfo_preds': pinfo_preds, 
-        }
+            'pinfo_preds': pinfo_preds}
 
     @torch.inference_mode()
     def incremental_forward(self, x, step):
@@ -172,14 +148,19 @@ class HighLowTransformerModel(nn.Module):
             assert self.context.numel() == 0, f"Context must be empty for first step, but got {self.context.shape}"
         else:
             assert self.context.shape[0] == step, f"Context must be of length {step}, but got {self.context.shape[0]}"
-        outputs = self.incremental_forward_with_context(x, self.context)
+        # 4 action types, and 3 uniform random for each action type 
+        # See "discrete_actor" for why we need 3 random values per action
+        uniform_samples = self._populate_uniform_buffer((x.shape[0], 4, 3)) 
+        outputs = self.incremental_forward_with_context(x, self.context, uniform_samples)
         self.context = outputs['context']
         return outputs
 
     @torch.inference_mode()
-    def incremental_forward_with_context(self, x, prev_context):
+    # @torch.compile(fullgraph=True, mode="max-autotune")
+    def incremental_forward_with_context(self, x, prev_context, uniform_samples):
         """
         x: [B, F]
+        uniform_samples: [B, 3] of torch.rand()
         prev_context: [T_sofar, B, D]. Post-encoder, pre-posEncoding
 
         Returns:
@@ -187,36 +168,30 @@ class HighLowTransformerModel(nn.Module):
             logprobs: [B]
             context: [T_sofar+1, B, D]
         """
-        # with torch.autocast(device_type=self.device.type, dtype=torch.bfloat16):
-        assert x.shape[1] == self.F, f"Expected observation feature dim {self.F}, got {x.shape[1]}"
-        assert prev_context.numel() == 0 or prev_context.shape[2] == self.n_embd, f"Expected context embedding dim {self.n_embd}, got {prev_context.shape[2]}"
-        
-        B, F = x.shape
-        encoded = self.encoder(x).view(1, B, self.n_embd)
-        
-        if prev_context.numel() == 0: # First timestep
-            context = encoded
-        else: # Concatenate with previous context
-            context = torch.cat([prev_context, encoded], dim=0)
-        features = self._incremental_core(context)
-        action_params = self.extract_action_params(features)
-        bid_px = BetaActor.sample(action_params['bid_px_alpha'], action_params['bid_px_beta'], 1, self.M)
-        ask_px = BetaActor.sample(action_params['ask_px_alpha'], action_params['ask_px_beta'], 1, self.M)
-        bid_sz = BetaActor.sample(action_params['bid_sz_alpha'], action_params['bid_sz_beta'], 0, self.S)
-        ask_sz = BetaActor.sample(action_params['ask_sz_alpha'], action_params['ask_sz_beta'], 0, self.S)
+        with torch.autocast(device_type=self.device.type, dtype=torch.bfloat16):
+            assert x.shape[1] == self.F, f"Expected observation feature dim {self.F}, got {x.shape[1]}"
+            assert prev_context.numel() == 0 or prev_context.shape[2] == self.n_embd, f"Expected context embedding dim {self.n_embd}, got {prev_context.shape[2]}"
+            
+            B, _F = x.shape
+            encoded = self.encoder(x).view(1, B, self.n_embd)
+            
+            if prev_context.numel() == 0: # First timestep
+                context = encoded
+            else: # Concatenate with previous context
+                context = torch.cat([prev_context, encoded], dim=0)
+            features = self._incremental_core(context)
+            action_outputs = self.actors.logp_entropy_and_sample(
+                features, uniform_samples)
 
-        logprobs_by_category, entropy_by_category = self._action_logprobs(
-            action_params, torch.stack([bid_px, ask_px, bid_sz, ask_sz], dim=-1))
-        pinfo_preds = {k: self.pinfo_model[k](features) for k in self.pinfo_model}
-        pinfo_preds['private_roles'] = pinfo_preds['private_roles'].reshape(B, self.P, 3)
-        pinfo_preds['settle_price'] = pinfo_preds['settle_price'].reshape(B)
+            pinfo_preds = {k: self.pinfo_model[k](features) for k in self.pinfo_model}
+            pinfo_preds['private_roles'] = pinfo_preds['private_roles'].reshape(B, self.P, 3)
+            pinfo_preds['settle_price'] = pinfo_preds['settle_price'].reshape(B)
         return {
-            'action': torch.stack([bid_px, ask_px, bid_sz, ask_sz], dim=-1), 
-            'action_params': action_params,
-            'logprobs': logprobs_by_category.sum(-1), 
-            'entropy': entropy_by_category.sum(-1),
-            'logprobs_by_category': logprobs_by_category,
-            'entropy_by_category': entropy_by_category,
+            'action': action_outputs['samples'],
+            'action_params': action_outputs['dist_params'],
+            'logprobs': action_outputs['logprobs'].sum(-1),
+            'logprobs_by_type': action_outputs['logprobs'],
+            'entropy_by_type': action_outputs['entropy'],
             'pinfo_preds': pinfo_preds,
             'context': context}
 
@@ -227,7 +202,7 @@ class HighLowTransformerModel(nn.Module):
     def reset_context(self):
         self.context = self.initial_context()
 
-    @torch.compile(mode="max-autotune")
+    # @torch.compile(mode="max-autotune")
     def _incremental_core(self, context: torch.Tensor) -> torch.Tensor:
         """
         Sample actions for a single timestep given augmented context. 
