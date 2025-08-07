@@ -74,7 +74,7 @@ class HighLowImpalaBuffer:
             'actual_private_roles': self.actual_private_roles,
         }
 
-# @torch.compile(mode='max-autotune', fullgraph=True)
+#@#torch.compile(mode='max-autotune', fullgraph=True)
 def vtrace_losses(
     rewards: Float[torch.Tensor, "T B"],
     dones: Bool[torch.Tensor, "T B"],
@@ -284,7 +284,7 @@ class HighLowImpalaTrainer:
             'metrics/learning_rate': current_lr,
         }
 
-    @torch.compile(mode="max-autotune-no-cudagraphs", fullgraph=True)
+    # @#torch.compile(mode="max-autotune-no-cudagraphs", fullgraph=True)
     def _train_step(self, 
                     minibatch_env_indices,
                     obs, logprobs, actions, rewards, dones, 
@@ -298,7 +298,7 @@ class HighLowImpalaTrainer:
         actual_settlement: [B]
         actual_private_roles: [B, num_players]
         """
-        T, _single_obs_shape = obs.shape[0], obs.shape[2:]
+        T, single_obs_shape = obs.shape[0], obs.shape[2:]
         num_envs_per_minibatch = self.args.num_envs // self.args.num_minibatches
 
         # Off-policy network, using surrogate loss 

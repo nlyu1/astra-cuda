@@ -76,7 +76,7 @@ class HighLowTransformerModel(nn.Module):
         # Pre-generate causal masks for different sequence lengths to avoid dynamic allocation
         self.register_buffer(
             'causal_mask', nn.Transformer.generate_square_subsequent_mask(self.T, device=self.device), persistent=False)
-        self.log_entropy_coef = nn.Parameter(torch.zeros(1, device=self.device) - 2) # ~0.13 entropy coef 
+        self.log_entropy_coef = nn.Parameter(torch.zeros(1, device=self.device) - 3) # ~0.13 entropy coef 
 
         self.register_buffer('uniform_buffer', torch.empty(0, device=self.device), persistent=False)
 
@@ -100,7 +100,6 @@ class HighLowTransformerModel(nn.Module):
         self.uniform_buffer.uniform_()
         return self.uniform_buffer
     
-    # @torch.compile(fullgraph=True, mode="max-autotune")
     def _batch_forward(self, x, pinfo_tensor, actions):
         """
         Fully parallel forward pass across all timesteps.
@@ -156,7 +155,7 @@ class HighLowTransformerModel(nn.Module):
         return outputs
 
     @torch.inference_mode()
-    # @torch.compile(fullgraph=True, mode="max-autotune")
+    @torch.compile(fullgraph=True, mode="max-autotune")
     def incremental_forward_with_context(self, x, prev_context, uniform_samples):
         """
         x: [B, F]
@@ -168,24 +167,23 @@ class HighLowTransformerModel(nn.Module):
             logprobs: [B]
             context: [T_sofar+1, B, D]
         """
-        with torch.autocast(device_type=self.device.type, dtype=torch.bfloat16):
-            assert x.shape[1] == self.F, f"Expected observation feature dim {self.F}, got {x.shape[1]}"
-            assert prev_context.numel() == 0 or prev_context.shape[2] == self.n_embd, f"Expected context embedding dim {self.n_embd}, got {prev_context.shape[2]}"
-            
-            B, _F = x.shape
-            encoded = self.encoder(x).view(1, B, self.n_embd)
-            
-            if prev_context.numel() == 0: # First timestep
-                context = encoded
-            else: # Concatenate with previous context
-                context = torch.cat([prev_context, encoded], dim=0)
-            features = self._incremental_core(context)
-            action_outputs = self.actors.logp_entropy_and_sample(
-                features, uniform_samples)
+        assert x.shape[1] == self.F, f"Expected observation feature dim {self.F}, got {x.shape[1]}"
+        assert prev_context.numel() == 0 or prev_context.shape[2] == self.n_embd, f"Expected context embedding dim {self.n_embd}, got {prev_context.shape[2]}"
+        
+        B, _F = x.shape
+        encoded = self.encoder(x).view(1, B, self.n_embd)
+        
+        if prev_context.numel() == 0: # First timestep
+            context = encoded
+        else: # Concatenate with previous context
+            context = torch.cat([prev_context, encoded], dim=0)
+        features = self._incremental_core(context)
+        action_outputs = self.actors.logp_entropy_and_sample(
+            features, uniform_samples)
 
-            pinfo_preds = {k: self.pinfo_model[k](features) for k in self.pinfo_model}
-            pinfo_preds['private_roles'] = pinfo_preds['private_roles'].reshape(B, self.P, 3)
-            pinfo_preds['settle_price'] = pinfo_preds['settle_price'].reshape(B)
+        pinfo_preds = {k: self.pinfo_model[k](features) for k in self.pinfo_model}
+        pinfo_preds['private_roles'] = pinfo_preds['private_roles'].reshape(B, self.P, 3)
+        pinfo_preds['settle_price'] = pinfo_preds['settle_price'].reshape(B)
         return {
             'action': action_outputs['samples'],
             'action_params': action_outputs['dist_params'],
@@ -202,7 +200,6 @@ class HighLowTransformerModel(nn.Module):
     def reset_context(self):
         self.context = self.initial_context()
 
-    # @torch.compile(mode="max-autotune")
     def _incremental_core(self, context: torch.Tensor) -> torch.Tensor:
         """
         Sample actions for a single timestep given augmented context. 

@@ -16,7 +16,6 @@ class BetaODE(nn.Module):
     def __init__(self):
         super().__init__()
 
-    @torch.compile(fullgraph=True, mode="max-autotune-no-cudagraphs")
     def forward(self, t, y):
         """
         Returns the integrand of the Beta integral with sigmoid(t) re-parameterization. 
@@ -50,7 +49,6 @@ class BetaCDF(nn.Module):
         self.t_span = self.t_span * (1 - 2 * eps) + eps # Rescale to [eps, 1 - eps]
         self.beta_ode = BetaODE()
 
-    # @torch.compile(fullgraph=True, mode="default")
     def forward(self, a, b, lower, upper):
         inv_lower, inv_upper = inv_sigmoid(lower), inv_sigmoid(upper)
         inv_range = inv_upper - inv_lower 
@@ -132,7 +130,6 @@ class DiscreteActor(nn.Module):
         self.register_buffer('min_values', min_values)
         self.register_buffer('max_values', max_values)
     
-    # @torch.compile(fullgraph=True, mode="max-autotune")
     def forward(self, x):
         output = self.actor(x)
         m_hidden, kappa_hidden = output[:, :self.n_actors], output[:, self.n_actors:]

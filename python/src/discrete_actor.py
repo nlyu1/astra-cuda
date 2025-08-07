@@ -256,7 +256,7 @@ class DiscreteActor(nn.Module):
         self.register_buffer('min_values', min_values, persistent=False)
         self.register_buffer('rangeP1', max_values - min_values + 1, persistent=False)
     
-    # @torch.compile(fullgraph=True, mode="max-autotune")
+    #@#torch.compile(fullgraph=True, mode="max-autotune")
     def forward(self, x):
         output = self.actor(x) / 2 + 0.5
         center, half_width, epsilon_fullsupport, epsilon_uniform = (
