@@ -168,6 +168,8 @@ CUDA_VISIBLE_DEVICES=0 python vtrace.py --game_setting 0 --learning_rate 1e-4 --
 
 # Modified action type
 
+When switching to non-smooth distributions like the triangle distribution, generally need to lower the LR. **Lowered default lr to `1e-4`**. 
+
 ## Seed run
 
 1. [Small game](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/t3diu0ft)
@@ -182,5 +184,5 @@ CUDA_VISIBLE_DEVICES=0 python vtrace.py --game_setting 0 --target_entropy 3 --nu
 ```
 
 ```
-CUDA_VISIBLE_DEVICES=0 python vtrace.py --game_setting 0 --entropy_coef 0.05 --num_iterations 3010 --iterations_per_checkpoint 3000 --iterations_per_heavy_logging 10 --iterations_per_pool_update 3000 --exp_name dev_run
+CUDA_VISIBLE_DEVICES=0 python vtrace.py --game_setting 0 --entropy_coef 0.05 --num_iterations 3010 --iterations_per_heavy_logging 10 --iterations_per_pool_update 3000 --warmup_steps 750 --exp_name dev_run --learning_rate 1e-4
 ```

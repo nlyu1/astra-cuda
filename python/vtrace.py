@@ -96,7 +96,7 @@ gc.disable()
 pbar = tqdm(range(args.num_iterations))
 done_zeros, done_ones = torch.zeros(args.num_envs, device=device).float(), torch.ones(args.num_envs, device=device).float()
 for iteration in pbar:
-    # Manual GC every 50 iterations
+    # Manual GC every 100 iterations
     if iteration > 0 and iteration % 50 == 0:
         gc.collect() 
     self_play = random.random() < args.self_play_prob

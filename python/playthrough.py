@@ -31,16 +31,16 @@ env = HighLowTrading(game_config)
 models = [HighLowTransformerModel(args, env, verbose=False).to(device) for _ in range(args.players - 1)]
 checkpoint_root = Path("/home/nlyu/Code/astra-cuda/python/checkpoints")
 checkpoint_path = "normaldecencritic_poolnsp4_5000"
-for model in models:
-    model.load_state_dict(
-    torch.load(checkpoint_root / f"{checkpoint_path}.pt", map_location=device, weights_only=False
-        )['model_state_dict'])
-    model.compile()
+# for model in models:
+    # model.load_state_dict(
+    # torch.load(checkpoint_root / f"{checkpoint_path}.pt", map_location=device, weights_only=False
+    #     )['model_state_dict'])
+    # model.compile()
 advisor_model = HighLowTransformerModel(args, env, verbose=False).to(device)
-advisor_model.load_state_dict(
-    torch.load(checkpoint_root / f"{checkpoint_path}.pt", map_location=device, weights_only=False
-        )['model_state_dict'])
-advisor_model.compile()
+# advisor_model.load_state_dict(
+#     torch.load(checkpoint_root / f"{checkpoint_path}.pt", map_location=device, weights_only=False
+#         )['model_state_dict'])
+# advisor_model.compile()
 # %%
 
 random.seed(args.seed)
@@ -58,7 +58,20 @@ obs_buffer = env.new_observation_buffer()
 expand_actions = lambda x: torch.tensor(x).unsqueeze(0).to(device).int()
 
 # %%
-# Removed beta distribution analysis - now using triangle distributions
+# Example of triangle distribution visualization
+from plotting import analyze_triangle_distribution
+
+# Example parameters for a concentrated distribution
+fig = analyze_triangle_distribution(
+    center=0.5,  # Center of distribution
+    half_width=0.1,  # Width of main triangle
+    epsilon_fullsupport=0.2,  # Probability of using full-support distribution
+    epsilon_uniform=0.3,  # Uniform mixing in full-support
+    min_value=1,
+    max_value=30,
+    title="Example Triangle Distribution"
+)
+fig['fig'].show()
 
 # %%
 

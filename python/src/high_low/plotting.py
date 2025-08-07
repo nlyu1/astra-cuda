@@ -8,7 +8,7 @@ import torch
 
 ArrayLike = Union[List, npt.NDArray]
 
-def plot_action_distributions(action_params, max_contract_value, max_contracts_per_trade, title=""):
+def plot_action_distributions_beta(action_params, max_contract_value, max_contracts_per_trade, title=""):
     """
     Creates a 2x2 subplot grid showing the beta distributions for bid/ask prices and sizes.
     
@@ -115,6 +115,143 @@ def plot_action_distributions(action_params, max_contract_value, max_contracts_p
         template="plotly_white",
         title={
             'text': f"{title} (H={entropy_sum:.2f})",
+            'x': 0.5,
+            'xanchor': 'center'
+        }
+    )
+    
+    return fig
+
+def plot_action_distributions(action_params, max_contract_value, max_contracts_per_trade, title=""):
+    """
+    Creates a 2x2 subplot grid showing the triangle distributions for bid/ask prices and sizes.
+    
+    Args:
+        action_params (dict): Dictionary containing distribution parameters
+                             Keys: 'center', 'half_width', 'epsilon_fullsupport', 'epsilon_uniform'
+                             Each value has shape [B, n_actors] where n_actors=4
+        max_contract_value (int): Maximum contract value for price distributions
+        max_contracts_per_trade (int): Maximum contracts per trade for size distributions
+        title (str): Title for the plot
+    
+    Returns:
+        fig: Plotly figure with 2x2 subplot grid
+    """
+    import sys
+    sys.path.append('/home/nlyu/Code/astra-cuda/python/src')
+    from discrete_actor import TriangleActionDistribution
+    
+    # Create 2x2 subplot grid
+    subplot_titles = ["Bid Price", "Ask Price", "Bid Size", "Ask Size"]
+    fig = make_subplots(
+        rows=2, cols=2,
+        subplot_titles=subplot_titles,
+        vertical_spacing=0.12,
+        horizontal_spacing=0.1)
+    
+    # Define parameters for each subplot
+    subplots_config = [
+        (0, 1, max_contract_value, 1, 1),  # (actor_idx, min_val, max_val, row, col)
+        (1, 1, max_contract_value, 1, 2),
+        (2, 0, max_contracts_per_trade, 2, 1),
+        (3, 0, max_contracts_per_trade, 2, 2)
+    ]
+    
+    entropy_sum = 0
+    for actor_idx, min_val, max_val, row, col in subplots_config:
+        # Extract parameters for this actor
+        center = action_params['center'][0, actor_idx].item() if torch.is_tensor(action_params['center']) else action_params['center'][actor_idx]
+        half_width = action_params['half_width'][0, actor_idx].item() if torch.is_tensor(action_params['half_width']) else action_params['half_width'][actor_idx]
+        epsilon_fs = action_params['epsilon_fullsupport'][0, actor_idx].item() if torch.is_tensor(action_params['epsilon_fullsupport']) else action_params['epsilon_fullsupport'][actor_idx]
+        epsilon_uniform = action_params['epsilon_uniform'][0, actor_idx].item() if torch.is_tensor(action_params['epsilon_uniform']) else action_params['epsilon_uniform'][actor_idx]
+        
+        # Create distribution
+        center_t = torch.tensor([center], dtype=torch.float32)
+        half_width_t = torch.tensor([half_width], dtype=torch.float32)
+        epsilon_fs_t = torch.tensor([epsilon_fs], dtype=torch.float32)
+        epsilon_uniform_t = torch.tensor([epsilon_uniform], dtype=torch.float32)
+        
+        dist = TriangleActionDistribution(center_t, half_width_t, epsilon_fs_t, epsilon_uniform_t)
+        
+        # Create continuous PDF
+        x_continuous = torch.linspace(0, 1, 1000)
+        y_continuous = []
+        for x in x_continuous:
+            y_continuous.append(dist.log_prob(x.unsqueeze(0)).exp().item())
+        y_continuous = np.array(y_continuous)
+        
+        # Transform to actual value range
+        rangeP1 = max_val - min_val + 1
+        x_continuous_scaled = x_continuous.numpy() * rangeP1 + (min_val - 0.5)
+        
+        # Calculate discrete probabilities
+        discrete_values = np.arange(min_val, max_val + 1)
+        discrete_probs = []
+        
+        for val in discrete_values:
+            # Calculate interval bounds
+            unit_lb = ((val - 0.5) + 0.5 - min_val) / rangeP1
+            unit_ub = ((val + 0.5) + 0.5 - min_val) / rangeP1
+            
+            # Get log probability of interval and convert to probability
+            logprob = dist.logp_interval(torch.tensor([unit_lb]), torch.tensor([unit_ub])).item()
+            prob = np.exp(logprob)
+            discrete_probs.append(prob)
+        
+        # Calculate entropy
+        entropy = dist.entropy().item()
+        entropy_sum += entropy
+        
+        # Add continuous PDF line
+        fig.add_trace(
+            go.Scatter(
+                x=x_continuous_scaled,
+                y=y_continuous / rangeP1,
+                mode='lines',
+                name='Triangle PDF',
+                line=dict(color='blue', width=2),
+                showlegend=False
+            ),
+            row=row, col=col
+        )
+        
+        # Add discrete probability bars
+        fig.add_trace(
+            go.Bar(
+                x=discrete_values,
+                y=discrete_probs,
+                name='Discrete Prob',
+                marker=dict(color='lightblue', opacity=0.7),
+                width=0.8,
+                showlegend=False
+            ),
+            row=row, col=col
+        )
+        
+        # Update subplot title with parameters
+        subplot_idx = (row - 1) * 2 + (col - 1)
+        fig.layout.annotations[subplot_idx].update(
+            text=f'{subplot_titles[subplot_idx]}<br>(c={center:.3f}, hw={half_width:.3f}, εfs={epsilon_fs:.3f}, εu={epsilon_uniform:.3f}, H={entropy:.2f})'
+        )
+        
+        # Update axes for this subplot
+        fig.update_xaxes(
+            range=[min_val - 1, max_val + 1],
+            dtick=1 if (max_val - min_val) <= 10 else None,
+            row=row, col=col
+        )
+        fig.update_yaxes(
+            row=row, col=col
+        )
+    
+    # Update overall layout
+    fig.update_layout(
+        height=600,
+        width=1200,
+        showlegend=False,
+        template="plotly_white",
+        title={
+            'text': f"{title} (Total H={entropy_sum:.2f})",
             'x': 0.5,
             'xanchor': 'center'
         }

@@ -17,7 +17,11 @@ The approach maps continuous distributions to discrete actions via:
 """
 
 import torch 
+import math 
 import torch.nn as nn 
+
+def inv_sigmoid(x):
+    return math.log(x) - math.log(1 - x)
 
 class TriangleVariableWidthDistribution:
     """
@@ -198,7 +202,7 @@ class TriangleActionDistribution:
             self.support.log_prob(x) + torch.log(self.epsilon_fullsupport))
     
     def logp_interval(self, lower_bound, upper_bound):
-        return torch.log(self.cdf(upper_bound) - self.cdf(lower_bound))
+        return torch.log(self.cdf(upper_bound) - self.cdf(lower_bound)).clamp(min=-100.)
     
     def cdf(self, x):
         return (
@@ -235,35 +239,52 @@ class DiscreteActor(nn.Module):
     1. Sampling continuous values in [0,1]
     2. Scaling to [min_values, max_values] and rounding
     3. Computing log-probs over discrete intervals
+
+    **Important!**
+    Ideally pair with learning rate warmup and smaller LR!!, else it's very easy to observe:
+    1. Models output bad actions which receive negative gradients. 
+    2. Gradients quickly push epsilon_fullsupport and epsilon_uniform to 1, which makes the model output uniform actions. 
+    3. Value network receives totally useless signals, and model collapses. 
     """
     def __init__(self, n_hidden, n_actors, 
-        min_values: torch.Tensor, max_values: torch.Tensor, eps=1e-4):
+        min_values: torch.Tensor, max_values: torch.Tensor, 
+        eps=1e-4, eps_logic_bias=6., eps_logic_inv_scale=25.):
         """
         n_hidden: Input feature dimension
         n_actors: Number of parallel action distributions 
         min_values, max_values: Inclusive bounds per actor, shape [n_actors]
-        eps: float. Prevents rounded result exceeding [min_values, max_values]
+        eps: float. Prevents rounded result exceeding [min_values, max_values]. Introduces small bias to the rounded result. 
+        eps_logic_bias: float. Bias for epsilon_fullsupport and epsilon_uniform. 
+        eps_logic_inv_scale: float. Inverse scale for epsilon_fullsupport and epsilon_uniform. 
         """
         super().__init__()
         self.n_hidden = n_hidden
         self.n_actors = n_actors
-        self.actor = nn.Sequential(
-            nn.Linear(n_hidden, n_actors * 4), nn.Softsign()) # Use softsign since triangle distribution is algebraic
+        self.actor = nn.Linear(n_hidden, n_actors * 4)
         assert min_values.shape == max_values.shape, f"min_values and max_values must have the same shape, but got {min_values.shape} and {max_values.shape}"
         assert min_values.ndim == 1, f"min_values and max_values must be 1D, but got {min_values.ndim} and {max_values.ndim}"
         assert min_values.shape[0] == n_actors, f"min_values and max_values must have length {n_actors}, but got {min_values.shape[0]} and {max_values.shape[0]}"
         self.eps = eps 
         self.register_buffer('min_values', min_values, persistent=False)
         self.register_buffer('rangeP1', max_values - min_values + 1, persistent=False)
-    
+        self.eps_logic_bias = eps_logic_bias
+        self.eps_logic_inv_scale = eps_logic_inv_scale
+        
     #@#torch.compile(fullgraph=True, mode="max-autotune")
     def forward(self, x):
-        output = self.actor(x) / 2 + 0.5
+        output = self.actor(x)
         center, half_width, epsilon_fullsupport, epsilon_uniform = (
             output[:, :self.n_actors], 
-            output[:, self.n_actors:2 * self.n_actors] * 0.5,  # half-width cannot be more than 1/2
+            output[:, self.n_actors:2 * self.n_actors],  
             output[:, 2 * self.n_actors:3 * self.n_actors],
             output[:, 3 * self.n_actors:])
+        center = torch.sigmoid(center)
+        half_width = torch.sigmoid(half_width) * 0.5
+        # Very important! Systemically bias weights to supporting mixtures at the beginning, and make it learn slower. 
+        # Helps value-net learn more reliably. 
+        # Cannot replace with initializing with different initializations (!) since gradient calculations are different (biases are easy to change)
+        epsilon_fullsupport = torch.sigmoid(epsilon_fullsupport / self.eps_logic_inv_scale - self.eps_logic_bias)
+        epsilon_uniform = torch.sigmoid(epsilon_uniform / self.eps_logic_inv_scale - self.eps_logic_bias)
         return center, half_width, epsilon_fullsupport, epsilon_uniform
     
     def _integer_samples_from_unit_samples(self, unit_samples):
@@ -367,7 +388,7 @@ if __name__ == '__main__':
 
     dist = TriangleActionDistribution(center, half_width, epsilon_fullsupport, epsilon_uniform)
     unit_samples = dist.sample(uniform_samples) # between [0, 1]
-    integer_samples = (unit_samples * rangeP1 + min_values - 0.5).round().int()
+    integer_samples = (unit_samples * rangeP1 + min_values - 0.5).round().int().clamp(min=min_values, max=max_values)
     unit_samples_ub = ((integer_samples + 0.5) + 0.5 - min_values) / rangeP1
     unit_samples_lb = ((integer_samples - 0.5) + 0.5 - min_values) / rangeP1
 
