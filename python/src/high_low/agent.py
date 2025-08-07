@@ -75,8 +75,7 @@ class HighLowTransformerModel(nn.Module):
         
         # Pre-generate causal masks for different sequence lengths to avoid dynamic allocation
         self.register_buffer(
-            'causal_mask', nn.Transformer.generate_square_subsequent_mask(self.T, device=self.device), persistent=False)
-        self.log_entropy_coef = nn.Parameter(torch.zeros(1, device=self.device) - 3) # ~0.13 entropy coef 
+            'causal_mask', nn.Transformer.generate_square_subsequent_mask(self.T, device=self.device), persistent=False) 
 
         self.register_buffer('uniform_buffer', torch.empty(0, device=self.device), persistent=False)
         self.context = self.initial_context()

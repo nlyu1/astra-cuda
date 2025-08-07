@@ -58,9 +58,7 @@ obs_buffer = env.new_observation_buffer()
 expand_actions = lambda x: torch.tensor(x).unsqueeze(0).to(device).int()
 
 # %%
-from plotting import analyze_discrete_alpha_beta 
-
-analyze_discrete_alpha_beta(1, 1, 1, 30, m=0.99, kappa=1000)['fig'].show()
+# Removed beta distribution analysis - now using triangle distributions
 
 # %%
 

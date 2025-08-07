@@ -31,8 +31,8 @@ class Args:
     update_epochs: int = 1
     """the K epochs to update the policy.
     `num_minibatches * update_epochs` trades between sampling efficiency and training stability."""
-    target_entropy: float = -2.
-    """target entropy for soft-entropy regularization, measured in natural units. Entropy bonus is not observed above this value."""
+    entropy_coef: float = 0.05
+    """coefficient for entropy regularization"""
     vf_coef: float = 0.5
     """coefficient of the value function"""
     psettlement_coef: float = 0.0

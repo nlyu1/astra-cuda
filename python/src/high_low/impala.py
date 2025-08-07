@@ -185,8 +185,7 @@ class HighLowImpalaTrainer:
 
         self.logging_size = self.args.update_epochs * self.args.num_minibatches
         self.explained_vars, self.value_losses, self.pg_losses, self.entropy, self.approx_kls, \
-            self.pred_settlement_losses, self.pred_private_roles_losses, self.entropy_coefs = (
-            torch.zeros((self.logging_size,), device=device),
+            self.pred_settlement_losses, self.pred_private_roles_losses = (
             torch.zeros((self.logging_size,), device=device),
             torch.zeros((self.logging_size,), device=device),
             torch.zeros((self.logging_size,), device=device),
@@ -257,7 +256,6 @@ class HighLowImpalaTrainer:
                     self.approx_kls[logging_counter] = step_results['approx_kls']
                     self.pred_settlement_losses[logging_counter] = step_results['pred_settlement_loss']
                     self.pred_private_roles_losses[logging_counter] = step_results['pred_private_roles_loss']
-                    self.entropy_coefs[logging_counter] = step_results['entropy_coef']
                     logging_counter += 1
 
         # Batch all tensor means to reduce GPU-CPU transfers
@@ -268,8 +266,7 @@ class HighLowImpalaTrainer:
             self.entropy.mean(),
             self.approx_kls.mean(),
             self.pred_settlement_losses.mean(),
-            self.pred_private_roles_losses.mean(),
-            self.entropy_coefs.mean()
+            self.pred_private_roles_losses.mean()
         ]).detach().cpu().numpy()
         
         return {
@@ -280,7 +277,7 @@ class HighLowImpalaTrainer:
             'metrics/approx_kls': float(metrics_cpu[4]),
             'metrics/pred_settlement_losses': float(metrics_cpu[5]),
             'metrics/pred_private_roles_losses': float(metrics_cpu[6]),
-            'metrics/entropy_coefs': float(metrics_cpu[7]),
+            'metrics/entropy_coef': self.args.entropy_coef,
             'metrics/learning_rate': current_lr,
         }
 
@@ -345,15 +342,11 @@ class HighLowImpalaTrainer:
             gamma=self.args.gamma,
             gae_lambda=self.args.gae_lambda)
 
-        entropy_coef = self.agent.log_entropy_coef.exp()
         entropy_value = entropy.mean()
-        entropy_loss = -entropy_coef.detach() * entropy_value
-        # Prove firm support to let entropy go above dictated value, and very soft incentive for entropy_coef to decrease
-        entropy_coef_loss = - entropy_coef * nn.functional.leaky_relu(
-            self.args.target_entropy - entropy_value, negative_slope=0.01).detach()
+        entropy_loss = -self.args.entropy_coef * entropy_value
 
         loss = (vtrace_results['policy_loss'] 
-                + entropy_loss + entropy_coef_loss
+                + entropy_loss
                 + vtrace_results['value_loss'] * self.args.vf_coef
                 + pred_settlement_loss * self.args.psettlement_coef
                 + pred_private_roles_loss * self.args.proles_coef)
@@ -367,7 +360,6 @@ class HighLowImpalaTrainer:
             'approx_kls': approx_kl,
             'pred_settlement_loss': pred_settlement_loss,
             'pred_private_roles_loss': pred_private_roles_loss,
-            'entropy_coef': entropy_coef.detach(),
         }
 
     def save_checkpoint(self, step):

@@ -117,6 +117,7 @@ for iteration in pbar:
 
     ### Rollout ### 
     settlement_preds, private_role_preds = [], []
+    eps_uniform, eps_support, width = [], [], []
     buffer.pinfo_tensor = env.pinfo_tensor()
     for step in range(args.num_steps):
         torch.compiler.cudagraph_mark_step_begin() # Mark iterations to enable cuda-graph in compilation
@@ -149,6 +150,10 @@ for iteration in pbar:
         settlement_preds.append(forward_results['pinfo_preds']['settle_price'].clone())
         private_role_preds.append(forward_results['pinfo_preds']['private_roles'].argmax(dim=-1))
 
+        eps_uniform.append(forward_results['action_params']['epsilon_uniform'].mean().item())
+        eps_support.append(forward_results['action_params']['epsilon_fullsupport'].mean().item())
+        width.append(forward_results['action_params']['half_width'].mean().item())
+
         buffer.update({
             # Observations are implicitly updated above. 
             'actions': action,
@@ -169,6 +174,12 @@ for iteration in pbar:
             env.step(npc_actions)
 
         if env.terminal():
+            wandb.log({
+                'debug/epsilon_uniform': np.mean(eps_uniform),
+                'debug/epsilon_support': np.mean(eps_support),
+                'debug/width': np.mean(width),
+            }, step=global_step)
+
             # This is the cumulative rewards, for logging. 
             env.fill_returns(returns_buffer)
             env.fill_rewards_since_last_action(buffer.rewards[step], player_offset)
