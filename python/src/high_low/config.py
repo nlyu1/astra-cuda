@@ -68,8 +68,8 @@ class Args:
     """Only start updating the pool after this many iterations."""
     self_play_prob: float = 0.0
     """Probability of self-playing (having fixed copies of self being opponent instead of pool-selected opponents)"""
-    checkpoint_name: str = None 
-    """Name of the checkpoint to load (e.g. 'name' for 'checkpoints/name.pt'). If None, we start from scratch."""
+    checkpoint_name: str = ""
+    """Name of the checkpoint to load (e.g. 'name' for 'checkpoints/name.pt'). If empty, we start from scratch."""
 
     #### Logging specification ####
     iterations_per_checkpoint: int = 3000

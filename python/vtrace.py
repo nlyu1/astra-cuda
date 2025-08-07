@@ -46,15 +46,15 @@ torch.manual_seed(args.seed);
 
 device = torch.device(f'cuda:{args.device_id}')
 initial_agents = {}
-if args.checkpoint_name is not None:
+if args.checkpoint_name != "":
     path = Path("./checkpoints") / (args.checkpoint_name + ".pt")
     weights = torch.load(path, map_location=device, weights_only=False)['model_state_dict']
     print(f"Loading checkpoint {args.checkpoint_name} from {path}")
 
-initial_agent_name = "Random" if args.checkpoint_name is None else f"{args.checkpoint_name}"
+initial_agent_name = "Random" if args.checkpoint_name == "" else f"{args.checkpoint_name}"
 initial_agents[initial_agent_name] = HighLowTransformerModel(
     args, env, verbose=False).to(device)
-if args.checkpoint_name is not None:   
+if args.checkpoint_name != "":   
     initial_agents[initial_agent_name].load_state_dict(weights, strict=False)
 
 num_features = env.num_features()
@@ -63,7 +63,7 @@ pool = Arena(env, initial_agents, device)
 buffer = HighLowImpalaBuffer(args, num_features, device)
 
 local_agent = HighLowTransformerModel(args, env).to(device)
-if args.checkpoint_name is not None:
+if args.checkpoint_name != "":
     local_agent.load_state_dict(weights, strict=False)
 trainer = HighLowImpalaTrainer(
     args, local_agent, 

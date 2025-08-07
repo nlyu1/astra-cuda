@@ -79,6 +79,7 @@ class HighLowTransformerModel(nn.Module):
         self.log_entropy_coef = nn.Parameter(torch.zeros(1, device=self.device) - 3) # ~0.13 entropy coef 
 
         self.register_buffer('uniform_buffer', torch.empty(0, device=self.device), persistent=False)
+        self.context = self.initial_context()
 
         if verbose:
             B, F = env.observation_shape()
@@ -155,7 +156,7 @@ class HighLowTransformerModel(nn.Module):
         return outputs
 
     @torch.inference_mode()
-    @torch.compile(fullgraph=True, mode="max-autotune")
+    @torch.compile(fullgraph=True, mode="max-autotune-no-cudagraphs")
     def incremental_forward_with_context(self, x, prev_context, uniform_samples):
         """
         x: [B, F]
