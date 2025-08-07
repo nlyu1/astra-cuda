@@ -180,9 +180,11 @@ When switching to non-smooth distributions like the triangle distribution, gener
 ```
 CUDA_VISIBLE_DEVICES=1 python vtrace.py --game_setting 1 --target_entropy 5 --num_iterations 3010 --iterations_per_pool_update 3000 --iterations_per_checkpoint 3000 --exp_name small_seedpool
 
-CUDA_VISIBLE_DEVICES=0 python vtrace.py --game_setting 0 --target_entropy 3 --num_iterations 3010 --iterations_per_checkpoint 3000 --iterations_per_pool_update 3000 --exp_name normal_seedpool
+CUDA_VISIBLE_DEVICES=0 python vtrace.py --game_setting 0 --entropy_coef 0.03 --num_iterations 3010 --iterations_per_checkpoint 3000 --iterations_per_pool_update 3000 --exp_name normal_seedpool --learning_rate 1e-4
+
+CUDA_VISIBLE_DEVICES=1 python vtrace.py --game_setting 0 --entropy_coef 0.03 --num_iterations 3010 --iterations_per_checkpoint 3000 --iterations_per_pool_update 3000 --exp_name normal_seedpool_ --learning_rate 1e-4
 ```
 
 ```
-CUDA_VISIBLE_DEVICES=0 python vtrace.py --game_setting 0 --entropy_coef 0.05 --num_iterations 3010 --iterations_per_heavy_logging 10 --iterations_per_pool_update 3000 --warmup_steps 750 --exp_name dev_run --learning_rate 1e-4
+CUDA_VISIBLE_DEVICES=1 python vtrace.py --game_setting 0 --entropy_coef 0.1 --num_iterations 3010 --iterations_per_heavy_logging 10 --iterations_per_pool_update 3000 --exp_name dev_run_ --warmup_steps 0
 ```

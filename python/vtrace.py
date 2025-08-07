@@ -95,6 +95,12 @@ gc.disable()
 
 pbar = tqdm(range(args.num_iterations))
 done_zeros, done_ones = torch.zeros(args.num_envs, device=device).float(), torch.ones(args.num_envs, device=device).float()
+
+# Pre-allocate GPU buffers for distribution parameters (outside loop for reuse)
+eps_uniform_buffer = torch.zeros(args.num_steps, device=device)
+eps_support_buffer = torch.zeros(args.num_steps, device=device)
+width_buffer = torch.zeros(args.num_steps, device=device)
+
 for iteration in pbar:
     # Manual GC every 100 iterations
     if iteration > 0 and iteration % 50 == 0:
@@ -117,7 +123,6 @@ for iteration in pbar:
 
     ### Rollout ### 
     settlement_preds, private_role_preds = [], []
-    eps_uniform, eps_support, width = [], [], []
     buffer.pinfo_tensor = env.pinfo_tensor()
     for step in range(args.num_steps):
         torch.compiler.cudagraph_mark_step_begin() # Mark iterations to enable cuda-graph in compilation
@@ -150,9 +155,10 @@ for iteration in pbar:
         settlement_preds.append(forward_results['pinfo_preds']['settle_price'].clone())
         private_role_preds.append(forward_results['pinfo_preds']['private_roles'].argmax(dim=-1))
 
-        eps_uniform.append(forward_results['action_params']['epsilon_uniform'].mean().item())
-        eps_support.append(forward_results['action_params']['epsilon_fullsupport'].mean().item())
-        width.append(forward_results['action_params']['half_width'].mean().item())
+        # Store distribution parameters in GPU buffers (no CPU transfer)
+        eps_uniform_buffer[step] = forward_results['action_params']['epsilon_uniform'].mean()
+        eps_support_buffer[step] = forward_results['action_params']['epsilon_fullsupport'].mean()
+        width_buffer[step] = forward_results['action_params']['half_width'].mean()
 
         buffer.update({
             # Observations are implicitly updated above. 
@@ -174,12 +180,6 @@ for iteration in pbar:
             env.step(npc_actions)
 
         if env.terminal():
-            wandb.log({
-                'debug/epsilon_uniform': np.mean(eps_uniform),
-                'debug/epsilon_support': np.mean(eps_support),
-                'debug/width': np.mean(width),
-            }, step=global_step)
-
             # This is the cumulative rewards, for logging. 
             env.fill_returns(returns_buffer)
             env.fill_rewards_since_last_action(buffer.rewards[step], player_offset)
@@ -200,7 +200,12 @@ for iteration in pbar:
                     'offset': player_offset,
                     'settlement_preds': settlement_preds_stacked,
                     'private_role_preds': torch.stack(private_role_preds, dim=0),
-                    'infos': env_info | env_pinfo_targets}
+                    'infos': env_info | env_pinfo_targets,
+                    'dist_params': {
+                        'epsilon_uniform': eps_uniform_buffer,
+                        'epsilon_support': eps_support_buffer,
+                        'width': width_buffer
+                    }}
                 # Only incur heavy logging when we're in seat 0 and after a certain interval 
                 heavy_logging_update = (
                     logger.counter - logger.last_heavy_counter > args.iterations_per_heavy_logging 

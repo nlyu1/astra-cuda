@@ -29,6 +29,7 @@ class HighLowLogger:
         returns = logging_inputs['returns'] # from env.fill_returns(), [N, P]
         player_rewards = returns[:, offset].cpu()
         infos = logging_inputs['infos'] # from env.expose_info()
+        dist_params = logging_inputs['dist_params'] # Distribution parameters from agent
 
         # Obtain the status of the current agent 
         info_roles = infos['info_roles'][:, offset].cpu()
@@ -104,6 +105,11 @@ class HighLowLogger:
             idx = int(pivot * (settlement_preds.shape[0] - 1))
             log_data[f'settlement_pred_diff/{idx+1}'] = settlement_diff[idx].mean().item()
             log_data[f'acc/non_self_acc{idx+1}'] = non_self_acc[idx].mean().item()
+        
+        # Log distribution parameters (only transfer to CPU here)
+        log_data['debug/epsilon_uniform'] = dist_params['epsilon_uniform'].mean().item()
+        log_data['debug/epsilon_support'] = dist_params['epsilon_support'].mean().item()
+        log_data['debug/width'] = dist_params['width'].mean().item()
 
         if heavy_updates: 
             customer_size_mask = (customer_size_sum == 0)

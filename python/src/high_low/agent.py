@@ -8,7 +8,8 @@ import torch.nn.functional as F
 import sys 
 sys.path.append('../')
 from model_components import ResidualBlock, LearnedPositionalEncoding
-from discrete_actor import DiscreteActor
+# from discrete_actor import DiscreteActor
+from discrete_actor_parabolic import DiscreteActor
 
 class HighLowTransformerModel(nn.Module):
     """
@@ -155,7 +156,7 @@ class HighLowTransformerModel(nn.Module):
         return outputs
 
     @torch.inference_mode()
-    @torch.compile(fullgraph=True, mode="max-autotune-no-cudagraphs")
+    # @torch.compile(fullgraph=True, mode="max-autotune-no-cudagraphs")
     def incremental_forward_with_context(self, x, prev_context, uniform_samples):
         """
         x: [B, F]
