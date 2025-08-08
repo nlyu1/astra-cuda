@@ -281,7 +281,7 @@ class HighLowImpalaTrainer:
             'metrics/learning_rate': current_lr,
         }
 
-    @torch.compile(mode="max-autotune-no-cudagraphs", fullgraph=True)
+    # @torch.compile(mode="max-autotune-no-cudagraphs", fullgraph=True)
     def _train_step(self, 
                     minibatch_env_indices,
                     obs, logprobs, actions, rewards, dones, 

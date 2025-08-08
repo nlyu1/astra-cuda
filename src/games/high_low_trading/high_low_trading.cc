@@ -56,7 +56,7 @@ HighLowTradingState::HighLowTradingState(std::shared_ptr<const Game> game)
       device_id_(static_cast<const HighLowTradingGame*>(game.get())->GetDeviceId()),
       market_(
         /*num_markets=*/static_cast<const HighLowTradingGame*>(game.get())->GetNumMarkets(), 
-        /*max_price_levels=*/static_cast<const HighLowTradingGame*>(game.get())->GetMaxContractValue(),
+        /*max_price_levels=*/static_cast<const HighLowTradingGame*>(game.get())->GetMaxContractValue() + 1,  // +1 to support prices 1 to max_contract_value inclusive
         /*max_active_orders_per_market=*/static_cast<const HighLowTradingGame*>(game.get())->GetNumPlayers() * 
                                          static_cast<const HighLowTradingGame*>(game.get())->GetStepsPerPlayer() * 2,
         /*max_active_fills_per_market=*/std::min(
@@ -304,7 +304,7 @@ void HighLowTradingState::ApplyPlayerTrading(torch::Tensor move) {
   immediate_rewards_.add_(cash_diff); // Add immediate cash value (in-place)
 
   // Highly discourage self trades (crossing bid and asks in general), even if bid and ask sizes are 0
-  auto self_trade_penalty = (torch::min(bid_sizes, ask_sizes) + 1) * torch::clamp_min(bid_prices - ask_prices, 0) * GetGame()->GetMaxContractValue();
+  auto self_trade_penalty = (torch::min(bid_sizes, ask_sizes) + 1) * torch::clamp_min(bid_prices - ask_prices + 1, 0) * GetGame()->GetMaxContractValue();
   immediate_rewards_.index({torch::indexing::Slice(), player}).add_(-self_trade_penalty.to(immediate_rewards_.dtype()));
 
   // Highly discourage cheap signaling

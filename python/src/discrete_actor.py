@@ -16,214 +16,77 @@ The approach maps continuous distributions to discrete actions via:
 3. Compute log probabilities over discrete intervals
 """
 
-import torch 
-import math 
+# %%
+
 import torch.nn as nn 
+import torch, math
+from torch import Tensor
+from typing import Tuple
 
-def inv_sigmoid(x):
-    return math.log(x) - math.log(1 - x)
+_TWO_PI = 2.0 * math.pi
+_LOG_SQRT_2PI = 0.5 * math.log(_TWO_PI)
 
-class TriangleVariableWidthDistribution:
+def _log_normal_pdf_prec(x: Tensor, loc: Tensor, prec: Tensor) -> Tensor:
+    z = (x - loc) * prec
+    return -0.5 * z.square() - _LOG_SQRT_2PI + torch.log(prec)
+
+def _log_ndtr(z: Tensor) -> Tensor:
+    return torch.special.log_ndtr(z)
+
+def _logsubexp(a: Tensor, b: Tensor) -> Tensor:
     """
-    Triangular distribution with adjustable center and width.
-    
-    Forms an isosceles triangle with:
-    - Peak at 'center' with height 1/half_width
-    - Support on [center-half_width, center+half_width]
-    - Linear slopes from edges to peak
-    - Area normalized to 1
-    
-    Used as the main concentrated distribution for confident actions.
+    Stable log(exp(a) - exp(b))   with   a ≥ b.
+    (Analogous to torch.logaddexp for the *sum* case.)
     """
-    def __init__(self, center, half_width):
-        """
-        center: [batch_size] in (0, 1)
-        half_width: [batch_size] in (0, 0.5)
-        """
-        # Removed assertions for torch.compile compatibility
-        # Use torch.clamp instead to ensure valid ranges
-        center = torch.clamp(center, min=0.0, max=1.0)
-        half_width = torch.clamp(half_width, min=0.0, max=0.5)
-        self.center = center 
-        self.half_width = torch.clamp(half_width, max=torch.min(center, 1 - center))
-        self.min_val = self.center - self.half_width
-        self.max_val = self.center + self.half_width
+    return a + torch.log1p(-torch.exp(b - a))
 
-    def log_prob(self, x):
-        """
-        x: [batch_size] in (0, 1)
-        """
-        # Removed assertion for torch.compile compatibility
-        x = torch.clamp(x, min=0.0, max=1.0)
-        # since half_width * max_height = 1, we have slope = max_height / half_width = 1 / half_width^2
-        prob = torch.where(
-            x < self.min_val, torch.zeros_like(x), torch.where(
-                x > self.max_val, torch.zeros_like(x), 
-                torch.where(
-                    x < self.center, (x - self.min_val) * self.half_width.pow(-2),
-                    -(x - self.center) * self.half_width.pow(-2) + 1 / self.half_width
-                )))
-        return torch.log(prob).clamp(min=-100.)
-    
-    def sample(self, uniform_samples):
-        return torch.where(
-            uniform_samples < 0.5, 
-            self.min_val + self.half_width * (2 * uniform_samples).sqrt(),
-            self.max_val - self.half_width * (2 * (1 - uniform_samples)).sqrt())
-    
-    def cdf(self, x):
-        cdf_value = torch.where(
-            x < self.min_val, torch.zeros_like(x), torch.where(
-                x > self.max_val, torch.ones_like(x), 
-                torch.where(
-                    x < self.center, 
-                    ((x - self.min_val) / self.half_width).pow(2) * 0.5,
-                    1. - ((self.max_val - x) / self.half_width).pow(2) * 0.5,
-                )))
-        return cdf_value
-
-    def entropy(self):
-        return 0.5 + torch.log(self.half_width)
-    
-class TriangleFullSupportDistribution:
+class GaussianActionDistribution:
     """
-    Triangular distribution covering the full [0,1] support.
-    
-    Properties:
-    - Peak at 'center' with height 2
-    - Support always [0, 1] regardless of center
-    - Piecewise linear: rises from 0 to peak, falls from peak to 1
-    - Enables exploration across entire action space
+    Truncated Normal N(center, σ²) on the open interval (0, 1),
+    **constructed with precision** (prec = 1 / std).
     """
-    def __init__(self, center):
-        self.center = center 
-        self.entropy_value = 0.5 - torch.log(2 * torch.ones_like(center))
 
-    def log_prob(self, x):
-        # Removed assertion for torch.compile compatibility
-        x = torch.clamp(x, min=0.0, max=1.0)
-        prob = torch.where(
-            x < self.center, 
-            2. / self.center * x, 
-            2. / (self.center - 1) * (x - self.center) + 2)
-        return torch.log(prob).clamp(min=-100.)
-    
-    def cdf(self, x):
-        return torch.where(
-            x < self.center, 
-            x.pow(2) / self.center,
-            1. - (1. - x).pow(2) / (1. - self.center))
-    
-    def entropy(self):
-        return self.entropy_value
-    
-    def sample(self, uniform_samples):
-        return torch.where(
-            uniform_samples < self.center, 
-            (self.center * uniform_samples).sqrt(),
-            1 - ((1 - self.center) * (1 - uniform_samples)).sqrt())
-    
-def binary_entropy(x):
-    """Binary entropy H(p) = -p*log(p) - (1-p)*log(1-p)"""
-    return -torch.xlogy(x, x) - torch.xlogy(1 - x, 1 - x)
+    def __init__(self, center: Tensor, precision: Tensor):
+        self.center = center
+        self.prec   = precision           # 1 / σ
+        alpha = (0.0 - center) * precision
+        beta  = (1.0 - center) * precision
+        self._log_F_alpha = _log_ndtr(alpha)
+        self._log_F_beta  = _log_ndtr(beta)
+        # Total weight contained within the truncated distribution 
+        self._log_Z = _logsubexp(self._log_F_beta, self._log_F_alpha)
 
-class TrapezoidFullSupportDistribution:
-    """
-    Mixture of triangular and uniform distributions.
-    
-    With probability uniform_epsilon: sample uniformly from [0,1]
-    With probability 1-uniform_epsilon: sample from TriangleFullSupport
-    
-    Creates a trapezoid shape that interpolates between triangle and uniform.
-    """
-    def __init__(self, center, uniform_epsilon):
-        """
-        center: Peak location for triangle component
-        uniform_epsilon: Mixing weight for uniform component
-        """
-        self.triangle = TriangleFullSupportDistribution(center)
-        self.uniform_epsilon = uniform_epsilon
+        # Plain CDF values (needed only for sampling)
+        self._F_alpha = torch.exp(self._log_F_alpha)
+        self._F_beta  = torch.exp(self._log_F_beta)
 
-    def log_prob(self, x):
-        return torch.logaddexp(
-            self.triangle.log_prob(x) + torch.log1p(-self.uniform_epsilon),
-            torch.log(self.uniform_epsilon))
-    
-    def cdf(self, x):
-        return self.uniform_epsilon * x + (1 - self.uniform_epsilon) * self.triangle.cdf(x)
-    
-    def sample(self, uniform_samples):
-        return torch.where(
-            uniform_samples[..., 0] < self.uniform_epsilon,
-            uniform_samples[..., 1],
-            self.triangle.sample(uniform_samples[..., 1]))
-    
-    def entropy(self):
-        """
-        Returns an estimate of entropy as mixture of entropy + 0.5 * binary entropy of epsilon-Bernoulli
-        """
-        return ((1 - self.uniform_epsilon) * self.triangle.entropy()
-            + 0.5 * binary_entropy(self.uniform_epsilon))
-    
-class TriangleActionDistribution:
-    """
-    Hierarchical mixture model for action sampling.
-    
-    Two-level mixture:
-    1. With probability (1-epsilon_fullsupport): sample from concentrated TriangleVariableWidth
-    2. With probability epsilon_fullsupport: sample from TrapezoidFullSupport
-    
-    The TrapezoidFullSupport itself mixes triangle and uniform based on epsilon_uniform.
-    This creates a flexible distribution that can range from highly concentrated to uniform.
-    """
-    def __init__(self, center, half_width, epsilon_fullsupport, epsilon_uniform):
-        """
-        center: Mode of distributions, shape [...] in (0, 1)
-        half_width: Width of concentrated distribution, shape [...] in (0, 0.5)
-        epsilon_fullsupport: Prob of using full-support distribution, shape [...] in (0, 1)
-        epsilon_uniform: Uniform mixing weight in full-support dist, shape [...] in (0, 1)
-        """
-        self.main = TriangleVariableWidthDistribution(center, half_width)
-        self.support = TrapezoidFullSupportDistribution(center, epsilon_uniform)
-        self.epsilon_fullsupport = epsilon_fullsupport
+    @torch.no_grad()
+    def sample(self, uniform_samples: Tensor) -> Tensor:
+        u = uniform_samples.clamp(1e-6, 1.0 - 1e-6)
+        p = u * (self._F_beta - self._F_alpha) + self._F_alpha
+        z = torch.special.ndtri(p)               # z-scores
+        return z / self.prec + self.center       # x = z * std + mean
 
-    def sample(self, uniform_samples):
-        """
-        Note that uniform_samples needs shape [..., 3]
-        """
-        return torch.where(
-            uniform_samples[..., 0] < self.epsilon_fullsupport, 
-            self.support.sample(uniform_samples[..., 1:]),
-            self.main.sample(uniform_samples[..., 1])) # Sample from the main distribution
-        
-    def log_prob(self, x):
-        return torch.logaddexp(
-            self.main.log_prob(x) + torch.log1p(-self.epsilon_fullsupport),
-            self.support.log_prob(x) + torch.log(self.epsilon_fullsupport))
-    
-    def logp_interval(self, lower_bound, upper_bound):
-        return torch.log(self.cdf(upper_bound) - self.cdf(lower_bound)).clamp(min=-100.)
-    
-    def cdf(self, x):
-        return (
-            self.epsilon_fullsupport * self.support.cdf(x) 
-            + (1 - self.epsilon_fullsupport) * self.main.cdf(x))
-    
-    def entropy(self):
-        """
-        Returns an approximation of the entropy. 
+    def log_prob(self, x: Tensor) -> Tensor:
+        return _log_normal_pdf_prec(x, self.center, self.prec) - self._log_Z
 
-        Mixture of entropy <= actual entropy <= mixture of entropy + binary entropy of epsilon. 
-        We approximate actual entropy ~= mixture of entropy + bce * 0.75
+    def log_cdf(self, x: Tensor) -> Tensor:
+        z = (x - self.center) * self.prec
+        return _logsubexp(_log_ndtr(z), self._log_F_alpha) - self._log_Z
 
-        We use the 0.75 weighting because when models are confident, width will be small, 
-        so the full-support and main distributions will be nearly disjoint, in which case 
-        entropy will be closer to the upper bound, but all of this's heuristic, anyways. 
-        """
-        return (
-            self.epsilon_fullsupport * self.support.entropy() 
-            + (1 - self.epsilon_fullsupport) * self.main.entropy()
-            + 0.75 * binary_entropy(self.epsilon_fullsupport))
+    def logp_interval(self, lo: Tensor, hi: Tensor) -> Tensor:
+        """log P(lo ≤ X ≤ hi)."""
+        return _logsubexp(self.log_cdf(hi), self.log_cdf(lo))
+
+    def entropy(self) -> Tensor:
+        alpha = (0.0 - self.center) * self.prec
+        beta  = (1.0 - self.center) * self.prec
+        phi   = lambda t: torch.exp(-0.5 * t.square()) / math.sqrt(_TWO_PI)
+
+        num = alpha * phi(alpha) - beta * phi(beta)
+        return (-torch.log(self.prec) + 0.5 * math.log(_TWO_PI * math.e) +
+                num / torch.exp(self._log_Z) - self._log_Z)
+
 
 class DiscreteActor(nn.Module):
     """
@@ -231,9 +94,9 @@ class DiscreteActor(nn.Module):
     
     Architecture:
     - Input: hidden state [B, n_hidden]
-    - Linear layer outputs 4*n_actors values through squishing to [0, 1]
-    - Splits into: center, half_width, epsilon_fullsupport, epsilon_uniform
-    - Creates TriangleActionDistribution and samples discrete actions
+    - Linear layer outputs 2*n_actors values through squishing to [0, 1]
+    - Splits into: mean, precision (1 / std)
+    - Creates GaussianActionDistribution and samples discrete actions
     
     Handles discrete action spaces by:
     1. Sampling continuous values in [0,1]
@@ -247,48 +110,38 @@ class DiscreteActor(nn.Module):
     3. Value network receives totally useless signals, and model collapses. 
     """
     def __init__(self, n_hidden, n_actors, 
-        min_values: torch.Tensor, max_values: torch.Tensor, 
-        eps=1e-4, eps_logic_bias=6., eps_logic_inv_scale=25.):
+        min_values: torch.Tensor, max_values: torch.Tensor, eps=1e-4):
         """
         n_hidden: Input feature dimension
         n_actors: Number of parallel action distributions 
         min_values, max_values: Inclusive bounds per actor, shape [n_actors]
         eps: float. Prevents rounded result exceeding [min_values, max_values]. Introduces small bias to the rounded result. 
-        eps_logic_bias: float. Bias for epsilon_fullsupport and epsilon_uniform. 
-        eps_logic_inv_scale: float. Inverse scale for epsilon_fullsupport and epsilon_uniform. 
         """
         super().__init__()
         self.n_hidden = n_hidden
         self.n_actors = n_actors
-        self.actor = nn.Linear(n_hidden, n_actors * 4)
+        self.actor = nn.Linear(n_hidden, n_actors * 2)
         assert min_values.shape == max_values.shape, f"min_values and max_values must have the same shape, but got {min_values.shape} and {max_values.shape}"
         assert min_values.ndim == 1, f"min_values and max_values must be 1D, but got {min_values.ndim} and {max_values.ndim}"
         assert min_values.shape[0] == n_actors, f"min_values and max_values must have length {n_actors}, but got {min_values.shape[0]} and {max_values.shape[0]}"
         self.eps = eps 
         self.register_buffer('min_values', min_values, persistent=False)
+        self.register_buffer('max_values', max_values, persistent=False)
         self.register_buffer('rangeP1', max_values - min_values + 1, persistent=False)
-        self.eps_logic_bias = eps_logic_bias
-        self.eps_logic_inv_scale = eps_logic_inv_scale
         
     #@#torch.compile(fullgraph=True, mode="max-autotune")
     def forward(self, x):
         output = self.actor(x)
-        center, half_width, epsilon_fullsupport, epsilon_uniform = (
-            output[:, :self.n_actors], 
-            output[:, self.n_actors:2 * self.n_actors],  
-            output[:, 2 * self.n_actors:3 * self.n_actors],
-            output[:, 3 * self.n_actors:])
-        center = torch.sigmoid(center)
-        half_width = torch.sigmoid(half_width) * 0.5
-        # Very important! Systemically bias weights to supporting mixtures at the beginning, and make it learn slower. 
-        # Helps value-net learn more reliably. 
-        # Cannot replace with initializing with different initializations (!) since gradient calculations are different (biases are easy to change)
-        epsilon_fullsupport = torch.sigmoid(epsilon_fullsupport / self.eps_logic_inv_scale - self.eps_logic_bias)
-        epsilon_uniform = torch.sigmoid(epsilon_uniform / self.eps_logic_inv_scale - self.eps_logic_bias)
-        return center, half_width, epsilon_fullsupport, epsilon_uniform
+        mean, precision = output[:, :self.n_actors], output[:, self.n_actors:]
+        print('output', output.min().item(), output.max().item(), 'shape:', x.shape)
+        mean = torch.sigmoid(mean)
+        precision = torch.nn.functional.softplus(precision)
+        print('min_precision', precision.min().item(), 'max_precision', precision.max().item())
+        return mean, precision
     
     def _integer_samples_from_unit_samples(self, unit_samples):
-        integer_samples = (unit_samples * (self.rangeP1 - 2 * self.eps) + self.min_values - 0.5 + self.eps).round().int()
+        unit_samples = unit_samples.clamp(self.eps, 1.0 - self.eps)
+        integer_samples = (unit_samples * self.rangeP1 + self.min_values - 0.5).clamp(self.min_values, self.max_values).round().int()
         return integer_samples
     
     def _unit_interval_of_integer_samples(self, integer_samples):
@@ -303,8 +156,8 @@ class DiscreteActor(nn.Module):
 
         Returns: 
         """
-        center, half_width, epsilon_fs, epsilon_uniform = self(x)
-        dist = TriangleActionDistribution(center, half_width, epsilon_fs, epsilon_uniform)
+        center, prec = self(x)
+        dist = GaussianActionDistribution(center, prec)
         unit_samples = dist.sample(uniform_samples) # between [0, 1]
         integer_samples = self._integer_samples_from_unit_samples(unit_samples)
         unit_lb, unit_ub = self._unit_interval_of_integer_samples(integer_samples)
@@ -319,9 +172,7 @@ class DiscreteActor(nn.Module):
             'entropy': entropy, # [B] float. Entropy of the computed distribution
             'dist_params': { # Distribution parameters
                 'center': center, # [B, n_actors] float
-                'half_width': half_width, # [B, n_actors] float
-                'epsilon_fullsupport': epsilon_fs, # [B, n_actors] float
-                'epsilon_uniform': epsilon_uniform, # [B, n_actors] float
+                'precision': prec, # [B, n_actors] float
             }}
     
     def logp_entropy(self, x, integer_samples):
@@ -333,8 +184,8 @@ class DiscreteActor(nn.Module):
         - logprobs: [B, n_actors] float. Logprobs of the samples
         - entropy: [B] float. Entropy of the computed distribution
         """
-        center, half_width, epsilon_fs, epsilon_uniform = self(x)
-        dist = TriangleActionDistribution(center, half_width, epsilon_fs, epsilon_uniform)
+        center, prec = self(x)
+        dist = GaussianActionDistribution(center, prec)
 
         unit_lb, unit_ub = self._unit_interval_of_integer_samples(integer_samples)
         logprobs = dist.logp_interval(unit_lb, unit_ub) - self.rangeP1.log() 
@@ -345,17 +196,16 @@ class DiscreteActor(nn.Module):
         }
     
 if __name__ == '__main__':
+    # %%
     import matplotlib.pyplot as plt
 
     num_samples = 1024000
-    center = torch.zeros((num_samples,), device='cuda:0') + 0.5
-    half_width = torch.ones((num_samples,), device='cuda:0') * 0.1
-    epsilon_fullsupport = torch.ones((num_samples,), device='cuda:0') * 0.6
-    epsilon_uniform = torch.ones((num_samples,), device='cuda:0') * 1.
+    center = torch.zeros((num_samples,), device='cuda:0') + 0.99
+    prec = torch.ones((num_samples,), device='cuda:0') * 1000
 
-    uniform_samples = torch.rand(num_samples, 3, device='cuda:0')
+    uniform_samples = torch.rand(num_samples, device='cuda:0')
 
-    dist = TriangleActionDistribution(center, half_width, epsilon_fullsupport, epsilon_uniform)
+    dist = GaussianActionDistribution(center, prec)
     # dist = TrapezoidFullSupportDistribution(center, epsilon_uniform)
     samples = dist.sample(uniform_samples)
     plt.hist(samples.cpu().numpy(), bins=100, density=True)
@@ -364,29 +214,27 @@ if __name__ == '__main__':
     plt.plot(x.cpu().numpy(), pdf_value.cpu().numpy())
     plt.show()
 
-    numerical_difference = (dist.cdf(x) - pdf_value.cumsum(dim=0) / num_samples).abs()
-    plt.plot(dist.cdf(x).cpu().numpy() + 0.01, label='cdf')
+    cdf = dist.log_cdf(x).exp()
+    numerical_difference = (cdf - pdf_value.cumsum(dim=0) / num_samples).abs()
+    plt.plot(cdf.cpu().numpy() + 0.01, label='cdf')
     plt.plot(pdf_value.cumsum(dim=0).cpu().numpy() / num_samples, label='cdf approx')
     plt.plot(x.cpu().numpy(), numerical_difference.cpu().numpy(), label='difference')
     plt.title(f'max difference: {numerical_difference.max().item():.6f}')
     plt.legend()
     plt.show()
 
-    ### Cell here ### 
-
+    # %%
     batch_size = 102400
     num_actors = 10
-    center = torch.zeros((batch_size, num_actors), device='cuda:0') + 0.5
-    half_width = torch.ones((batch_size, num_actors), device='cuda:0') * 0.1
-    epsilon_fullsupport = torch.ones((batch_size, num_actors), device='cuda:0') * 0.3
-    epsilon_uniform = torch.ones((batch_size, num_actors), device='cuda:0') * 0.4
-    uniform_samples = torch.rand(batch_size, num_actors, 3, device='cuda:0')
+    center = torch.zeros((batch_size, num_actors), device='cuda:0') + 0.9
+    prec = torch.ones((batch_size, num_actors), device='cuda:0') * 10
+    uniform_samples = torch.rand(batch_size, num_actors, device='cuda:0')
 
     min_values = torch.zeros((num_actors,), device='cuda:0')
-    max_values = torch.zeros((num_actors,), device='cuda:0') + 2000
+    max_values = torch.zeros((num_actors,), device='cuda:0') + 100
     rangeP1 = max_values - min_values + 1
 
-    dist = TriangleActionDistribution(center, half_width, epsilon_fullsupport, epsilon_uniform)
+    dist = GaussianActionDistribution(center, prec)
     unit_samples = dist.sample(uniform_samples) # between [0, 1]
     integer_samples = (unit_samples * rangeP1 + min_values - 0.5).round().int().clamp(min=min_values, max=max_values)
     unit_samples_ub = ((integer_samples + 0.5) + 0.5 - min_values) / rangeP1
@@ -402,9 +250,7 @@ if __name__ == '__main__':
         'entropy': entropy, # [B] float. Entropy of the computed distribution
         'dist_params': { # Distribution parameters
             'center': center, # [B, n_actors] float
-            'half_width': half_width, # [B, n_actors] float
-            'epsilon_fullsupport': epsilon_fullsupport, # [B, n_actors] float
-            'epsilon_uniform': epsilon_uniform, # [B, n_actors] float
+            'precision': prec, # [B, n_actors] float
         }}
 
     output_samples = output['samples']

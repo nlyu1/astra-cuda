@@ -53,6 +53,7 @@ for model in models:
 advisor_model.reset_context()
 returns_buffer = env.new_reward_buffer()
 reward_buffer = env.new_player_reward_buffer()
+immediate_reward_buffer = env.new_reward_buffer()
 obs_buffer = env.new_observation_buffer()
 # print(env.env.to_string(0))
 expand_actions = lambda x: torch.tensor(x).unsqueeze(0).to(device).int()
@@ -106,10 +107,12 @@ fig.show()
 # ask_price = int(input('Ask price: '))
 # bid_size = int(input('Bid size: '))
 # ask_size = int(input('Ask size: '))
-bid_price, ask_price = 11, 29
-bid_size, ask_size = 4, 4
+bid_price, ask_price = 30, 30
+bid_size, ask_size = 1, 0
 env.step(expand_actions([bid_price, ask_price, bid_size, ask_size]))
-print(f'Made quote {bid_price} @ {ask_price} [{bid_size} x {ask_size}]. Proceed?')
+env.fill_rewards(immediate_reward_buffer)
+print(f'Made quote {bid_price} @ {ask_price} [{bid_size} x {ask_size}]. Proceeding...')
+print(f'Players immediate rewards: {immediate_reward_buffer.cpu().numpy()}')
 # %%
 for i in range(args.players - 1):
     env.fill_observation_tensor(obs_buffer)

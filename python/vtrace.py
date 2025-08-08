@@ -97,9 +97,8 @@ pbar = tqdm(range(args.num_iterations))
 done_zeros, done_ones = torch.zeros(args.num_envs, device=device).float(), torch.ones(args.num_envs, device=device).float()
 
 # Pre-allocate GPU buffers for distribution parameters (outside loop for reuse)
-eps_uniform_buffer = torch.zeros(args.num_steps, device=device)
-eps_support_buffer = torch.zeros(args.num_steps, device=device)
-width_buffer = torch.zeros(args.num_steps, device=device)
+center_buffer = torch.zeros(args.num_steps, device=device)
+precision_buffer = torch.zeros(args.num_steps, device=device)
 
 for iteration in pbar:
     # Manual GC every 100 iterations
@@ -156,9 +155,8 @@ for iteration in pbar:
         private_role_preds.append(forward_results['pinfo_preds']['private_roles'].argmax(dim=-1))
 
         # Store distribution parameters in GPU buffers (no CPU transfer)
-        eps_uniform_buffer[step] = forward_results['action_params']['epsilon_uniform'].mean()
-        eps_support_buffer[step] = forward_results['action_params']['epsilon_fullsupport'].mean()
-        width_buffer[step] = forward_results['action_params']['half_width'].mean()
+        center_buffer[step] = forward_results['action_params']['center'].mean()
+        precision_buffer[step] = forward_results['action_params']['precision'].mean()
 
         buffer.update({
             # Observations are implicitly updated above. 
@@ -202,9 +200,8 @@ for iteration in pbar:
                     'private_role_preds': torch.stack(private_role_preds, dim=0),
                     'infos': env_info | env_pinfo_targets,
                     'dist_params': {
-                        'epsilon_uniform': eps_uniform_buffer,
-                        'epsilon_support': eps_support_buffer,
-                        'width': width_buffer
+                        'center': center_buffer,
+                        'precision': precision_buffer
                     }}
                 # Only incur heavy logging when we're in seat 0 and after a certain interval 
                 heavy_logging_update = (

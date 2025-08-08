@@ -139,7 +139,7 @@ def plot_action_distributions(action_params, max_contract_value, max_contracts_p
     """
     import sys
     sys.path.append('/home/nlyu/Code/astra-cuda/python/src')
-    from discrete_actor import TriangleActionDistribution
+    from python.src.discrete_actor_triangular import TriangleActionDistribution
     
     # Create 2x2 subplot grid
     subplot_titles = ["Bid Price", "Ask Price", "Bid Size", "Ask Size"]

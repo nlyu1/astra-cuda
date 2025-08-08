@@ -8,8 +8,7 @@ import torch.nn.functional as F
 import sys 
 sys.path.append('../')
 from model_components import ResidualBlock, LearnedPositionalEncoding
-# from discrete_actor import DiscreteActor
-from discrete_actor_parabolic import DiscreteActor
+from src.discrete_actor import DiscreteActor
 
 class HighLowTransformerModel(nn.Module):
     """
@@ -150,7 +149,7 @@ class HighLowTransformerModel(nn.Module):
             assert self.context.shape[0] == step, f"Context must be of length {step}, but got {self.context.shape[0]}"
         # 4 action types, and 3 uniform random for each action type 
         # See "discrete_actor" for why we need 3 random values per action
-        uniform_samples = self._populate_uniform_buffer((x.shape[0], 4, 3)) 
+        uniform_samples = self._populate_uniform_buffer((x.shape[0], 4)) 
         outputs = self.incremental_forward_with_context(x, self.context, uniform_samples)
         self.context = outputs['context']
         return outputs
