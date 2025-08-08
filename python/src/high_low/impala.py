@@ -328,6 +328,11 @@ class HighLowImpalaTrainer:
             log_ratio = new_logprob - logprobs[:, minibatch_env_indices]
             ratio = log_ratio.exp() 
             approx_kl = ((ratio - 1) - log_ratio).mean()
+        print(f"Approx KL: {approx_kl.min().item()}, {approx_kl.max().item()}")
+        print(f"Log ratio: {log_ratio.min().item()}, {log_ratio.max().item()}")
+        print(f"Logprobs: {logprobs.min().item()}, {logprobs.max().item()}")
+        print(f"New logprob: {new_logprob.min().item()}, {new_logprob.max().item()}")
+        print(f"Entropy: {entropy.min().item()}, {entropy.max().item()}")
 
         assert dones[-1, minibatch_env_indices].all(), "All episodes must be terminated at the end of the episode"
         augmented_values = torch.cat([ # [T+1, B]

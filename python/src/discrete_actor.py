@@ -83,9 +83,9 @@ class GaussianActionDistribution:
         beta  = (1.0 - self.center) * self.prec
         phi   = lambda t: torch.exp(-0.5 * t.square()) / math.sqrt(_TWO_PI)
 
-        num = alpha * phi(alpha) - beta * phi(beta)
-        return (-torch.log(self.prec) + 0.5 * math.log(_TWO_PI * math.e) +
-                num / torch.exp(self._log_Z) - self._log_Z)
+        # num = alpha * phi(alpha) - beta * phi(beta)
+        return (-torch.log(self.prec) + 0.5 * math.log(_TWO_PI * math.e))
+                # num / torch.exp(self._log_Z) - self._log_Z)
 
 
 class DiscreteActor(nn.Module):
@@ -135,7 +135,7 @@ class DiscreteActor(nn.Module):
         mean, precision = output[:, :self.n_actors], output[:, self.n_actors:]
         print('output', output.min().item(), output.max().item(), 'shape:', x.shape)
         mean = torch.sigmoid(mean)
-        precision = torch.nn.functional.softplus(precision)
+        precision = torch.nn.functional.softplus(precision) + 1
         print('min_precision', precision.min().item(), 'max_precision', precision.max().item())
         return mean, precision
     
