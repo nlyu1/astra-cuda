@@ -5,6 +5,7 @@ import numpy as np
 import hashlib
 import collections
 from collections.abc import Mapping, Iterable
+from datetime import datetime
 
 import torch
 import torch.nn as nn
@@ -114,9 +115,13 @@ def vtrace_losses(
     next_values = values[1:] * (1 - dones)
     cur_values = values[:-1]
     with torch.no_grad(): 
-        prob_ratio = (logprobs - ref_logprobs).exp()
-        policy_clip = torch.clamp(prob_ratio, max=bar_rho) # [T B]
-        vtrace_clip = torch.clamp(prob_ratio, max=bar_c) # [T B]
+        log_prob_ratio = logprobs - ref_logprobs
+        # Clip log ratio to prevent exp() overflow - log(bar_rho) and log(bar_c)
+        log_policy_clip = torch.clamp(log_prob_ratio, max=torch.log(torch.tensor(bar_rho)))
+        log_vtrace_clip = torch.clamp(log_prob_ratio, max=torch.log(torch.tensor(bar_c)))
+        
+        policy_clip = log_policy_clip.exp() # [T B]
+        vtrace_clip = log_vtrace_clip.exp() # [T B]
 
         corrected_td = policy_clip * (rewards + gamma * next_values - cur_values)
         # For example, vtrace_H = V_H + clip_H * corrected_td[H] 
@@ -151,12 +156,10 @@ def vtrace_losses(
     pg_loss = - policy_clip * logprobs * vtrace_advantage 
     pg_loss = pg_loss.mean()
 
-    result = {
+    return {
         'policy_loss': pg_loss,
         'value_loss': value_loss,
-        'value_r2': value_r2,
-    }
-    return result 
+        'value_r2': value_r2}
     
 
 class HighLowImpalaTrainer:
@@ -175,6 +178,9 @@ class HighLowImpalaTrainer:
         self.current_step = 0
         self.warmup_steps = args.warmup_steps
         self.base_lr = args.learning_rate
+        
+        # Initialize NaN debugging counter
+        self.nan_debug_counter = 0
 
         # Weights for private loss: [0, ..., 1] across different time steps
         # Decay by half every (tau) ratio away from horizon. 
@@ -247,30 +253,30 @@ class HighLowImpalaTrainer:
                     
                     if torch.isnan(approx_kl_value):
                         print('WARNING: Skipping update due to NaN approx_kl - model may be unstable')
-                        skip_update = True
+                        # skip_update = True
                         step_results['approx_kls'] = torch.tensor(float('nan'))
                     elif approx_kl_value > self.args.update_kl_threshold:
                         print(f'WARNING: Skipping update due to large approx_kl ({approx_kl_value:.6f} > {self.args.update_kl_threshold})')
-                        skip_update = True
+                        # skip_update = True
                         step_results['approx_kls'] = self.args.update_kl_threshold
                     
-                    if not skip_update:
-                        step_results['loss'].backward()
-                        # Sanitize gradients: zero out any NaN gradients and warn
-                        nan_grad_detected = False
-                        for name, param in self.agent.named_parameters():
-                            if param.grad is not None:
-                                nan_mask = torch.isnan(param.grad)
-                                if nan_mask.any():
-                                    print(f"(!) WARNING: NaN gradients detected in {name} - zeroing them out")
-                                    param.grad[nan_mask] = 0.0
-                                    nan_grad_detected = True
-                        if nan_grad_detected:
-                            print("(!) WARNING: NaN gradients were sanitized - model may be experiencing numerical instability")
+                    if skip_update:
+                        step_results['loss'] *= 0 
+                    step_results['loss'].backward()
+                    # Sanitize gradients: zero out any NaN gradients and warn
+                    nan_grad_detected = False
+                    for name, param in self.agent.named_parameters():
+                        if param.grad is not None:
+                            nan_mask = torch.isnan(param.grad)
+                            if nan_mask.any():
+                                print(f"WARNING: NaN gradients detected in {name} - zeroing them out")
+                                param.grad[nan_mask] = 0.0
+                                nan_grad_detected = True
+                    if nan_grad_detected:
+                        print("(!) WARNING: NaN gradients were sanitized - model may be experiencing numerical instability")
                         
                         nn.utils.clip_grad_norm_(self.agent.parameters(), self.args.max_grad_norm)
-                        self.optimizer.step()
-                    
+                    self.optimizer.step()
                     self.optimizer.zero_grad()
                     self.explained_vars[logging_counter] = step_results['explained_vars']
                     self.value_losses[logging_counter] = step_results['value_losses']
@@ -304,7 +310,7 @@ class HighLowImpalaTrainer:
             'metrics/learning_rate': current_lr,
         }
 
-    @torch.compile(mode="max-autotune-no-cudagraphs", fullgraph=True)
+    @torch.compile(mode="max-autotune-no-cudagraphs", fullgraph=True, disable=True)
     def _train_step(self, 
                     minibatch_env_indices,
                     obs, logprobs, actions, rewards, dones, 
@@ -349,8 +355,9 @@ class HighLowImpalaTrainer:
 
         with torch.no_grad():
             log_ratio = new_logprob - logprobs[:, minibatch_env_indices]
-            ratio = log_ratio.exp() 
-            approx_kl = ((ratio - 1) - log_ratio).mean()
+            clipped_log_ratio = torch.clamp(log_ratio, min=-10.0, max=10.0) # Clip log ratio to prevent exp() overflow (symmetric clipping for KL)
+            ratio = clipped_log_ratio.exp() 
+            approx_kl = ((ratio - 1) - clipped_log_ratio).mean()
 
         assert dones[-1, minibatch_env_indices].all(), "All episodes must be terminated at the end of the episode"
         augmented_values = torch.cat([ # [T+1, B]
@@ -379,7 +386,7 @@ class HighLowImpalaTrainer:
             'explained_vars': vtrace_results['value_r2'],
             'value_losses': vtrace_results['value_loss'],
             'pg_losses': vtrace_results['policy_loss'],
-            'entropy': entropy_value.detach(),
+            'entropy': entropy_value,
             'approx_kls': approx_kl,
             'pred_settlement_loss': pred_settlement_loss,
             'pred_private_roles_loss': pred_private_roles_loss,

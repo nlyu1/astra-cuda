@@ -154,7 +154,7 @@ class HighLowTransformerModel(nn.Module):
         return outputs
 
     @torch.inference_mode()
-    @torch.compile(fullgraph=False, mode="max-autotune-no-cudagraphs")
+    @torch.compile(fullgraph=False, mode="max-autotune-no-cudagraphs", disable=True)
     def incremental_forward_with_context(self, x, prev_context, uniform_samples):
         """
         x: [B, F]
