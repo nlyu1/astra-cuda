@@ -33,41 +33,39 @@ def _log_normal_pdf_prec(x: Tensor, loc: Tensor, prec: Tensor) -> Tensor:
 def _log_ndtr(z: Tensor) -> Tensor:
     return torch.special.log_ndtr(z)
 
+# def _logsubexp(a: Tensor, b: Tensor) -> Tensor:
+#     """
+#     Stable log(exp(a) - exp(b))   with   a ≥ b.
+#     (Analogous to torch.logaddexp for the *sum* case.)
+#     Backward pass results in terrible gradients
+#     """
+#     return a + torch.log1p(-torch.exp(b - a))
+
 def _logsubexp(a: Tensor, b: Tensor) -> Tensor:
     """
     Stable log(exp(a) - exp(b)) with a ≥ b.
-    
-    Key insight: log(exp(a) - exp(b)) = a + log(1 - exp(b-a))
-    Since b ≤ a, we have b-a ≤ 0, so exp(b-a) ≤ 1.
+    Uses arithmetic operations to avoid torch.where gradient issues.
     """
-    diff = b - a
-    return a + torch.log1p(-torch.exp(diff))
-
-# def _logsubexp(a: Tensor, b: Tensor) -> Tensor:
-#     """
-#     Stable log(exp(a) - exp(b)) with a ≥ b.
-#     Uses arithmetic operations to avoid torch.where gradient issues.
-#     """
-#     a32, b32 = a.to(torch.float32), b.to(torch.float32)
-#     diff = b32 - a32  # This is ≤ 0
+    a32, b32 = a.to(torch.float32), b.to(torch.float32)
+    diff = b32 - a32  # This is ≤ 0
     
-#     eps = torch.finfo(torch.bfloat16).eps
-#     use_series = (diff.abs() < eps).float()  # Convert to float for arithmetic
+    eps = torch.finfo(torch.bfloat16).eps
+    use_series = (diff.abs() < eps).float()  # Convert to float for arithmetic
     
-#     # Compute both branches with safe fallbacks
-#     # For series: when |diff| < eps, use approximation
-#     # Add small epsilon to avoid log(0) issues
-#     safe_diff_series = diff - (1.0 - use_series) * 1.0  # Make diff = diff - 1 when not using series
-#     series_result = a32 + torch.log(-safe_diff_series + 1e-30)
+    # Compute both branches with safe fallbacks
+    # For series: when |diff| < eps, use approximation
+    # Add small epsilon to avoid log(0) issues
+    safe_diff_series = diff - (1.0 - use_series) * 1.0  # Make diff = diff - 1 when not using series
+    series_result = a32 + torch.log(-safe_diff_series + 1e-30)
     
-#     # For standard: when |diff| >= eps
-#     # Clamp diff to avoid exp overflow in unused branch
-#     safe_diff_standard = diff * (1.0 - use_series) + use_series * (-10.0)
-#     standard_result = a32 + torch.log1p(-torch.exp(safe_diff_standard))
+    # For standard: when |diff| >= eps
+    # Clamp diff to avoid exp overflow in unused branch
+    safe_diff_standard = diff * (1.0 - use_series) + use_series * (-10.0)
+    standard_result = a32 + torch.log1p(-torch.exp(safe_diff_standard))
     
-#     # Combine using arithmetic (not torch.where)
-#     out32 = series_result * use_series + standard_result * (1.0 - use_series)
-#     return out32.to(a.dtype)
+    # Combine using arithmetic (not torch.where)
+    out32 = series_result * use_series + standard_result * (1.0 - use_series)
+    return out32.to(a.dtype)
 
 class GaussianActionDistribution:
     """
@@ -112,41 +110,44 @@ class GaussianActionDistribution:
         
         # Detect extreme cases (convert to float for arithmetic)
         is_extreme = (((z_low > 4.0) & (z_high > 4.0)) | 
-                    ((z_low < -4.0) & (z_high < -4.0))).float()
+                     ((z_low < -4.0) & (z_high < -4.0))).float()
         
-        # Detect which formulation to use for non-extreme cases
-        use_complement = ((z_low > -z_high) & (z_low > 0)).float()
-        
-        # === Compute all three branches with safe fallbacks ===
-        
-        # 1. Extreme case approximation
+        # Approximation for extreme cases
         z_mid = 0.5 * (z_low + z_high)
         log_pdf_mid = -0.5 * z_mid**2 - _LOG_SQRT_2PI
         width = hi - lo
         approx_logp = log_pdf_mid + torch.log(width + 1e-30) + torch.log(self.prec)
         
-        # 2. Standard computation: log(Φ(z_high) - Φ(z_low))
-        # Mask out extreme cases by replacing with safe dummy values
-        safe_z_high_std = z_high * (1.0 - is_extreme) + is_extreme * 1.0
-        safe_z_low_std = z_low * (1.0 - is_extreme) + is_extreme * 0.0
-        log_cdf_high = _log_ndtr(safe_z_high_std)
-        log_cdf_low = _log_ndtr(safe_z_low_std)
-        standard = _logsubexp(log_cdf_high, log_cdf_low) - self._log_Z
+        # Decide which exact formulation to use (convert to float)
+        use_complement = ((z_low > -z_high) & (z_low > 0)).float()
         
-        # 3. Complement computation: log(Φ(-z_low) - Φ(-z_high))
-        # Mask out extreme cases by replacing with safe dummy values
-        safe_z_low_comp = z_low * (1.0 - is_extreme) + is_extreme * 0.0
-        safe_z_high_comp = z_high * (1.0 - is_extreme) + is_extreme * 1.0
-        log_sf_low = _log_ndtr(-safe_z_low_comp)
-        log_sf_high = _log_ndtr(-safe_z_high_comp)
-        complement = _logsubexp(log_sf_low, log_sf_high) - self._log_Z
+        # === Key change: Compute all branches with safe values ===
         
-        # === Arithmetic combination of all three branches ===
-        # First combine standard and complement for non-extreme cases
-        non_extreme_value = complement * use_complement + standard * (1.0 - use_complement)
+        # Standard computation: Φ(z_high) - Φ(z_low)
+        log_cdf_high = _log_ndtr(z_high)
+        log_cdf_low = _log_ndtr(z_low)
         
-        # Then combine with extreme approximation
-        result = approx_logp * is_extreme + non_extreme_value * (1.0 - is_extreme)
+        # For the standard branch, we need log(CDF_high - CDF_low)
+        # When this would be problematic (in extreme tails), we substitute safe values
+        # that won't cause NaN but won't be used in the final result
+        safe_log_cdf_high = log_cdf_high * (1.0 - is_extreme) + is_extreme * 0.0
+        safe_log_cdf_low = log_cdf_low * (1.0 - is_extreme) + is_extreme * (-1.0)
+        standard = _logsubexp(safe_log_cdf_high, safe_log_cdf_low) - self._log_Z
+        
+        # Complement computation: Φ(-z_low) - Φ(-z_high)
+        log_sf_low = _log_ndtr(-z_low)
+        log_sf_high = _log_ndtr(-z_high)
+        
+        # Similarly, make these safe when in extreme cases
+        safe_log_sf_low = log_sf_low * (1.0 - is_extreme) + is_extreme * 0.0
+        safe_log_sf_high = log_sf_high * (1.0 - is_extreme) + is_extreme * (-1.0)
+        complement = _logsubexp(safe_log_sf_low, safe_log_sf_high) - self._log_Z
+        
+        # Combine exact values using arithmetic
+        exact_value = complement * use_complement + standard * (1.0 - use_complement)
+        
+        # Final combination using arithmetic instead of torch.where
+        result = approx_logp * is_extreme + exact_value * (1.0 - is_extreme)
         
         return result
 
@@ -197,7 +198,7 @@ class DiscreteActor(nn.Module):
         self.register_buffer('precision_ceiling', num_distinct_values * 2) # Corresponds to integer bin containing \pm 2-sigma
         self.register_buffer('rangeP1', max_values - min_values + 1, persistent=False)
         
-    # @torch.compile(fullgraph=True, mode="max-autotune")
+    #@#torch.compile(fullgraph=True, mode="max-autotune")
     def forward(self, x):
         output = self.actor(x)
         mean, precision = output[:, :self.n_actors], output[:, self.n_actors:]
@@ -218,7 +219,6 @@ class DiscreteActor(nn.Module):
         unit_samples_lb = ((integer_samples - 0.5) + 0.5 - self.min_values) / self.rangeP1
         return unit_samples_lb, unit_samples_ub
     
-    @torch.compile(fullgraph=False, mode="max-autotune-no-cudagraphs")
     def logp_entropy_and_sample(self, x, uniform_samples):
         """
         Sample actions and compute log probabilities.
@@ -249,7 +249,6 @@ class DiscreteActor(nn.Module):
                 'precision': prec, # [B, n_actors] float
             }}
     
-    @torch.compile(fullgraph=True, mode="max-autotune")
     def logp_entropy(self, x, integer_samples):
         """
         Compute log probabilities and entropy for given actions.

@@ -137,7 +137,6 @@ class HighLowTransformerModel(nn.Module):
         
         return {
             'values': values,
-            'dist_params': logp_entropy['dist_params'],
             'logprobs': logprobs.reshape(T, B),
             'entropy': entropy.reshape(T, B),
             'pinfo_preds': pinfo_preds}
@@ -155,7 +154,7 @@ class HighLowTransformerModel(nn.Module):
         return outputs
 
     @torch.inference_mode()
-    @torch.compile(fullgraph=False, mode="max-autotune-no-cudagraphs")
+    @torch.compile(fullgraph=False, mode="max-autotune-no-cudagraphs", dynamic=True)
     def incremental_forward_with_context(self, x, prev_context, uniform_samples):
         """
         x: [B, F]

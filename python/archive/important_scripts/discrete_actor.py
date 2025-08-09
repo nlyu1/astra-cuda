@@ -28,9 +28,6 @@ def _log_normal_pdf_prec(x: Tensor, loc: Tensor, prec: Tensor) -> Tensor:
     z = (x - loc) * prec
     return -0.5 * z.square() - _LOG_SQRT_2PI + torch.log(prec)
 
-def _log_ndtr(z: Tensor) -> Tensor:
-    return torch.special.log_ndtr(z)
-
 def _logsubexp(a: Tensor, b: Tensor) -> Tensor:
     """
     Stable log(exp(a) - exp(b))   with   a ≥ b.
@@ -49,8 +46,8 @@ class GaussianActionDistribution:
         self.prec   = precision           # 1 / σ
         alpha = (0.0 - center) * precision
         beta  = (1.0 - center) * precision
-        self._log_F_alpha = _log_ndtr(alpha)
-        self._log_F_beta  = _log_ndtr(beta)
+        self._log_F_alpha = torch.special.log_ndtr(alpha)
+        self._log_F_beta  = torch.special.log_ndtr(beta)
         # Total weight contained within the truncated distribution 
 
         # Plain CDF values (needed only for sampling)
@@ -70,13 +67,13 @@ class GaussianActionDistribution:
 
     def log_cdf(self, x: Tensor) -> Tensor:
         z = (x - self.center) * self.prec
-        return _logsubexp(_log_ndtr(z), self._log_F_alpha) - self._log_Z
+        return _logsubexp(torch.special.log_ndtr(z), self._log_F_alpha) - self._log_Z
 
     def logp_interval(self, lo: Tensor, hi: Tensor) -> Tensor:
         """log P(lo ≤ X ≤ hi)."""
         z_low = (lo - self.center) * self.prec
         z_high = (hi - self.center) * self.prec
-        return _logsubexp(_log_ndtr(z_high), _log_ndtr(z_low)) - self._log_Z
+        return _logsubexp(torch.special.log_ndtr(z_high), torch.special.log_ndtr(z_low)) - self._log_Z
 
     def entropy(self) -> Tensor:
         alpha = (0.0 - self.center) * self.prec
@@ -146,6 +143,7 @@ class DiscreteActor(nn.Module):
         unit_samples_lb = ((integer_samples - 0.5) + 0.5 - self.min_values) / self.rangeP1
         return unit_samples_lb, unit_samples_ub
     
+    @torch.compile(fullgraph=True, mode="max-autotune")
     def logp_entropy_and_sample(self, x, uniform_samples):
         """
         Sample actions and compute log probabilities.
@@ -176,6 +174,7 @@ class DiscreteActor(nn.Module):
                 'precision': prec, # [B, n_actors] float
             }}
     
+    @torch.compile(fullgraph=True, mode="max-autotune-no-cudagraphs")
     def logp_entropy(self, x, integer_samples):
         """
         Compute log probabilities and entropy for given actions.
