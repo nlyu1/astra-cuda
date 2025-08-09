@@ -35,13 +35,12 @@ class HighLowTransformerModel(nn.Module):
         self.n_embd = args.n_embd
         self.n_layer = args.n_layer
         
-        # ---------------- Policy trunk ---------------- #
-        # Input encoder (policy)
+        # Input encoder
         self.encoder = ResidualBlock(self.F, self.n_embd)
         self.pos_encoding = LearnedPositionalEncoding(self.n_embd, max_len=max(self.T, 512))
         self.pinfo_numfeatures = 2 + 1 + self.P # see pinfo_tensor method in `env.py`
         
-        # Transformer core (policy)
+        # Transformer core using memory-efficient configurations
         encoder_layer = nn.TransformerEncoderLayer(
             d_model=self.n_embd,
             nhead=self.n_head,
@@ -49,7 +48,7 @@ class HighLowTransformerModel(nn.Module):
             dropout=0,
             activation="gelu",
             batch_first=False,
-            norm_first=True)
+            norm_first=True)  # Pre-norm architecture
         
         self.transformer = nn.TransformerEncoder(
             encoder_layer,
@@ -57,40 +56,22 @@ class HighLowTransformerModel(nn.Module):
             enable_nested_tensor=False)
         self.transformer_norm = nn.LayerNorm(self.n_embd)
         
-        # ---------------- Separate critic trunk ---------------- #
-        # Optionally smaller/lighter critic stack to reduce compute while disjoint
-        critic_layers = max(2, self.n_layer // 2)
-        critic_encoder_layer = nn.TransformerEncoderLayer(
-            d_model=self.n_embd,
-            nhead=self.n_head,
-            dim_feedforward=self.n_embd * 4,
-            dropout=0.1,
-            activation="gelu",
-            batch_first=False,
-            norm_first=True)
-        self.value_encoder = ResidualBlock(self.F + self.pinfo_numfeatures, self.n_embd)
-        self.value_pos_encoding = LearnedPositionalEncoding(self.n_embd, max_len=max(self.T, 512))
-        self.value_transformer = nn.TransformerEncoder(
-            critic_encoder_layer,
-            num_layers=critic_layers,
-            enable_nested_tensor=False)
-        self.value_transformer_norm = nn.LayerNorm(self.n_embd)
-        # Value head (critic trunk features concatenated with pinfo)
-        self.critic = nn.Sequential(
-            ResidualBlock(self.n_embd, self.n_hidden),
-            ResidualBlock(self.n_hidden, self.n_hidden),
-            nn.Linear(self.n_hidden, 1))
-        
-        ### Policy trunk follow-ups ###
         self.actors = DiscreteSoftmaxActor(
             self.n_embd, 4, 
             min_values=torch.tensor([1, 1, 0, 0], device=self.device),
             max_values=torch.tensor([self.M, self.M, self.S, self.S], device=self.device))
         
-        # Private information prediction heads (policy trunk features)
+        # Private information prediction heads
         self.pinfo_model = nn.ModuleDict({
             'settle_price': nn.Linear(self.n_embd, 1),
             'private_roles': nn.Linear(self.n_embd, self.P * 3)})
+        
+        # Value head
+        self.critic = nn.Sequential(
+            ResidualBlock(self.n_embd + self.pinfo_numfeatures, self.n_hidden),
+            ResidualBlock(self.n_hidden, self.n_hidden),
+            ResidualBlock(self.n_hidden, self.n_hidden),
+            nn.Linear(self.n_hidden, 1))
         
         # Pre-generate causal masks for different sequence lengths to avoid dynamic allocation
         self.register_buffer(
@@ -135,27 +116,22 @@ class HighLowTransformerModel(nn.Module):
             pinfo_preds / settle_price: [T, B]
         """
         T, B, F = x.shape
-        # -------- Policy trunk for actor and auxiliary heads -------- #
         encoded = self.encoder(x.view(T*B, F)).view(T, B, self.n_embd)
         encoded = self.pos_encoding(encoded) # [T, B, D]
-        policy_features = self.transformer(encoded, mask=self.causal_mask, is_causal=True).view(T * B, self.n_embd) # [T * B, D]
-        policy_features = self.transformer_norm(policy_features)
+        # [T, B, D]. causal_mask shape [T, T] with -inf on strict upper-diagonal
+        features = self.transformer(encoded, mask=self.causal_mask, is_causal=True).view(T * B, self.n_embd) # [T * B, D]
+        features = self.transformer_norm(features)
+        critic_features = torch.cat([
+            features.view(T, B, self.n_embd),
+            pinfo_tensor.expand(T, B, self.pinfo_numfeatures)
+        ], dim=-1).reshape(T*B, self.n_embd + self.pinfo_numfeatures)
+        values = self.critic(critic_features).reshape(T, B)
 
-        # -------- Separate critic trunk -------- #
-        # Concatenate private info at the very beginning for the critic
-        pinfo_expanded = pinfo_tensor.expand(T, B, self.pinfo_numfeatures)
-        v_input = torch.cat([x, pinfo_expanded], dim=-1)  # [T, B, F + pinfo]
-        v_encoded = self.value_encoder(v_input.view(T * B, F + self.pinfo_numfeatures)).view(T, B, self.n_embd)
-        v_encoded = self.value_pos_encoding(v_encoded)
-        value_features = self.value_transformer(v_encoded, mask=self.causal_mask, is_causal=True).view(T * B, self.n_embd)
-        value_features = self.value_transformer_norm(value_features)
-        values = self.critic(value_features).reshape(T, B)
-
-        logp_entropy = self.actors.logp_entropy(policy_features, actions.view(T*B, 4))
+        logp_entropy = self.actors.logp_entropy(features, actions.view(T*B, 4))
         logprobs = logp_entropy['logprobs'].sum(-1).reshape(T, B) # Sum over action types [bid_px, ask_px, bid_sz, ask_sz]
         entropy = logp_entropy['entropy'].sum(-1).reshape(T, B)
 
-        pinfo_preds = {k: self.pinfo_model[k](policy_features) for k in self.pinfo_model}
+        pinfo_preds = {k: self.pinfo_model[k](features) for k in self.pinfo_model}
         pinfo_preds['private_roles'] = pinfo_preds['private_roles'].reshape(T, B, self.P, 3)
         pinfo_preds['settle_price'] = pinfo_preds['settle_price'].reshape(T, B)
         

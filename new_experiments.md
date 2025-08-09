@@ -1,5 +1,7 @@
 # Modified action type
 
+1. In normal game, we observed collapse where explained variance went to 1 while policy loss lagged. 
+2. Trying separate critic 
 
 ## Seed run
 
