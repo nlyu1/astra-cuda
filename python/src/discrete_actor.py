@@ -54,11 +54,11 @@ class GaussianActionDistribution:
         self._log_F_alpha = _log_ndtr(alpha)
         self._log_F_beta  = _log_ndtr(beta)
         # Total weight contained within the truncated distribution 
-        self._log_Z = _logsubexp(self._log_F_beta, self._log_F_alpha)
 
         # Plain CDF values (needed only for sampling)
         self._F_alpha = torch.exp(self._log_F_alpha)
         self._F_beta  = torch.exp(self._log_F_beta)
+        self._log_Z = (self._F_beta - self._F_alpha).log()
 
     @torch.no_grad()
     def sample(self, uniform_samples: Tensor) -> Tensor:
@@ -76,16 +76,18 @@ class GaussianActionDistribution:
 
     def logp_interval(self, lo: Tensor, hi: Tensor) -> Tensor:
         """log P(lo ≤ X ≤ hi)."""
-        return _logsubexp(self.log_cdf(hi), self.log_cdf(lo))
+        z_low = (lo - self.center) * self.prec
+        z_high = (hi - self.center) * self.prec
+        return _logsubexp(_log_ndtr(z_high), _log_ndtr(z_low)) - self._log_Z
 
     def entropy(self) -> Tensor:
         alpha = (0.0 - self.center) * self.prec
         beta  = (1.0 - self.center) * self.prec
         phi   = lambda t: torch.exp(-0.5 * t.square()) / math.sqrt(_TWO_PI)
 
-        # num = alpha * phi(alpha) - beta * phi(beta)
-        return (-torch.log(self.prec) + 0.5 * math.log(_TWO_PI * math.e))
-                # num / torch.exp(self._log_Z) - self._log_Z)
+        num = alpha * phi(alpha) - beta * phi(beta)
+        return (-torch.log(self.prec) + 0.5 * math.log(_TWO_PI * math.e) + 
+                num / torch.exp(self._log_Z) - self._log_Z)
 
 
 class DiscreteActor(nn.Module):
@@ -133,10 +135,8 @@ class DiscreteActor(nn.Module):
     def forward(self, x):
         output = self.actor(x)
         mean, precision = output[:, :self.n_actors], output[:, self.n_actors:]
-        print('output', output.min().item(), output.max().item(), 'shape:', x.shape)
         mean = torch.sigmoid(mean)
-        precision = torch.nn.functional.softplus(precision) + 1
-        print('min_precision', precision.min().item(), 'max_precision', precision.max().item())
+        precision = nn.functional.softplus(precision / 10) + 0.5
         return mean, precision
     
     def _integer_samples_from_unit_samples(self, unit_samples):
@@ -193,7 +193,10 @@ class DiscreteActor(nn.Module):
         return {
             'logprobs': logprobs, # [B, n_actors] float. Logprobs of the samples
             'entropy': entropy, # [B] float. Entropy of the computed distribution
-        }
+            'dist_params': { # Distribution parameters
+                'center': center, # [B, n_actors] float
+                'precision': prec, # [B, n_actors] float
+            }}
     
 if __name__ == '__main__':
     # %%

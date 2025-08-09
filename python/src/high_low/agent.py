@@ -137,6 +137,7 @@ class HighLowTransformerModel(nn.Module):
         
         return {
             'values': values,
+            'action_params': logp_entropy['dist_params'],
             'logprobs': logprobs.reshape(T, B),
             'entropy': entropy.reshape(T, B),
             'pinfo_preds': pinfo_preds}

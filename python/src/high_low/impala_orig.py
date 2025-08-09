@@ -224,40 +224,6 @@ class HighLowImpalaTrainer:
         num_envs_per_minibatch = self.args.num_envs // self.args.num_minibatches
         assert num_envs_per_minibatch * self.args.num_minibatches == self.args.num_envs
 
-        def check_for_nan_gradients():
-            # Iterates over parameters to check for nan gradients, print the name of the parameter and the gradient
-            actor_weight_grad_norm = None
-            actor_bias_grad_norm = None
-            max_grad_norm, max_grad_norm_name = 0, None
-            max_grad_norm_value_min, max_grad_norm_value_max = float('inf'), float('-inf')
-            for name, param in self.agent.named_parameters():
-                if param.grad is not None:
-                    if torch.isnan(param.grad).any():
-                        print(f"NaN gradient detected in {name}")
-                    if torch.isinf(param.grad).any():
-                        print(f"Inf gradient detected in {name}")
-                    
-                    # Calculate gradient norms for actor parameters
-                    if name == "actors.actor.weight":
-                        actor_weight_grad_norm = param.grad.norm().item()
-                    elif name == "actors.actor.bias":
-                        actor_bias_grad_norm = param.grad.norm().item()
-                    grad_norm = param.grad.norm().item()
-                    if grad_norm > max_grad_norm:
-                        max_grad_norm = grad_norm
-                        max_grad_norm_name = name
-                        max_grad_norm_value_min = param.grad.min().item()
-                        max_grad_norm_value_max = param.grad.max().item()
-            return_values = {
-                'actor_weight_grad_norm': actor_weight_grad_norm,
-                'actor_bias_grad_norm': actor_bias_grad_norm,
-                'max_grad_norm': max_grad_norm,
-                'max_grad_norm_name': max_grad_norm_name,
-                'max_grad_norm_value_min': max_grad_norm_value_min,
-                'max_grad_norm_value_max': max_grad_norm_value_max,
-            }
-            return return_values
-
         with torch.autocast(device_type=obs.device.type, dtype=torch.bfloat16, cache_enabled=True):
             for _ in range(self.args.update_epochs):
                 batch_env_indices = torch.randperm(self.args.num_envs).to(obs.device)
@@ -276,20 +242,6 @@ class HighLowImpalaTrainer:
                         step_results['loss'] *= 0 
                         step_results['approx_kls'] = self.args.update_kl_threshold
                         print('Skipping update on too-high KL. Careful here')
-
-                    ### DEBUGGING ###
-                    print('Approx kl:', step_results['approx_kls'].item())
-                    for name in ['pg_losses', 'value_losses']:
-                        loss = step_results[name]
-                        print('Debugging', name, 'value:', loss.item())
-                        if torch.isnan(loss).any():
-                            print(f"NaN {name} detected in step_results")
-                        loss.backward(retain_graph=True)
-                        grad_check_results = check_for_nan_gradients()
-                        self.optimizer.zero_grad()
-                        print(f"{name} passed. Actor weight: {grad_check_results['actor_weight_grad_norm']}, Actor bias: {grad_check_results['actor_bias_grad_norm']}, Max grad norm: {grad_check_results['max_grad_norm']}, Max grad norm name: {grad_check_results['max_grad_norm_name']}, Max grad norm value min: {grad_check_results['max_grad_norm_value_min']}, Max grad norm value max: {grad_check_results['max_grad_norm_value_max']}")
-
-                    ######
                     step_results['loss'].backward()
                     nn.utils.clip_grad_norm_(self.agent.parameters(), self.args.max_grad_norm)
                     self.optimizer.step()
@@ -374,12 +326,6 @@ class HighLowImpalaTrainer:
             log_ratio = new_logprob - logprobs[:, minibatch_env_indices]
             ratio = log_ratio.exp() 
             approx_kl = ((ratio - 1) - log_ratio).mean()
-
-        precisions = outputs['action_params']['precision']
-        print('    precisions', precisions.min().item(), precisions.max().item())
-        print('    log_ratio', log_ratio.min().item(), log_ratio.max().item())
-        print('    new_logprob', new_logprob.min().item(), new_logprob.max().item())
-        print('    logprobs', logprobs[:, minibatch_env_indices].min().item(), logprobs[:, minibatch_env_indices].max().item())
 
         assert dones[-1, minibatch_env_indices].all(), "All episodes must be terminated at the end of the episode"
         augmented_values = torch.cat([ # [T+1, B]

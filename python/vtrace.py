@@ -91,7 +91,7 @@ player_reward_buffer = env.new_player_reward_buffer() # [N]
 self_play = True 
 
 # Disable garbage collection for performance
-gc.disable()
+# gc.disable()
 
 pbar = tqdm(range(args.num_iterations))
 done_zeros, done_ones = torch.zeros(args.num_envs, device=device).float(), torch.ones(args.num_envs, device=device).float()
