@@ -83,8 +83,8 @@ def vtrace_losses(
     values: Float[torch.Tensor, "T_plus_1 B"],
     gamma: float = 0.99,
     gae_lambda: float = 0, # (0, 1) interpolates between (1-step TD, MC) respectively 
-    bar_rho: float = 1.0,
-    bar_c: float = 1.0): 
+    log_bar_rho: float = 0.0,
+    log_bar_c: float = 0.0): 
     """Computes V-trace bootstrapped value targets from a batch of trajectories.
 
     This function implements the V-trace algorithm, which provides off-policy
@@ -116,8 +116,8 @@ def vtrace_losses(
     with torch.no_grad(): 
         log_prob_ratio = logprobs - ref_logprobs
         # Clip log ratio to prevent exp() overflow - log(bar_rho) and log(bar_c)
-        log_policy_clip = torch.clamp(log_prob_ratio, max=torch.log(torch.tensor(bar_rho)))
-        log_vtrace_clip = torch.clamp(log_prob_ratio, max=torch.log(torch.tensor(bar_c)))
+        log_policy_clip = torch.clamp(log_prob_ratio, max=log_bar_rho)
+        log_vtrace_clip = torch.clamp(log_prob_ratio, max=log_bar_c)
         
         policy_clip = log_policy_clip.exp() # [T B]
         vtrace_clip = log_vtrace_clip.exp() # [T B]

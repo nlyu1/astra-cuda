@@ -9,6 +9,13 @@ from copy import deepcopy
 import matplotlib.pyplot as plt
 import wandb 
 
+
+class PlayoutFileLogger:
+    def __init__(self, args, playout_file_path): 
+        # Create if does not exist, else print-warn and overwrite
+
+    def log_playout_results()
+
 class Arena:
     """
     Playout scores can be registered freely, while agents can only be sampled after they're registered. 

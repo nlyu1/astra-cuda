@@ -1,9 +1,0 @@
-Sampling 4096 frames per iteration across 4096 environments
-Per-gradient step batch size: 1024. 4 gradient steps for 1 updates
-Args(exp_name='normal0', seed=20250716, track=True, wandb_project_name='HighLowTrading', wandb_entity=None, learning_rate=0.0003, num_steps=16, gamma=1, gae_lambda=0.0, update_kl_threshold=50, num_minibatches=4, update_epochs=1, entropy_coef=0.01, vf_coef=0.5, psettlement_coef=0.1, proles_coef=0.1, pdecay_tau=0.4, max_grad_norm=0.5, warmup_steps=750, n_hidden=512, n_embd=256, n_head=8, n_layer=5, num_iterations=40000000, iterations_per_pool_update=3000, iterations_to_first_pool_update=0, self_play_prob=0.0, checkpoint_name='normal_seedpool_4000', iterations_per_checkpoint=3000, iterations_per_heavy_logging=1000, steps_per_player=16, max_contracts_per_trade=5, customer_max_size=5, max_contract_value=30, players=5, game_setting=0, threads_per_block=64, num_blocks=64, num_markets=4096, device_id=0, batch_size=4096, total_timesteps=163840000000, num_envs=4096)
-Loading checkpoint normal_seedpool_4000 from checkpoints/normal_seedpool_4000.pt
-Batch size: 4096, Sequence length: 16, Feature dim: 42
-Transformer config: 512d hidden, 8 heads, 5 layers
-Total parameters: 4,762,649
-Trainable parameters: 4,762,649
-Model size: 18.17 MB (assuming float32)

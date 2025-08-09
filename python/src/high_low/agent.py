@@ -8,7 +8,7 @@ import torch.nn.functional as F
 import sys 
 sys.path.append('../')
 from model_components import ResidualBlock, LearnedPositionalEncoding
-from discrete_actor import DiscreteActor
+from discrete_actor import DiscreteGaussianActor, DiscreteSoftmaxActor
 
 class HighLowTransformerModel(nn.Module):
     """
@@ -56,7 +56,7 @@ class HighLowTransformerModel(nn.Module):
             enable_nested_tensor=False)
         self.transformer_norm = nn.LayerNorm(self.n_embd)
         
-        self.actors = DiscreteActor(
+        self.actors = DiscreteSoftmaxActor(
             self.n_embd, 4, 
             min_values=torch.tensor([1, 1, 0, 0], device=self.device),
             max_values=torch.tensor([self.M, self.M, self.S, self.S], device=self.device))
@@ -154,7 +154,7 @@ class HighLowTransformerModel(nn.Module):
         return outputs
 
     @torch.inference_mode()
-    @torch.compile(fullgraph=False, mode="max-autotune-no-cudagraphs", dynamic=True)
+    @torch.compile(fullgraph=True, mode="max-autotune-no-cudagraphs", dynamic=True)
     def incremental_forward_with_context(self, x, prev_context, uniform_samples):
         """
         x: [B, F]
@@ -169,7 +169,7 @@ class HighLowTransformerModel(nn.Module):
         assert x.shape[1] == self.F, f"Expected observation feature dim {self.F}, got {x.shape[1]}"
         assert prev_context.numel() == 0 or prev_context.shape[2] == self.n_embd, f"Expected context embedding dim {self.n_embd}, got {prev_context.shape[2]}"
         
-        B, _F = x.shape
+        B = x.shape[0]
         encoded = self.encoder(x).view(1, B, self.n_embd)
         
         if prev_context.numel() == 0: # First timestep
