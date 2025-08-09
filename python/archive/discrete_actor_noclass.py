@@ -43,6 +43,91 @@ def _logsubexp(a: Tensor, b: Tensor) -> Tensor:
     diff = b - a
     return a + torch.log1p(-torch.exp(diff))
 
+def _compute_truncation_params(center: Tensor, precision: Tensor) -> Tuple[Tensor, Tensor, Tensor, Tensor, Tensor]:
+    """Compute truncation parameters for the distribution."""
+    alpha = (0.0 - center) * precision
+    beta = (1.0 - center) * precision
+    log_F_alpha = _log_ndtr(alpha)
+    log_F_beta = _log_ndtr(beta)
+    log_Z = _logsubexp(log_F_beta, log_F_alpha)
+    return alpha, beta, log_F_alpha, log_F_beta, log_Z
+
+def _sample_truncated_gaussian(center: Tensor, precision: Tensor, uniform_samples: Tensor,
+                             log_F_alpha: Tensor, log_F_beta: Tensor) -> Tensor:
+    """Sample from truncated Gaussian distribution."""
+    u = uniform_samples.clamp(1e-6, 1.0 - 1e-6)
+    F_alpha = torch.exp(log_F_alpha)
+    F_beta = torch.exp(log_F_beta)
+    p = u * (F_beta - F_alpha) + F_alpha
+    z = torch.special.ndtri(p)  # z-scores
+    return z / precision + center  # x = z * std + mean
+
+def _log_prob_truncated(x: Tensor, center: Tensor, precision: Tensor, log_Z: Tensor) -> Tensor:
+    """Compute log probability for truncated Gaussian."""
+    return _log_normal_pdf_prec(x, center, precision) - log_Z
+
+def _log_cdf_truncated(x: Tensor, center: Tensor, precision: Tensor, 
+                      log_F_alpha: Tensor, log_Z: Tensor) -> Tensor:
+    """Compute log CDF for truncated Gaussian."""
+    z = (x - center) * precision
+    return _logsubexp(_log_ndtr(z), log_F_alpha) - log_Z
+
+def _logp_interval_truncated(lo: Tensor, hi: Tensor, center: Tensor, precision: Tensor,
+                           log_Z: Tensor) -> Tensor:
+    """
+    log P(lo ≤ X ≤ hi) using arithmetic masking for torch.compile compatibility.
+    """
+    z_low = (lo - center) * precision
+    z_high = (hi - center) * precision
+    
+    # Detect extreme cases (convert to float for arithmetic)
+    is_extreme = (((z_low > 4.0) & (z_high > 4.0)) | 
+                ((z_low < -4.0) & (z_high < -4.0))).float()
+    
+    # Detect which formulation to use for non-extreme cases
+    use_complement = ((z_low > -z_high) & (z_low > 0)).float()
+    
+    # === Compute all three branches with safe fallbacks ===
+    
+    # 1. Extreme case approximation
+    z_mid = 0.5 * (z_low + z_high)
+    log_pdf_mid = -0.5 * z_mid**2 - _LOG_SQRT_2PI
+    width = hi - lo
+    approx_logp = log_pdf_mid + torch.log(width + 1e-30) + torch.log(precision)
+    
+    # 2. Standard computation: log(Φ(z_high) - Φ(z_low))
+    # Mask out extreme cases by replacing with safe dummy values
+    safe_z_high_std = z_high * (1.0 - is_extreme) + is_extreme * 1.0
+    safe_z_low_std = z_low * (1.0 - is_extreme) + is_extreme * 0.0
+    log_cdf_high = _log_ndtr(safe_z_high_std)
+    log_cdf_low = _log_ndtr(safe_z_low_std)
+    standard = _logsubexp(log_cdf_high, log_cdf_low) - log_Z
+    
+    # 3. Complement computation: log(Φ(-z_low) - Φ(-z_high))
+    # Mask out extreme cases by replacing with safe dummy values
+    safe_z_low_comp = z_low * (1.0 - is_extreme) + is_extreme * 0.0
+    safe_z_high_comp = z_high * (1.0 - is_extreme) + is_extreme * 1.0
+    log_sf_low = _log_ndtr(-safe_z_low_comp)
+    log_sf_high = _log_ndtr(-safe_z_high_comp)
+    complement = _logsubexp(log_sf_low, log_sf_high) - log_Z
+    
+    # === Arithmetic combination of all three branches ===
+    # First combine standard and complement for non-extreme cases
+    non_extreme_value = complement * use_complement + standard * (1.0 - use_complement)
+    
+    # Then combine with extreme approximation
+    result = approx_logp * is_extreme + non_extreme_value * (1.0 - is_extreme)
+    
+    return result
+
+def _entropy_truncated(center: Tensor, precision: Tensor, alpha: Tensor, beta: Tensor,
+                      log_Z: Tensor) -> Tensor:
+    """Compute entropy for truncated Gaussian."""
+    phi = lambda t: torch.exp(-0.5 * t.square()) / math.sqrt(_TWO_PI)
+    num = alpha * phi(alpha) - beta * phi(beta)
+    return (-torch.log(precision) + 0.5 * math.log(_TWO_PI * math.e) + 
+            num / torch.exp(log_Z) - log_Z)
+
 # def _logsubexp(a: Tensor, b: Tensor) -> Tensor:
 #     """
 #     Stable log(exp(a) - exp(b)) with a ≥ b.
@@ -218,7 +303,7 @@ class DiscreteActor(nn.Module):
         unit_samples_lb = ((integer_samples - 0.5) + 0.5 - self.min_values) / self.rangeP1
         return unit_samples_lb, unit_samples_ub
     
-    @torch.compile(fullgraph=False, mode="max-autotune-no-cudagraphs")
+    # @torch.compile(fullgraph=False, mode="max-autotune-no-cudagraphs")
     def logp_entropy_and_sample(self, x, uniform_samples):
         """
         Sample actions and compute log probabilities.
@@ -231,15 +316,17 @@ class DiscreteActor(nn.Module):
             Dict with samples, logprobs, entropy, and distribution parameters
         """
         center, prec = self(x)
-        dist = GaussianActionDistribution(center, prec)
-        unit_samples = dist.sample(uniform_samples) # between [0, 1]
+        # Compute truncation parameters
+        alpha, beta, log_F_alpha, log_F_beta, log_Z = _compute_truncation_params(center, prec)
+        # Sample from truncated Gaussian
+        unit_samples = _sample_truncated_gaussian(center, prec, uniform_samples, log_F_alpha, log_F_beta)
         integer_samples = self._integer_samples_from_unit_samples(unit_samples)
         unit_lb, unit_ub = self._unit_interval_of_integer_samples(integer_samples)
         # Logprobs needs to be appropriately scaled
-        logprobs = dist.logp_interval(unit_lb, unit_ub) - self.rangeP1.log() 
+        logprobs = _logp_interval_truncated(unit_lb, unit_ub, center, prec, log_Z) - self.rangeP1.log() 
 
         # Approximating discrete entropy by continuous differential entropy, so we need to scale by the range
-        entropy = dist.entropy() + self.rangeP1.log()
+        entropy = _entropy_truncated(center, prec, alpha, beta, log_Z) + self.rangeP1.log()
         return {
             'samples': integer_samples, # [B, n_actors] int. A batch of samples
             'logprobs': logprobs, # [B, n_actors] float. Logprobs of the samples
@@ -249,7 +336,7 @@ class DiscreteActor(nn.Module):
                 'precision': prec, # [B, n_actors] float
             }}
     
-    @torch.compile(fullgraph=True, mode="max-autotune")
+    # @torch.compile(fullgraph=True, mode="max-autotune")
     def logp_entropy(self, x, integer_samples):
         """
         Compute log probabilities and entropy for given actions.
@@ -262,11 +349,12 @@ class DiscreteActor(nn.Module):
             Dict with logprobs, entropy, and distribution parameters
         """
         center, prec = self(x)
-        dist = GaussianActionDistribution(center, prec)
+        # Compute truncation parameters
+        alpha, beta, log_F_alpha, log_F_beta, log_Z = _compute_truncation_params(center, prec)
 
         unit_lb, unit_ub = self._unit_interval_of_integer_samples(integer_samples)
-        logprobs = dist.logp_interval(unit_lb, unit_ub) - self.rangeP1.log() 
-        entropy = dist.entropy() + self.rangeP1.log()
+        logprobs = _logp_interval_truncated(unit_lb, unit_ub, center, prec, log_Z) - self.rangeP1.log() 
+        entropy = _entropy_truncated(center, prec, alpha, beta, log_Z) + self.rangeP1.log()
         return {
             'logprobs': logprobs, # [B, n_actors] float. Logprobs of the samples
             'entropy': entropy, # [B] float. Entropy of the computed distribution
