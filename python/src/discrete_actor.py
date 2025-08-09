@@ -136,7 +136,7 @@ class DiscreteActor(nn.Module):
         output = self.actor(x)
         mean, precision = output[:, :self.n_actors], output[:, self.n_actors:]
         mean = torch.sigmoid(mean)
-        precision = nn.functional.softplus(precision / 10) + 0.5
+        precision = nn.functional.softplus(precision / 10) + 2.
         return mean, precision
     
     def _integer_samples_from_unit_samples(self, unit_samples):
