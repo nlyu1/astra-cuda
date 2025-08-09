@@ -31,7 +31,7 @@ class Args:
     update_epochs: int = 1
     """the K epochs to update the policy.
     `num_minibatches * update_epochs` trades between sampling efficiency and training stability."""
-    entropy_coef: float = 0.05
+    entropy_coef: float = 0.01
     """coefficient for entropy regularization"""
     vf_coef: float = 0.5
     """coefficient of the value function"""

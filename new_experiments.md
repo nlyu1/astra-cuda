@@ -12,6 +12,15 @@ CUDA_VISIBLE_DEVICES=1 python vtrace.py --game_setting 1 --entropy_coef 0.01 --n
 CUDA_VISIBLE_DEVICES=0 python vtrace.py --game_setting 0 --entropy_coef 0.01 --num_iterations 4005 --iterations_per_checkpoint 4000 --iterations_per_pool_update 4000 --exp_name normal_seedpool > normal_seedpool.txt
 ```
 
-##
+## Bootstrap runs 
 
-CUDA_VISIBLE_DEVICES=1 python vtrace.py --game_setting 1 --entropy_coef 0.01 --num_iterations 4005 --iterations_per_checkpoint 4000 --iterations_per_pool_update 4000 --exp_name normal_seedpool_dev --checkpoint_name small_seedpool_4000 --warmup_steps 0 > logs.txt
+1. [Small game]
+2. [Normal game]
+
+```
+CUDA_VISIBLE_DEVICES=1 python vtrace.py --game_setting 1 --entropy_coef 0.01 --num_iterations 40000000 --exp_name small0 --checkpoint_name small_seedpool__4000 > small_seedpool.txt
+
+CUDA_VISIBLE_DEVICES=0 python vtrace.py --game_setting 0 --entropy_coef 0.01 --num_iterations 40000000 --exp_name normal0 --checkpoint_name normal_seedpool__4000 > normal_seedpool.txt
+```
+
+CUDA_VISIBLE_DEVICES=1 python vtrace.py --game_setting 1 --entropy_coef 0.01 --num_iterations 40000000 --exp_name small0 --checkpoint_name small_seedpool_4000 --num_warmup_steps 0 

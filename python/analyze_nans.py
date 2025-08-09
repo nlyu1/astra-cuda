@@ -17,7 +17,7 @@ from discrete_actor import GaussianActionDistribution
 import tyro
 
 # %% Load debug directory
-debug_dir = "nan_debug_normal_seedpool_dev_20250808_233453_1"
+debug_dir = "nan_debug_small0_20250809_004928_1"
 print(f"Analyzing debug directory: {debug_dir}")
 
 # Check if directory exists
@@ -70,6 +70,7 @@ env = HighLowTrading(game_config)
 # Create model
 device = torch.device(f'cuda:{args.device_id}' if torch.cuda.is_available() else 'cpu')
 model = HighLowTransformerModel(args, env, verbose=False).to(device)
+optimizer = torch.optim.Adam(model.parameters(), lr=args.learning_rate)
 
 # Load the saved state
 model.load_state_dict(model_state, strict=True)
@@ -114,18 +115,26 @@ print(f"  - obs: {torch.isinf(obs).any().item()}")
 print(f"  - logprobs: {torch.isinf(logprobs).any().item()}")
 print(f"  - rewards: {torch.isinf(rewards).any().item()}")
 
-# %% Create pinfo_tensor (needed for forward pass)
-# This is a placeholder - in actual training this comes from the environment
+# %% 
+raw_minibatch_indices = debug_data['minibatch_env_indices']
+print(raw_minibatch_indices.shape)
+minibatch_env_indices = raw_minibatch_indices[0:1]
+
+# %% Replicate the forward pass
+
+indices = torch.zeros((1024,)).bool()
+indices[1:10] = 1
+
+## %% Compute losses (matching _train_step)
+# Enable gradient computation
+optimizer.zero_grad()
+
 num_envs_in_minibatch = len(minibatch_env_indices)
 pinfo_numfeatures = 2 + 1 + args.players  # From agent.py
 pinfo_tensor = torch.zeros((num_envs_in_minibatch, pinfo_numfeatures), device=device)
 print(f"\nCreated pinfo_tensor with shape: {pinfo_tensor.shape}")
 
-# %% Replicate the forward pass
 print("\nReplicating forward pass...")
-
-# Enable gradient computation
-model.zero_grad()
 
 # Run forward pass with autocast (matching training)
 with torch.autocast(device_type=device.type, dtype=torch.bfloat16, cache_enabled=True):
@@ -175,6 +184,7 @@ else:
 # Analyze where -inf occurred
 print("\nAnalyzing -inf log probabilities...")
 inf_mask = torch.isinf(new_logprob)
+print("total number of infs", inf_mask.sum().item())
 print(new_logprob.shape, policy_centers.shape)
 if inf_mask.any():
     inf_indices = torch.where(inf_mask)
@@ -207,115 +217,118 @@ if inf_mask.any():
                     print(f"    Action[{j}]={action_vals[j].item()} not in [{min_vals[j].item()}, {max_vals[j].item()}]")
         break
 
-# %% Replicate the discrete_action pass for debugging -inf
+##  %% Replicate the discrete_action pass for debugging -inf
 print("\n" + "="*50)
 print("DEBUGGING -INF LOG PROBABILITY")
 print("="*50)
 
 # Use the first -inf case
-for i in range(min(5, len(inf_indices[0]))):
-    t_idx = inf_indices[0][i].item()
-    b_idx = inf_indices[1][i].item()
-    
-    print(f"\nAnalyzing timestep {t_idx}, batch {b_idx}:")
+inf_indices = None 
+if inf_indices is not None:
+    for i in range(min(5, len(inf_indices[0]))):
+        t_idx = inf_indices[0][i].item()
+        b_idx = inf_indices[1][i].item()
+        
+        print(f"\nAnalyzing timestep {t_idx}, batch {b_idx}:")
 
-    # Get the specific values
-    action = actions[t_idx, b_idx]
-    center = policy_centers[t_idx, b_idx]
-    precision = policy_precisions[t_idx, b_idx]
+        # Get the specific values
+        action = actions[t_idx, b_idx]
+        center = policy_centers[t_idx, b_idx]
+        precision = policy_precisions[t_idx, b_idx]
 
-    print(f"Action: {action.cpu().numpy()}")
-    print(f"Center: {center.detach().float().cpu().numpy()}")
-    print(f"Precision: {precision.detach().cpu().numpy()}")
+        print(f"Action: {action.cpu().numpy()}")
+        print(f"Center: {center.detach().float().cpu().numpy()}")
+        print(f"Precision: {precision.detach().cpu().numpy()}")
 
-    # Get min/max values for each action type
-    min_vals = torch.tensor([1, 1, 0, 0], device=device)
-    max_vals = torch.tensor([args.max_contract_value, args.max_contract_value, args.max_contracts_per_trade, args.max_contracts_per_trade], device=device)
-    rangeP1 = max_vals - min_vals + 1
+        # Get min/max values for each action type
+        min_vals = torch.tensor([1, 1, 0, 0], device=device)
+        max_vals = torch.tensor([args.max_contract_value, args.max_contract_value, args.max_contracts_per_trade, args.max_contracts_per_trade], device=device)
+        rangeP1 = max_vals - min_vals + 1
 
-    print(f"\nValid ranges:")
-    for i in range(4):
-        print(f"  Action {i}: [{min_vals[i].item()}, {max_vals[i].item()}], rangeP1={rangeP1[i].item()}")
-
-    # Manually compute the log probability step by step
-    print("\n" + "-"*30)
-    print("MANUAL COMPUTATION:")
-
-    with torch.no_grad():
-        # Create distribution for each action dimension
+        print(f"\nValid ranges:")
         for i in range(4):
-            print(f"\nAction dimension {i}:")
-            print(f"  Action value: {action[i].item()}")
-            print(f"  Center: {center[i].item():.6f}")
-            print(f"  Precision: {precision[i].item():.6f}")
-            
-            # Create distribution
-            dist_i = GaussianActionDistribution(center[i:i+1], precision[i:i+1])
-            
-            # Compute unit interval bounds for the integer action
-            unit_lb = ((action[i] - 0.5) + 0.5 - min_vals[i]) / rangeP1[i]
-            unit_ub = ((action[i] + 0.5) + 0.5 - min_vals[i]) / rangeP1[i]
-            
-            print(f"  Unit interval: [{unit_lb.item():.6f}, {unit_ub.item():.6f}]")
-            
-            # Check the distribution's truncation bounds
-            alpha = (0.0 - center[i]) * precision[i]
-            beta = (1.0 - center[i]) * precision[i]
-            print(f"  Alpha (z-score at 0): {alpha.item():.6f}")
-            print(f"  Beta (z-score at 1): {beta.item():.6f}")
-            
-            # Check log CDF values
-            print(f"  _log_F_alpha: {dist_i._log_F_alpha.item():.6f}")
-            print(f"  _log_F_beta: {dist_i._log_F_beta.item():.6f}")
-            print(f"  _log_Z: {dist_i._log_Z.item():.6f}")
-            
-            # Compute log probability of the interval
-            logp_interval = dist_i.logp_interval(unit_lb, unit_ub)
-            logp_scaled = logp_interval - rangeP1[i].log()
-            
-            print(f"  logp_interval: {logp_interval.item():.6f}")
-            print(f"  log(rangeP1): {rangeP1[i].log().item():.6f}")
-            print(f"  Final logp: {logp_scaled.item():.6f}")
-            
-            if torch.isinf(logp_scaled):
-                print(f"  WARNING: -inf detected!")
-                
-                # Debug the interval computation
-                z_low = (unit_lb - center[i]) * precision[i]
-                z_high = (unit_ub - center[i]) * precision[i]
-                log_cdf_low = torch.special.log_ndtr(z_low)
-                log_cdf_high = torch.special.log_ndtr(z_high)
-                
-                print(f"  Debug interval computation:")
-                print(f"    z_low: {z_low.item():.6f}")
-                print(f"    z_high: {z_high.item():.6f}")
-                print(f"    log_ndtr(z_low): {log_cdf_low.item():.6f}")
-                print(f"    log_ndtr(z_high): {log_cdf_high.item():.6f}")
-                
-                # Check if the interval is outside the support
-                if unit_ub <= 0.0 or unit_lb >= 1.0:
-                    print(f"    ERROR: Interval completely outside [0,1] support!")
-                elif z_high < alpha.item():
-                    print(f"    ERROR: Interval below truncation lower bound!")
-                elif z_low > beta.item():
-                    print(f"    ERROR: Interval above truncation upper bound!")
+            print(f"  Action {i}: [{min_vals[i].item()}, {max_vals[i].item()}], rangeP1={rangeP1[i].item()}")
 
-    # Now replicate the full computation
-    print("\n" + "-"*30)
-    print("FULL COMPUTATION WITH AUTOCAST:")
-    with torch.autocast(device_type=device.type, dtype=torch.bfloat16, cache_enabled=True):
-        dist = GaussianActionDistribution(center, precision)
-        
-        # Get the log probabilities using the DiscreteActor logic
-        unit_lb, unit_ub = model.actors._unit_interval_of_integer_samples(action.unsqueeze(0))
-        unit_lb, unit_ub = unit_lb.squeeze(0), unit_ub.squeeze(0)
-        
-        logprobs = dist.logp_interval(unit_lb, unit_ub) - rangeP1.log()
-        
-        print(f"Logprobs per action: {logprobs.detach().float().cpu().numpy()}")
-        print(f"Total logprob: {logprobs.sum().item():.6f}")
+        # Manually compute the log probability step by step
+        print("\n" + "-"*30)
+        print("MANUAL COMPUTATION:")
 
-# %% Compute losses (matching _train_step)
+        with torch.no_grad():
+            # Create distribution for each action dimension
+            for i in range(4):
+                print(f"\nAction dimension {i}:")
+                print(f"  Action value: {action[i].item()}")
+                print(f"  Center: {center[i].item():.6f}")
+                print(f"  Precision: {precision[i].item():.6f}")
+                
+                # Create distribution
+                dist_i = GaussianActionDistribution(center[i:i+1], precision[i:i+1])
+                
+                # Compute unit interval bounds for the integer action
+                unit_lb = ((action[i] - 0.5) + 0.5 - min_vals[i]) / rangeP1[i]
+                unit_ub = ((action[i] + 0.5) + 0.5 - min_vals[i]) / rangeP1[i]
+                
+                print(f"  Unit interval: [{unit_lb.item():.6f}, {unit_ub.item():.6f}]")
+                
+                # Check the distribution's truncation bounds
+                alpha = (0.0 - center[i]) * precision[i]
+                beta = (1.0 - center[i]) * precision[i]
+                print(f"  Alpha (z-score at 0): {alpha.item():.6f}")
+                print(f"  Beta (z-score at 1): {beta.item():.6f}")
+                
+                # Check log CDF values
+                print(f"  _log_F_alpha: {dist_i._log_F_alpha.item():.6f}")
+                print(f"  _log_F_beta: {dist_i._log_F_beta.item():.6f}")
+                print(f"  _log_Z: {dist_i._log_Z.item():.6f}")
+                
+                # Compute log probability of the interval
+                logp_interval = dist_i.logp_interval(unit_lb, unit_ub)
+                logp_scaled = logp_interval - rangeP1[i].log()
+                
+                print(f"  logp_interval: {logp_interval.item():.6f}")
+                print(f"  log(rangeP1): {rangeP1[i].log().item():.6f}")
+                print(f"  Final logp: {logp_scaled.item():.6f}")
+                
+                if torch.isinf(logp_scaled):
+                    print(f"  WARNING: -inf detected!")
+                    
+                    # Debug the interval computation
+                    z_low = (unit_lb - center[i]) * precision[i]
+                    z_high = (unit_ub - center[i]) * precision[i]
+                    log_cdf_low = torch.special.log_ndtr(z_low)
+                    log_cdf_high = torch.special.log_ndtr(z_high)
+                    
+                    print(f"  Debug interval computation:")
+                    print(f"    z_low: {z_low.item():.6f}")
+                    print(f"    z_high: {z_high.item():.6f}")
+                    print(f"    log_ndtr(z_low): {log_cdf_low.item():.6f}")
+                    print(f"    log_ndtr(z_high): {log_cdf_high.item():.6f}")
+                    
+                    # Check if the interval is outside the support
+                    if unit_ub <= 0.0 or unit_lb >= 1.0:
+                        print(f"    ERROR: Interval completely outside [0,1] support!")
+                    elif z_high < alpha.item():
+                        print(f"    ERROR: Interval below truncation lower bound!")
+                    elif z_low > beta.item():
+                        print(f"    ERROR: Interval above truncation upper bound!")
+
+        # Now replicate the full computation
+        print("\n" + "-"*30)
+        print("FULL COMPUTATION WITH AUTOCAST:")
+        with torch.autocast(device_type=device.type, dtype=torch.bfloat16, cache_enabled=True):
+            dist = GaussianActionDistribution(center, precision)
+            
+            # Get the log probabilities using the DiscreteActor logic
+            unit_lb, unit_ub = model.actors._unit_interval_of_integer_samples(action.unsqueeze(0))
+            unit_lb, unit_ub = unit_lb.squeeze(0), unit_ub.squeeze(0)
+            
+            logprobs = dist.logp_interval(unit_lb, unit_ub) - rangeP1.log()
+            
+            print(f"Logprobs per action: {logprobs.detach().float().cpu().numpy()}")
+            print(f"Total logprob: {logprobs.sum().item():.6f}")
+
+## %% Computing losses and backward pass
+
 print("\nComputing losses...")
 
 T = obs.shape[0]
@@ -366,6 +379,7 @@ def vtrace_losses(
         bar_c (float): The clipping threshold (c-bar) for the trace importance
             weight ($c$), which controls the bootstrapping lookahead.
     """
+    print('V-trace:', values.shape, logprobs.shape)
 
     # If done at current episode, next-step value is truncated 
     next_values = values[1:] * (1 - dones)
@@ -409,7 +423,7 @@ def vtrace_losses(
                 delta + gamma * gae_lambda * ctd * last_gae_lambda)
             
         # vtrace_advantage = rewards + gamma * (1 - dones) *vtrace_values[1:] - cur_values 
-        vtrace_advantage = (vtrace_advantage - vtrace_advantage.mean()) / (vtrace_advantage.std() + 1e-8)
+        # vtrace_advantage = (vtrace_advantage - vtrace_advantage.mean()) / (vtrace_advantage.std() + 1e-8)
     pg_loss = - policy_clip * logprobs * vtrace_advantage 
     pg_loss = pg_loss.mean()
     print('Hello')
@@ -421,21 +435,6 @@ def vtrace_losses(
 
 # Compute losses
 with torch.autocast(device_type=device.type, dtype=torch.bfloat16, cache_enabled=True):
-    # Settlement loss
-    pred_settlement_loss = torch.nn.functional.smooth_l1_loss(
-        pred_settlement, 
-        actual_settlement.unsqueeze(0).expand(T, num_envs_per_minibatch), 
-        reduction='none')
-    pred_settlement_loss = (pred_settlement_loss * pinfo_loss_weights).mean()
-    
-    # Private roles loss
-    flattened_pred_private_roles = pred_private_roles.reshape(-1, 3)
-    flattened_actual_private_roles = actual_private_roles.unsqueeze(0).expand(
-        T, num_envs_per_minibatch, args.players).reshape(-1)
-    pred_private_roles_loss = torch.nn.functional.cross_entropy(
-        flattened_pred_private_roles, flattened_actual_private_roles, reduction='none'
-    ).reshape(T, num_envs_per_minibatch, args.players)
-    pred_private_roles_loss = (pred_private_roles_loss * pinfo_loss_weights.unsqueeze(-1)).mean()
     
     # V-trace losses
     augmented_values = torch.cat([
@@ -443,11 +442,11 @@ with torch.autocast(device_type=device.type, dtype=torch.bfloat16, cache_enabled
     
     # Note: vtrace_losses now takes log_bar_rho and log_bar_c instead of bar_rho and bar_c
     vtrace_results = vtrace_losses(
-        rewards,
-        dones,
-        logprobs,
-        new_logprob,
-        augmented_values,
+        rewards[:, indices],
+        dones[:,indices],
+        logprobs[:,indices],
+        new_logprob[:,indices],
+        augmented_values[:,indices],
         gamma=args.gamma,
         gae_lambda=args.gae_lambda,
         log_bar_rho=0.0,  # log(1.0) = 0.0
@@ -457,22 +456,21 @@ with torch.autocast(device_type=device.type, dtype=torch.bfloat16, cache_enabled
     entropy_loss = -args.entropy_coef * entropy_value
     
     # Total loss
-    loss = (vtrace_results['policy_loss'] 
-            + entropy_loss
-            + vtrace_results['value_loss'] * args.vf_coef
-            + pred_settlement_loss * args.psettlement_coef
-            + pred_private_roles_loss * args.proles_coef)
+    # loss = (vtrace_results['policy_loss'] 
+    #         + entropy_loss
+    #         + vtrace_results['value_loss'] * args.vf_coef
+    #         + pred_settlement_loss * args.psettlement_coef
+    #         + pred_private_roles_loss * args.proles_coef)
+    loss = vtrace_results['policy_loss']
     
     print(f"\nLoss components:")
     print(f"  - policy_loss: {vtrace_results['policy_loss'].item():.6f}")
     print(f"  - value_loss: {vtrace_results['value_loss'].item():.6f}")
     print(f"  - entropy_loss: {entropy_loss.item():.6f}")
-    print(f"  - pred_settlement_loss: {pred_settlement_loss.item():.6f}")
-    print(f"  - pred_private_roles_loss: {pred_private_roles_loss.item():.6f}")
     print(f"  - total_loss: {loss.item():.6f}")
     print(f"  - loss has NaN: {torch.isnan(loss).item()}")
 
-# %% Compute gradients
+## %% Compute gradients
 print("\nComputing gradients...")
 loss.backward()
 

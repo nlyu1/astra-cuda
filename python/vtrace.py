@@ -24,7 +24,8 @@ from high_low.agent import HighLowTransformerModel
 from high_low.config import Args
 from high_low.env import HighLowTrading
 from high_low.logger import HighLowLogger
-from high_low.impala import HighLowImpalaTrainer, HighLowImpalaBuffer
+# from high_low.impala import HighLowImpalaTrainer, HighLowImpalaBuffer
+from high_low.impala_lognans import HighLowImpalaTrainer, HighLowImpalaBuffer
 from timer import Timer, OneTickTimer
 import tyro
 
