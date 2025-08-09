@@ -272,7 +272,6 @@ class HighLowImpalaTrainer:
                         self.optimizer.step()
                     
                     self.optimizer.zero_grad()
-
                     self.explained_vars[logging_counter] = step_results['explained_vars']
                     self.value_losses[logging_counter] = step_results['value_losses']
                     self.pg_losses[logging_counter] = step_results['pg_losses']

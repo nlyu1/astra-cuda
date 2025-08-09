@@ -121,6 +121,8 @@ class DiscreteActor(nn.Module):
         self.eps = eps 
         self.register_buffer('min_values', min_values, persistent=False)
         self.register_buffer('max_values', max_values, persistent=False)
+        num_distinct_values = (max_values - min_values + 1)
+        self.register_buffer('precision_ceiling', num_distinct_values * 2.5) # Corresponds to integer bin containing \pm 2.5-sigma
         self.register_buffer('rangeP1', max_values - min_values + 1, persistent=False)
         
     #@#torch.compile(fullgraph=True, mode="max-autotune")
@@ -129,7 +131,8 @@ class DiscreteActor(nn.Module):
         mean, precision = output[:, :self.n_actors], output[:, self.n_actors:]
         mean = torch.sigmoid(mean)
         precision = nn.functional.softplus(
-            nn.functional.leaky_relu(precision, negative_slope=0.1) + 1.5) + 0.5
+            nn.functional.leaky_relu(precision, negative_slope=0.1) + 1.5) + 0.5 
+        precision = torch.clamp(precision, max=self.precision_ceiling)
         return mean, precision
     
     def _integer_samples_from_unit_samples(self, unit_samples):

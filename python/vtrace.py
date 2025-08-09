@@ -125,7 +125,6 @@ for iteration in pbar:
     settlement_preds, private_role_preds = [], []
     buffer.pinfo_tensor = env.pinfo_tensor()
     for step in range(args.num_steps):
-        torch.compiler.cudagraph_mark_step_begin() # Mark iterations to enable cuda-graph in compilation
         global_step += args.num_envs 
 
         for npc_id in range(player_offset):
@@ -133,6 +132,7 @@ for iteration in pbar:
             env.fill_observation_tensor(observation_buffer)
             with torch.autocast(device_type=device.type, dtype=torch.bfloat16, cache_enabled=True):
                 with torch.inference_mode():
+                    torch.compiler.cudagraph_mark_step_begin()
                     npc_actions = npc_agents[npc_id].incremental_forward(observation_buffer, step)['action']
             env.step(npc_actions)
         
@@ -150,6 +150,7 @@ for iteration in pbar:
         env.fill_observation_tensor(buffer.obs[step])
         with torch.autocast(device_type=device.type, dtype=torch.bfloat16, cache_enabled=True):
             with torch.inference_mode():
+                torch.compiler.cudagraph_mark_step_begin()
                 forward_results = local_agent.incremental_forward(buffer.obs[step], step)
         action, log_probs = forward_results['action'], forward_results['logprobs']
         settlement_preds.append(forward_results['pinfo_preds']['settle_price'].clone())
@@ -175,6 +176,7 @@ for iteration in pbar:
             env.fill_observation_tensor(observation_buffer)
             with torch.autocast(device_type=device.type, dtype=torch.bfloat16, cache_enabled=True):
                 with torch.inference_mode():
+                    
                     npc_actions = npc_agents[npc_id].incremental_forward(observation_buffer, step)['action']
             env.step(npc_actions)
 
