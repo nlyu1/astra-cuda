@@ -150,11 +150,11 @@ class HighLowTransformerModel(nn.Module):
         # 4 action types
         uniform_samples = self._populate_uniform_buffer((x.shape[0], 4)) 
         outputs = self.incremental_forward_with_context(x, self.context, uniform_samples)
-        self.context = outputs['context'].clone()
+        self.context = outputs['context']
         return outputs
 
     @torch.inference_mode()
-    @torch.compile(fullgraph=False, mode="max-autotune")
+    @torch.compile(fullgraph=False, mode="max-autotune-no-cudagraphs")
     def incremental_forward_with_context(self, x, prev_context, uniform_samples):
         """
         x: [B, F]

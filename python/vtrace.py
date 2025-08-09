@@ -103,7 +103,7 @@ dist_params_buffer = {
 
 for iteration in pbar:
     # Manual GC every 100 iterations
-    if iteration > 0 and iteration % 50 == 0:
+    if iteration > 0 and iteration % 100 == 0:
         gc.collect() 
     self_play = random.random() < args.self_play_prob
     # Pick npc agents and player offset
