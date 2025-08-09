@@ -295,7 +295,7 @@ class HighLowImpalaTrainer:
         actual_settlement: [B]
         actual_private_roles: [B, num_players]
         """
-        T, _single_obs_shape = obs.shape[0], obs.shape[2:]
+        T = obs.shape[0]
         num_envs_per_minibatch = self.args.num_envs // self.args.num_minibatches
 
         # Off-policy network, using surrogate loss 

@@ -107,9 +107,9 @@ class HighLowLogger:
             log_data[f'acc/non_self_acc{idx+1}'] = non_self_acc[idx].mean().item()
         
         # Log distribution parameters (only transfer to CPU here)
-        log_data['debug/epsilon_uniform'] = dist_params['epsilon_uniform'].mean().item()
-        log_data['debug/epsilon_support'] = dist_params['epsilon_support'].mean().item()
-        log_data['debug/width'] = dist_params['width'].mean().item()
+        for j, name in enumerate(['bid_px', 'ask_px', 'bid_sz', 'ask_sz']):
+            for k, v in dist_params.items():
+                log_data[f'{k}/{name}'] = v[:, j].mean().item()
 
         if heavy_updates: 
             customer_size_mask = (customer_size_sum == 0)

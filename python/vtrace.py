@@ -97,9 +97,9 @@ pbar = tqdm(range(args.num_iterations))
 done_zeros, done_ones = torch.zeros(args.num_envs, device=device).float(), torch.ones(args.num_envs, device=device).float()
 
 # Pre-allocate GPU buffers for distribution parameters (outside loop for reuse)
-eps_uniform_buffer = torch.zeros(args.num_steps, device=device)
-eps_support_buffer = torch.zeros(args.num_steps, device=device)
-width_buffer = torch.zeros(args.num_steps, device=device)
+dist_params_buffer = {
+    'center': torch.zeros(args.num_steps, 4, device=device),
+    'precision': torch.zeros(args.num_steps, 4, device=device)}
 
 for iteration in pbar:
     # Manual GC every 100 iterations
@@ -156,9 +156,8 @@ for iteration in pbar:
         private_role_preds.append(forward_results['pinfo_preds']['private_roles'].argmax(dim=-1))
 
         # Store distribution parameters in GPU buffers (no CPU transfer)
-        eps_uniform_buffer[step] = forward_results['action_params']['epsilon_uniform'].mean()
-        eps_support_buffer[step] = forward_results['action_params']['epsilon_fullsupport'].mean()
-        width_buffer[step] = forward_results['action_params']['half_width'].mean()
+        for k, v in forward_results['action_params'].items():
+            dist_params_buffer[k][step] = v.mean(0)
 
         buffer.update({
             # Observations are implicitly updated above. 
@@ -201,11 +200,7 @@ for iteration in pbar:
                     'settlement_preds': settlement_preds_stacked,
                     'private_role_preds': torch.stack(private_role_preds, dim=0),
                     'infos': env_info | env_pinfo_targets,
-                    'dist_params': {
-                        'epsilon_uniform': eps_uniform_buffer,
-                        'epsilon_support': eps_support_buffer,
-                        'width': width_buffer
-                    }}
+                    'dist_params': dist_params_buffer}
                 # Only incur heavy logging when we're in seat 0 and after a certain interval 
                 heavy_logging_update = (
                     logger.counter - logger.last_heavy_counter > args.iterations_per_heavy_logging 
