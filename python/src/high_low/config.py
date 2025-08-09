@@ -20,7 +20,7 @@ class Args:
     """the learning rate of the optimizer"""
     num_steps: int = 16
     """the number of steps to run in each environment per policy rollout"""
-    gamma: float = 1
+    gamma: float = 0.99
     """the discount factor gamma"""
     gae_lambda: float = 0.0
     """lambda parameter for GAE. (0, 1) interpolates between (1-step TD, MC) respectively. Heavily suggested to be 0."""
@@ -44,7 +44,7 @@ class Args:
     max_grad_norm: float = 0.5
     """the maximum norm for the gradient clipping"""
 
-    warmup_steps: int = 750
+    warmup_steps: int = 0
     """number of steps for linear learning rate warmup"""
 
     ##### Model specific arguments #####

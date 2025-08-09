@@ -765,7 +765,8 @@ class DiscreteSoftmaxActor(nn.Module):
         samples = comparison.long().argmax(dim=-1)  # [B, n_actors]
         
         # Offset samples by min_values to get actual actions
-        integer_samples = (samples + self.min_values.unsqueeze(0)).clamp(max=self.rangeP1.unsqueeze(0) - 1)
+        integer_samples = (samples + self.min_values.unsqueeze(0)).clamp(
+            min=self.min_values.unsqueeze(0), max=self.max_values.unsqueeze(0))
         
         # Vectorized log probability extraction using gather
         gather_indices = samples.unsqueeze(-1)  # [B, n_actors, 1]

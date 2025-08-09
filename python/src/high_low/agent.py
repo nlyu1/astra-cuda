@@ -58,8 +58,8 @@ class HighLowTransformerModel(nn.Module):
         self.transformer_norm = nn.LayerNorm(self.n_embd)
         
         # ---------------- Separate critic trunk ---------------- #
-        # Optionally smaller/lighter critic stack to reduce compute while disjoint
-        critic_layers = max(2, self.n_layer // 2)
+        # Optionally smaller/lighter critic stack to reduce compute while disjoint  
+        self.critic_layers = max(2, self.n_layer // 2)
         critic_encoder_layer = nn.TransformerEncoderLayer(
             d_model=self.n_embd,
             nhead=self.n_head,
@@ -72,13 +72,12 @@ class HighLowTransformerModel(nn.Module):
         self.value_pos_encoding = LearnedPositionalEncoding(self.n_embd, max_len=max(self.T, 512))
         self.value_transformer = nn.TransformerEncoder(
             critic_encoder_layer,
-            num_layers=critic_layers,
+            num_layers=self.critic_layers,
             enable_nested_tensor=False)
         self.value_transformer_norm = nn.LayerNorm(self.n_embd)
         # Value head (critic trunk features concatenated with pinfo)
         self.critic = nn.Sequential(
             ResidualBlock(self.n_embd, self.n_hidden),
-            ResidualBlock(self.n_hidden, self.n_hidden),
             nn.Linear(self.n_hidden, 1))
         
         ### Policy trunk follow-ups ###

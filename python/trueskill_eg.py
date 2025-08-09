@@ -32,7 +32,7 @@ class RolloutGenerator:
 
     def generate_rollout(self, state_dicts):
         for j in range(args.players):
-            self.agents[j].load_state_dict(state_dicts[j])
+            self.agents[j].load_state_dict(state_dicts[j], strict=False)
             self.agents[j].eval()
             self.agents[j].reset_context()
         self.env.reset()
@@ -66,10 +66,76 @@ class RolloutGenerator:
         return self.payoff_matrix 
 # %%
 evaluator = RolloutGenerator(args)
-state_dicts = [checkpoint['model_state_dict'] for _ in range(args.players)]
+def get_random_weights():
+    return HighLowTransformerModel(args, evaluator.env, verbose=False).to(device).state_dict()
+state_dicts = [get_random_weights() for _ in range(args.players)]
 
 # %%
 
 %%timeit
 payoff_matrix = evaluator.generate_rollout(state_dicts)
 # %%
+
+from collections import defaultdict
+from trueskill import Player, Game 
+
+class Arena:
+    def __init__(self, args, save_to=None):
+        if save_to is None:
+            save_to = Path(python_root / 'checkpoints' / args.exp_name)
+
+        self.weights_cache = {} # Cache for 
+        self.saved_to_disk = defaultdict(lambda: False) # Indicator for whether we have saved the weights to disk
+
+        self.agent_pool = {}
+        self.agent_players = {}
+        self.playouts = []
+        self.save_to = save_to
+        self._initialize()
+        if save_to.exists():
+            print(f'Arena loaded from {save_to}')
+        else:
+            print(f'Arena initialized from scratch at {save_to}')
+        self.args = args 
+        self.device = torch.device(f'cuda:{args.device_id}')
+
+    def _get_weights(self, name):
+        if name in self.weights_cache:
+            return self.weights_cache[name]
+        else:
+            # try to look for {save_to}/checkpoints/
+            candidate_path = self.save_to / 'checkpoints' / f'{name}.pt'
+            if candidate_path.exists():
+                self.weights_cache[name] = torch.load(
+                    candidate_path, weights_only=False, 
+                    map_location=self.device)['model_state_dict']
+                self.saved_to_disk[name] = True
+                return self.weights_cache[name]
+            else:
+                raise FileNotFoundError(f'Weights for {name} not found at {candidate_path}')
+    
+    def register_player(self, name):
+        """
+        This registration only puts the player in the registry, without 
+        """
+
+    def _load_from_directory(self):
+        if not self.save_to.exists():
+            self.save_to.mkdir(parents=True, exist_ok=True)
+            (self.save_to / "checkpoints").mkdir(parents=True, exist_ok=True)
+            print(f'Initialized arena at {self.save_to}')
+            return 
+        
+        for checkpoint_path in self.save_to.glob("checkpoints/*.pt"):
+            name = checkpoint_path.stem
+            self.weights_cache[name] = self._get_weights(name)
+        print(f"Loaded {len(self.weights_cache)} weights from {self.save_to}")
+
+
+agent_pool = {
+    f'random_{j}': get_random_weights()
+    for j in range(args.players)}
+
+agent_players = {
+    
+}
