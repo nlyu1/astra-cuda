@@ -10,11 +10,11 @@ import matplotlib.pyplot as plt
 import wandb 
 
 
-class PlayoutFileLogger:
-    def __init__(self, args, playout_file_path): 
-        # Create if does not exist, else print-warn and overwrite
+# class PlayoutFileLogger:
+#     def __init__(self, args, playout_file_path): 
+#         # Create if does not exist, else print-warn and overwrite
 
-    def log_playout_results()
+#     def log_playout_results()
 
 class Arena:
     """
