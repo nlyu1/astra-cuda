@@ -5,7 +5,6 @@ import numpy as np
 import hashlib
 import collections
 from collections.abc import Mapping, Iterable
-from datetime import datetime
 
 import torch
 import torch.nn as nn
@@ -122,7 +121,7 @@ def vtrace_losses(
         
         policy_clip = log_policy_clip.exp() # [T B]
         vtrace_clip = log_vtrace_clip.exp() # [T B]
-
+        
         corrected_td = policy_clip * (rewards + gamma * next_values - cur_values)
         # For example, vtrace_H = V_H + clip_H * corrected_td[H] 
         # vtrace_{H-1} = V_{H-1} + clip_{H-1} * corrected_td[H-1] + clip_{H-1} * clip_H * gamma * corrected_td[H]
@@ -178,9 +177,6 @@ class HighLowImpalaTrainer:
         self.current_step = 0
         self.warmup_steps = args.warmup_steps
         self.base_lr = args.learning_rate
-        
-        # Initialize NaN debugging counter
-        self.nan_debug_counter = 0
 
         # Weights for private loss: [0, ..., 1] across different time steps
         # Decay by half every (tau) ratio away from horizon. 
@@ -212,46 +208,6 @@ class HighLowImpalaTrainer:
         for param_group in self.optimizer.param_groups:
             param_group['lr'] = lr
         return lr
-    
-    def _save_nan_debug_info(self, minibatch_env_indices, obs, logprobs, actions, rewards, dones):
-        """Save debugging information when NaN gradients are detected."""
-        self.nan_debug_counter += 1
-        debug_dir = f"nan_debug_{self.args.exp_name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{self.nan_debug_counter}"
-        os.makedirs(debug_dir, exist_ok=True)
-        
-        # Save model state dict
-        torch.save(self.agent.state_dict(), os.path.join(debug_dir, "model_state_dict.pt"))
-        
-        # Save inputs to _train_step (detached to avoid memory issues)
-        debug_data = {
-            'minibatch_env_indices': minibatch_env_indices.detach().cpu(),
-            'obs': obs[:, minibatch_env_indices].detach().cpu(),
-            'logprobs': logprobs[:, minibatch_env_indices].detach().cpu(),
-            'actions': actions[:, minibatch_env_indices].detach().cpu(),
-            'rewards': rewards[:, minibatch_env_indices].detach().cpu(),
-            'dones': dones[:, minibatch_env_indices].detach().cpu(),
-            'args': self.args,
-            'current_step': self.current_step,
-            'nan_location': 'gradient_check'
-        }
-        
-        torch.save(debug_data, os.path.join(debug_dir, "debug_inputs.pt"))
-        
-        # Save gradients info
-        grad_info = {}
-        for name, param in self.agent.named_parameters():
-            if param.grad is not None:
-                grad_info[name] = {
-                    'has_nan': torch.isnan(param.grad).any().item(),
-                    'nan_count': torch.isnan(param.grad).sum().item(),
-                    'grad_norm': torch.norm(param.grad).item() if not torch.isnan(param.grad).all() else float('nan'),
-                    'grad_mean': param.grad.mean().item() if not torch.isnan(param.grad).all() else float('nan'),
-                    'grad_std': param.grad.std().item() if not torch.isnan(param.grad).all() else float('nan'),
-                }
-        
-        torch.save(grad_info, os.path.join(debug_dir, "gradient_info.pt"))
-        
-        print(f"NaN debug information saved to {debug_dir}")
 
     def train(self, update_dictionary):
         obs, logprobs, actions, rewards, dones = (
@@ -314,10 +270,8 @@ class HighLowImpalaTrainer:
                                 nan_grad_detected = True
                     if nan_grad_detected:
                         print("(!) WARNING: NaN gradients were sanitized - model may be experiencing numerical instability")
-                        # Save debugging information
-                        self._save_nan_debug_info(minibatch_env_indices, obs, logprobs, actions, rewards, dones)
                         
-                    nn.utils.clip_grad_norm_(self.agent.parameters(), self.args.max_grad_norm)
+                        nn.utils.clip_grad_norm_(self.agent.parameters(), self.args.max_grad_norm)
                     self.optimizer.step()
                     self.optimizer.zero_grad()
                     self.explained_vars[logging_counter] = step_results['explained_vars']
@@ -352,7 +306,7 @@ class HighLowImpalaTrainer:
             'metrics/learning_rate': current_lr,
         }
 
-    @torch.compile(mode="max-autotune-no-cudagraphs", fullgraph=True, disable=True)
+    @torch.compile(mode="max-autotune-no-cudagraphs", fullgraph=True)
     def _train_step(self, 
                     minibatch_env_indices,
                     obs, logprobs, actions, rewards, dones, 

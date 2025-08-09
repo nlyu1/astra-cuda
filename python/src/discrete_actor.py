@@ -73,10 +73,27 @@ class GaussianActionDistribution:
         return _logsubexp(_log_ndtr(z), self._log_F_alpha) - self._log_Z
 
     def logp_interval(self, lo: Tensor, hi: Tensor) -> Tensor:
-        """log P(lo ≤ X ≤ hi)."""
+        """
+        log P(lo ≤ X ≤ hi).
+        Use the most numerically stable formulation based on which tail we're in.
+        """
         z_low = (lo - self.center) * self.prec
         z_high = (hi - self.center) * self.prec
-        return _logsubexp(_log_ndtr(z_high), _log_ndtr(z_low)) - self._log_Z
+        # Choose formulation based on which side of 0 we're further from
+        # If we're in the right tail (both z > 0), use complement
+        # If we're in the left tail (both z < 0), use standard
+        # If we straddle 0, use standard (it's stable in the middle)
+        # More generally: use complement when we're further from 0 on the positive side
+        use_complement = (z_low > -z_high) & (z_low > 0)
+        # Standard computation: Φ(z_high) - Φ(z_low)
+        log_cdf_high = _log_ndtr(z_high)
+        log_cdf_low = _log_ndtr(z_low)
+        standard = _logsubexp(log_cdf_high, log_cdf_low) - self._log_Z
+        # Complement computation: (1 - Φ(-z_low)) - (1 - Φ(-z_high)) = Φ(-z_low) - Φ(-z_high)
+        log_sf_low = _log_ndtr(-z_low)   # log survival function
+        log_sf_high = _log_ndtr(-z_high)
+        complement = _logsubexp(log_sf_low, log_sf_high) - self._log_Z
+        return torch.where(use_complement, complement, standard)
 
     def entropy(self) -> Tensor:
         alpha = (0.0 - self.center) * self.prec
