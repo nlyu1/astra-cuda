@@ -32,10 +32,15 @@ for file in os.listdir(debug_dir):
 # %% Load saved data
 # Load the debug inputs
 debug_data = torch.load(os.path.join(debug_dir, "debug_inputs.pt"), map_location='cpu', weights_only=False)
+left, right = 337, 338
 print("\nDebug data keys:")
 for key in debug_data.keys():
     if isinstance(debug_data[key], torch.Tensor):
+        if debug_data[key].ndim == 3 or debug_data[key].ndim == 2:
+            debug_data[key] = debug_data[key][:, left:right]
         print(f"  - {key}: shape {debug_data[key].shape}, dtype {debug_data[key].dtype}")
+        if debug_data[key].ndim == 1:
+            debug_data[key] = debug_data[key][left:right]
     else:
         print(f"  - {key}: {type(debug_data[key])}")
 
@@ -80,6 +85,12 @@ print(f"\nModel loaded successfully on {device}")
 # %% Move data to device
 
 device = torch.device('cuda:0')
+# minibatch_env_indices = debug_data['minibatch_env_indices'][left:right].to(device)
+# obs = debug_data['obs'][:, left:right].to(device)
+# logprobs = debug_data['logprobs'][:, left:right].to(device)
+# actions = debug_data['actions'].long()[:, left:right].to(device)
+# rewards = debug_data['rewards'][:, left:right].to(device)
+# dones = debug_data['dones'][:, left:right].to(device)
 minibatch_env_indices = debug_data['minibatch_env_indices'].to(device)
 obs = debug_data['obs'].to(device)
 logprobs = debug_data['logprobs'].to(device)
@@ -115,21 +126,14 @@ print(f"  - obs: {torch.isinf(obs).any().item()}")
 print(f"  - logprobs: {torch.isinf(logprobs).any().item()}")
 print(f"  - rewards: {torch.isinf(rewards).any().item()}")
 
-# %% 
-raw_minibatch_indices = debug_data['minibatch_env_indices']
-print(raw_minibatch_indices.shape)
-minibatch_env_indices = raw_minibatch_indices[0:1]
-
 # %% Replicate the forward pass
-
-indices = torch.zeros((1024,)).bool()
-indices[1:10] = 1
 
 ## %% Compute losses (matching _train_step)
 # Enable gradient computation
 optimizer.zero_grad()
 
 num_envs_in_minibatch = len(minibatch_env_indices)
+print('NUM ENVS IN MINIBATCH', num_envs_in_minibatch)
 pinfo_numfeatures = 2 + 1 + args.players  # From agent.py
 pinfo_tensor = torch.zeros((num_envs_in_minibatch, pinfo_numfeatures), device=device)
 print(f"\nCreated pinfo_tensor with shape: {pinfo_tensor.shape}")
@@ -442,11 +446,11 @@ with torch.autocast(device_type=device.type, dtype=torch.bfloat16, cache_enabled
     
     # Note: vtrace_losses now takes log_bar_rho and log_bar_c instead of bar_rho and bar_c
     vtrace_results = vtrace_losses(
-        rewards[:, indices],
-        dones[:,indices],
-        logprobs[:,indices],
-        new_logprob[:,indices],
-        augmented_values[:,indices],
+        rewards,
+        dones,
+        logprobs,
+        new_logprob,
+        augmented_values,
         gamma=args.gamma,
         gae_lambda=args.gae_lambda,
         log_bar_rho=0.0,  # log(1.0) = 0.0
@@ -495,6 +499,101 @@ if not nan_params:
     print("  No NaN gradients found!")
 else:
     print(f"\nTotal parameters with NaN gradients: {len(nan_params)}")
+
+# %%
+print('STOP HERE')
+# Create a copy that requires gradients
+# isolated_new_logprob = new_logprob.clone().detach().requires_grad_(True)
+
+# Recompute the loss using the isolated tensor
+# with torch.autocast(device_type=device.type, dtype=torch.bfloat16, cache_enabled=True):
+x = obs.clone()
+T, B, F = x.shape
+encoded = model.encoder(x.view(T*B, F)).view(T, B, model.n_embd)
+encoded = model.pos_encoding(encoded) # [T, B, D]
+# [T, B, D]. causal_mask shape [T, T] with -inf on strict upper-diagonal
+features = model.transformer(encoded, mask=model.causal_mask, is_causal=True).view(T * B, model.n_embd) # [T * B, D]
+features = model.transformer_norm(features)
+
+center, prec = model.actors(features)
+isolated_center, isolated_prec = center.clone(), prec.clone()
+isolated_center.requires_grad_(True)
+isolated_prec.requires_grad_(True)
+
+# logp_entropy = model.actors.logp_entropy(features, actions.view(T*B, 4))
+# new_logprob = logp_entropy['logprobs'].sum(-1).reshape(T, B)
+dist = GaussianActionDistribution(isolated_center, isolated_prec)
+
+unit_lb, unit_ub = model.actors._unit_interval_of_integer_samples(actions.view(T*B, 4))
+new_logprob = dist.logp_interval(unit_lb, unit_ub) - model.actors.rangeP1.log()
+new_logprob = new_logprob.sum(-1).reshape(T, B)
+
+# isolated_new_logprob = new_logprob.clone().detach().requires_grad_(True)
+
+# outputs = model(obs, pinfo_tensor, actions)
+# new_logprob = outputs['logprobs']
+candidate_loss = vtrace_losses(
+    rewards,
+    dones,
+    logprobs,
+    new_logprob,
+    # isolated_new_logprob,
+    augmented_values,
+    gamma=args.gamma,
+    gae_lambda=args.gae_lambda,
+    log_bar_rho=0.0,
+    log_bar_c=0.0)['policy_loss']
+
+print(f"Candidate loss: {candidate_loss.item():.6f}, has NaN: {torch.isnan(candidate_loss).item()}")
+
+# Now compute gradient of loss w.r.t isolated_new_logprob
+grad_logprob = torch.autograd.grad(
+    candidate_loss,
+    # model.actors.actor.weight,
+    isolated_center,
+    # isolated_new_logprob,
+    retain_graph=True,
+    create_graph=False
+)[0]
+print('Isolated prec:', isolated_prec)
+print('Isolated center:', isolated_center)
+print('Logprob gradient:', grad_logprob)
+print('new_logprob:', new_logprob)
+
+# %%
+isolated_center, isolated_prec = center.clone()[6,1], prec.clone()[6,1]
+isolated_center.requires_grad_(True)
+isolated_prec.requires_grad_(True)
+print('isolated_center:', isolated_center.item())
+print('isolated_prec:', isolated_prec.item())
+
+dist = GaussianActionDistribution(isolated_center, isolated_prec)
+
+unit_lb, unit_ub = model.actors._unit_interval_of_integer_samples(actions[6, 0, 1])
+print('lb, ub:', unit_lb[1].item(), unit_ub[1].item(), unit_lb[1].dtype, unit_ub[1].dtype)
+new_logprob = dist.logp_interval(unit_lb[1], unit_ub[1]) - model.actors.rangeP1[1].log()
+new_logprob = new_logprob
+print('logprob:', new_logprob.item())
+torch.autograd.grad(
+    new_logprob,
+    # model.actors.actor.weight,
+    isolated_center,
+    # isolated_new_logprob,
+    retain_graph=True,
+    create_graph=False
+)[0]
+# %%
+
+z = torch.tensor([-100.], requires_grad=True)
+z.requires_grad_(True)
+y = torch.special.log_ndtr(z)
+print('gradient:', torch.autograd.grad(
+    y,
+    z,
+    retain_graph=True,
+    create_graph=False
+)[0])
+
 
 # %% Analyze specific problematic parameters
 if nan_params:

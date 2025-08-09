@@ -31,12 +31,44 @@ def _log_normal_pdf_prec(x: Tensor, loc: Tensor, prec: Tensor) -> Tensor:
 def _log_ndtr(z: Tensor) -> Tensor:
     return torch.special.log_ndtr(z)
 
-def _logsubexp(a: Tensor, b: Tensor) -> Tensor:
+# def _logsubexp(a: Tensor, b: Tensor) -> Tensor:
+#     """
+#     Stable log(exp(a) - exp(b))   with   a ≥ b.
+#     (Analogous to torch.logaddexp for the *sum* case.)
+#     Backward pass results in terrible gradients
+#     """
+#     return a + torch.log1p(-torch.exp(b - a))
+
+def _logsubexp(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
     """
-    Stable log(exp(a) - exp(b))   with   a ≥ b.
-    (Analogous to torch.logaddexp for the *sum* case.)
+    Stable log(exp(a) - exp(b)) with a ≥ b, safe for bf16 inputs.
+    The core math is done in fp32 to avoid the diff→0 truncation.
     """
-    return a + torch.log1p(-torch.exp(b - a))
+    print('Using smart version')
+    # a,b come in as bf16; promote once
+    a32, b32 = a.to(torch.float32), b.to(torch.float32)
+
+    # Pre-condition check (keep it hard-assert style)
+    # assert torch.all(a32 >= b32), f"a {a} must be ≥ b {b} element-wise"
+    if torch.any(a32 < b32):
+        print(f"a {a} must be ≥ b {b} element-wise")
+        print('a:', a)
+        print('b:', b)
+        print('a32:', a32)
+        print('b32:', b32)
+        # raise ValueError("a must be ≥ b element-wise")
+    assert torch.all(a32 >= b32), f"a {a} must be ≥ b {b} element-wise"
+
+    diff = b32 - a32                                # fp32 diff
+    # assert torch.all(diff > 0), "diff must be positive"
+    eps  = torch.finfo(torch.bfloat16).eps          # 7.8125e-3
+    use_series = diff.abs() < eps                   # |diff| < ε
+
+    standard = a32 + torch.log1p(-torch.exp(diff))  # safe when |diff| > ε
+    series   = a32 + torch.log(-diff)               # first-order series
+
+    out32 = torch.where(use_series, series, standard)
+    return out32.to(a.dtype)                        # back to bf16
 
 class GaussianActionDistribution:
     """
@@ -79,12 +111,22 @@ class GaussianActionDistribution:
         """
         z_low = (lo - self.center) * self.prec
         z_high = (hi - self.center) * self.prec
+        # Heuristic for 
+        is_extreme = ((z_low > 4.0) & (z_high > 4.0)) | ((z_low < -4.0) & (z_high < -4.0))
+        print('is extreme:', is_extreme)
+
+        z_mid = 0.5 * (z_low + z_high)
+        log_pdf_mid = -0.5 * z_mid**2 - _LOG_SQRT_2PI
+        width = hi - lo
+        approx_logp = log_pdf_mid + torch.log(width) + torch.log(self.prec)
+
         # Choose formulation based on which side of 0 we're further from
         # If we're in the right tail (both z > 0), use complement
         # If we're in the left tail (both z < 0), use standard
         # If we straddle 0, use standard (it's stable in the middle)
         # More generally: use complement when we're further from 0 on the positive side
         use_complement = (z_low > -z_high) & (z_low > 0)
+        print('Z scores:', z_low, z_high, z_low.dtype, use_complement, is_extreme)
         # Standard computation: Φ(z_high) - Φ(z_low)
         log_cdf_high = _log_ndtr(z_high)
         log_cdf_low = _log_ndtr(z_low)
@@ -93,7 +135,9 @@ class GaussianActionDistribution:
         log_sf_low = _log_ndtr(-z_low)   # log survival function
         log_sf_high = _log_ndtr(-z_high)
         complement = _logsubexp(log_sf_low, log_sf_high) - self._log_Z
-        return torch.where(use_complement, complement, standard)
+        exact_value = torch.where(use_complement, complement, standard)
+
+        return torch.where(is_extreme, approx_logp, exact_value)
 
     def entropy(self) -> Tensor:
         alpha = (0.0 - self.center) * self.prec
