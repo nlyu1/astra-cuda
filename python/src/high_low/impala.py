@@ -240,13 +240,37 @@ class HighLowImpalaTrainer:
                         update_dictionary['actual_settlement'],
                         update_dictionary['actual_private_roles'],
                         update_dictionary['pinfo_tensor'])
-                    if step_results['approx_kls'] > self.args.update_kl_threshold: # Never update on too 
-                        step_results['loss'] *= 0 
+                    
+                    # Check approx_kl before doing any backward passes for efficiency
+                    approx_kl_value = step_results['approx_kls']
+                    skip_update = False
+                    
+                    if torch.isnan(approx_kl_value):
+                        print('WARNING: Skipping update due to NaN approx_kl - model may be unstable')
+                        skip_update = True
+                        step_results['approx_kls'] = torch.tensor(float('nan'))
+                    elif approx_kl_value > self.args.update_kl_threshold:
+                        print(f'WARNING: Skipping update due to large approx_kl ({approx_kl_value:.6f} > {self.args.update_kl_threshold})')
+                        skip_update = True
                         step_results['approx_kls'] = self.args.update_kl_threshold
-                        print('Skipping update on too-high KL. Careful here')
-                    step_results['loss'].backward()
-                    nn.utils.clip_grad_norm_(self.agent.parameters(), self.args.max_grad_norm)
-                    self.optimizer.step()
+                    
+                    if not skip_update:
+                        step_results['loss'].backward()
+                        # Sanitize gradients: zero out any NaN gradients and warn
+                        nan_grad_detected = False
+                        for name, param in self.agent.named_parameters():
+                            if param.grad is not None:
+                                nan_mask = torch.isnan(param.grad)
+                                if nan_mask.any():
+                                    print(f"(!) WARNING: NaN gradients detected in {name} - zeroing them out")
+                                    param.grad[nan_mask] = 0.0
+                                    nan_grad_detected = True
+                        if nan_grad_detected:
+                            print("(!) WARNING: NaN gradients were sanitized - model may be experiencing numerical instability")
+                        
+                        nn.utils.clip_grad_norm_(self.agent.parameters(), self.args.max_grad_norm)
+                        self.optimizer.step()
+                    
                     self.optimizer.zero_grad()
 
                     self.explained_vars[logging_counter] = step_results['explained_vars']

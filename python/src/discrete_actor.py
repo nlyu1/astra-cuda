@@ -1,17 +1,15 @@
 """
-Triangular distribution-based discrete action sampler for RL with continuous parameterization. 
+Truncated Gaussian-based discrete action sampler for RL.
 
-Use case: action space is a discretization of continuous interval (e.g. bid and ask prices / size). 
+Use case: Discrete action spaces that are discretizations of continuous intervals
+(e.g. bid/ask prices, order sizes in trading environments).
 
 Key components:
-- TriangleVariableWidthDistribution: Triangular distribution with adjustable width and center
-- TriangleFullSupportDistribution: Triangle covering full [0,1] range  
-- TrapezoidFullSupportDistribution: Mixture of triangle and uniform for exploration
-- TriangleActionDistribution: Hierarchical mixture of above distributions
-- DiscreteActor: NN module that outputs distribution parameters and samples discrete actions
+- GaussianActionDistribution: Truncated Normal on (0,1) parameterized by center and precision
+- DiscreteActor: Neural network that outputs distribution parameters and samples discrete actions
 
-The approach maps continuous distributions to discrete actions via:
-1. Sample from continuous distribution in [0,1]
+The approach:
+1. Sample from truncated Gaussian in [0,1]
 2. Scale to action range and round to nearest integer
 3. Compute log probabilities over discrete intervals
 """
@@ -58,7 +56,7 @@ class GaussianActionDistribution:
         # Plain CDF values (needed only for sampling)
         self._F_alpha = torch.exp(self._log_F_alpha)
         self._F_beta  = torch.exp(self._log_F_beta)
-        self._log_Z = (self._F_beta - self._F_alpha).log()
+        self._log_Z = _logsubexp(self._log_F_beta, self._log_F_alpha)
 
     @torch.no_grad()
     def sample(self, uniform_samples: Tensor) -> Tensor:
@@ -92,32 +90,26 @@ class GaussianActionDistribution:
 
 class DiscreteActor(nn.Module):
     """
-    Neural network module for discrete action sampling using triangular distributions.
+    Neural network for discrete action sampling using truncated Gaussians.
     
     Architecture:
     - Input: hidden state [B, n_hidden]
-    - Linear layer outputs 2*n_actors values through squishing to [0, 1]
-    - Splits into: mean, precision (1 / std)
-    - Creates GaussianActionDistribution and samples discrete actions
+    - Linear layer outputs 2*n_actors values
+    - Splits into: center (sigmoid to [0,1]), precision (softplus with bias)
+    - Creates truncated Gaussian distributions and samples discrete actions
     
-    Handles discrete action spaces by:
-    1. Sampling continuous values in [0,1]
-    2. Scaling to [min_values, max_values] and rounding
-    3. Computing log-probs over discrete intervals
-
-    **Important!**
-    Ideally pair with learning rate warmup and smaller LR!!, else it's very easy to observe:
-    1. Models output bad actions which receive negative gradients. 
-    2. Gradients quickly push epsilon_fullsupport and epsilon_uniform to 1, which makes the model output uniform actions. 
-    3. Value network receives totally useless signals, and model collapses. 
+    Important: Use learning rate warmup to prevent early collapse where
+    the model outputs bad actions and gets stuck in high-entropy mode.
     """
     def __init__(self, n_hidden, n_actors, 
         min_values: torch.Tensor, max_values: torch.Tensor, eps=1e-4):
         """
-        n_hidden: Input feature dimension
-        n_actors: Number of parallel action distributions 
-        min_values, max_values: Inclusive bounds per actor, shape [n_actors]
-        eps: float. Prevents rounded result exceeding [min_values, max_values]. Introduces small bias to the rounded result. 
+        Args:
+            n_hidden: Input feature dimension
+            n_actors: Number of parallel action distributions
+            min_values: Minimum action values per actor [n_actors]
+            max_values: Maximum action values per actor [n_actors]
+            eps: Small constant to prevent boundary issues
         """
         super().__init__()
         self.n_hidden = n_hidden
@@ -136,7 +128,8 @@ class DiscreteActor(nn.Module):
         output = self.actor(x)
         mean, precision = output[:, :self.n_actors], output[:, self.n_actors:]
         mean = torch.sigmoid(mean)
-        precision = nn.functional.softplus(precision / 10) + 2.
+        precision = nn.functional.softplus(
+            nn.functional.leaky_relu(precision, negative_slope=0.1) + 1.5) + 0.5
         return mean, precision
     
     def _integer_samples_from_unit_samples(self, unit_samples):
@@ -151,10 +144,14 @@ class DiscreteActor(nn.Module):
     
     def logp_entropy_and_sample(self, x, uniform_samples):
         """
-        x: [B, n_hidden]
-        uniform_samples: [B, n_actors, 3] float
-
-        Returns: 
+        Sample actions and compute log probabilities.
+        
+        Args:
+            x: Hidden states [B, n_hidden]
+            uniform_samples: Random samples [B, n_actors]
+            
+        Returns:
+            Dict with samples, logprobs, entropy, and distribution parameters
         """
         center, prec = self(x)
         dist = GaussianActionDistribution(center, prec)
@@ -177,12 +174,14 @@ class DiscreteActor(nn.Module):
     
     def logp_entropy(self, x, integer_samples):
         """
-        x: [B, n_hidden]
-        samples: [B, n_actors] float in (0, 1)
-
-        Returns: 
-        - logprobs: [B, n_actors] float. Logprobs of the samples
-        - entropy: [B] float. Entropy of the computed distribution
+        Compute log probabilities and entropy for given actions.
+        
+        Args:
+            x: Hidden states [B, n_hidden]
+            integer_samples: Integer actions [B, n_actors]
+            
+        Returns:
+            Dict with logprobs, entropy, and distribution parameters
         """
         center, prec = self(x)
         dist = GaussianActionDistribution(center, prec)

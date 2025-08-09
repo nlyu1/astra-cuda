@@ -24,7 +24,7 @@ class Args:
     """the discount factor gamma"""
     gae_lambda: float = 0.0
     """lambda parameter for GAE. (0, 1) interpolates between (1-step TD, MC) respectively. Heavily suggested to be 0."""
-    update_kl_threshold: float = 1e10
+    update_kl_threshold: float = 100
     """the threshold for updating the policy. If the KL is greater than this threshold, the update is skipped"""
     num_minibatches: int = 4
     """the number of mini-batches"""
