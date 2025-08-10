@@ -77,6 +77,7 @@ payoff_matrix = evaluator.generate_rollout(state_dicts)
 # %%
 
 from collections import defaultdict
+from copy import deepcopy
 from trueskill import Player, Game 
 
 class Arena:
@@ -114,10 +115,20 @@ class Arena:
             else:
                 raise FileNotFoundError(f'Weights for {name} not found at {candidate_path}')
     
-    def register_player(self, name):
+    def register_player(self, name, copy_from=None):
         """
-        This registration only puts the player in the registry, without 
+        This registration only puts the player in the registry without committing the weights 
         """
+        if copy_from is None:
+            assert copy_from in self.agent_players, f'Player {copy_from} not found in registry'
+            self.agent_players[name] = deepcopy(self.agent_players[copy_from])
+            return 
+        assert name not in self.agent_players, f'Player {name} already registered'
+        self.agent_players[name] = Player()
+
+    def register_playout_scores(self, names, scores):
+        agent_players = [self.agent_players[name] for name in names]
+        
 
     def _load_from_directory(self):
         if not self.save_to.exists():
