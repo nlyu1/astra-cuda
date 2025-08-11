@@ -17,7 +17,7 @@ class HighLowLogger:
                 config=vars(args),
                 name=args.run_name,
                 save_code=True,
-                dir="/tmp/high_low_ppo_wandb", 
+                dir="./checkpoints/logs", 
             )
         self.counter = 0 
         self.last_heavy_counter = 0 
