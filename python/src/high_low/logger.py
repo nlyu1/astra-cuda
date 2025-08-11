@@ -17,7 +17,7 @@ class HighLowLogger:
                 config=vars(args),
                 name=args.run_name,
                 save_code=True,
-                dir="/tmp/high_low_ppo_wandb", 
+                dir="./checkpoints/logs", 
             )
         self.counter = 0 
         self.last_heavy_counter = 0 
@@ -107,9 +107,9 @@ class HighLowLogger:
             log_data[f'acc/non_self_acc{idx+1}'] = non_self_acc[idx].mean().item()
         
         # Log distribution parameters (only transfer to CPU here)
-        for k, v in dist_params.items():
-            for j, t in enumerate(['bid_px', 'ask_px', 'bid_sz', 'ask_sz']):
-                log_data[f'{k}/{t}'] = v[j].mean().item()
+        for j, name in enumerate(['bid_px', 'ask_px', 'bid_sz', 'ask_sz']):
+            for k, v in dist_params.items():
+                log_data[f'{k}/{name}'] = v[:, j].mean().item()
 
         if heavy_updates: 
             customer_size_mask = (customer_size_sum == 0)

@@ -25,7 +25,6 @@ from high_low.config import Args
 from high_low.env import HighLowTrading
 from high_low.logger import HighLowLogger
 from high_low.impala import HighLowImpalaTrainer, HighLowImpalaBuffer
-# from high_low.impala_lognans import HighLowImpalaTrainer, HighLowImpalaBuffer
 from timer import Timer, OneTickTimer
 import tyro
 
@@ -92,7 +91,7 @@ player_reward_buffer = env.new_player_reward_buffer() # [N]
 self_play = True 
 
 # Disable garbage collection for performance
-# gc.disable()
+gc.disable()
 
 pbar = tqdm(range(args.num_iterations))
 done_zeros, done_ones = torch.zeros(args.num_envs, device=device).float(), torch.ones(args.num_envs, device=device).float()

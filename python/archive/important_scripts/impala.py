@@ -83,8 +83,8 @@ def vtrace_losses(
     values: Float[torch.Tensor, "T_plus_1 B"],
     gamma: float = 0.99,
     gae_lambda: float = 0, # (0, 1) interpolates between (1-step TD, MC) respectively 
-    log_bar_rho: float = 0.0,
-    log_bar_c: float = 0.0): 
+    bar_rho: float = 1.0,
+    bar_c: float = 1.0): 
     """Computes V-trace bootstrapped value targets from a batch of trajectories.
 
     This function implements the V-trace algorithm, which provides off-policy
@@ -116,8 +116,8 @@ def vtrace_losses(
     with torch.no_grad(): 
         log_prob_ratio = logprobs - ref_logprobs
         # Clip log ratio to prevent exp() overflow - log(bar_rho) and log(bar_c)
-        log_policy_clip = torch.clamp(log_prob_ratio, max=log_bar_rho)
-        log_vtrace_clip = torch.clamp(log_prob_ratio, max=log_bar_c)
+        log_policy_clip = torch.clamp(log_prob_ratio, max=torch.log(torch.tensor(bar_rho)))
+        log_vtrace_clip = torch.clamp(log_prob_ratio, max=torch.log(torch.tensor(bar_c)))
         
         policy_clip = log_policy_clip.exp() # [T B]
         vtrace_clip = log_vtrace_clip.exp() # [T B]
@@ -149,9 +149,10 @@ def vtrace_losses(
             delta = rewards[t] - cur_values[t] + gamma * next_values * ctd
             vtrace_advantage[t] = last_gae_lambda = (
                 delta + gamma * gae_lambda * ctd * last_gae_lambda)
+            
+        # vtrace_advantage = rewards + gamma * (1 - dones) *vtrace_values[1:] - cur_values 
         vtrace_advantage = (vtrace_advantage - vtrace_advantage.mean()) / (vtrace_advantage.std() + 1e-8)
-    
-    pg_loss = - policy_clip * logprobs * vtrace_advantage
+    pg_loss = - policy_clip * logprobs * vtrace_advantage 
     pg_loss = pg_loss.mean()
 
     return {
@@ -226,40 +227,6 @@ class HighLowImpalaTrainer:
         # Obs: [T, B, s]. Logprobs: [T, B], Actions: [T, B, 4], Rewards [T, B], Done: [T, B]
         num_envs_per_minibatch = self.args.num_envs // self.args.num_minibatches
         assert num_envs_per_minibatch * self.args.num_minibatches == self.args.num_envs
-
-        def check_for_nan_gradients():
-            # Iterates over parameters to check for nan gradients, print the name of the parameter and the gradient
-            actor_weight_grad_norm = None
-            actor_bias_grad_norm = None
-            max_grad_norm, max_grad_norm_name = 0, None
-            max_grad_norm_value_min, max_grad_norm_value_max = float('inf'), float('-inf')
-            for name, param in self.agent.named_parameters():
-                if param.grad is not None:
-                    if torch.isnan(param.grad).any():
-                        print(f"NaN gradient detected in {name}")
-                    if torch.isinf(param.grad).any():
-                        print(f"Inf gradient detected in {name}")
-                    
-                    # Calculate gradient norms for actor parameters
-                    if name == "actors.actor.weight":
-                        actor_weight_grad_norm = param.grad.norm().item()
-                    elif name == "actors.actor.bias":
-                        actor_bias_grad_norm = param.grad.norm().item()
-                    grad_norm = param.grad.norm().item()
-                    if grad_norm > max_grad_norm:
-                        max_grad_norm = grad_norm
-                        max_grad_norm_name = name
-                        max_grad_norm_value_min = param.grad.min().item()
-                        max_grad_norm_value_max = param.grad.max().item()
-            return_values = {
-                'actor_weight_grad_norm': actor_weight_grad_norm,
-                'actor_bias_grad_norm': actor_bias_grad_norm,
-                'max_grad_norm': max_grad_norm,
-                'max_grad_norm_name': max_grad_norm_name,
-                'max_grad_norm_value_min': max_grad_norm_value_min,
-                'max_grad_norm_value_max': max_grad_norm_value_max,
-            }
-            return return_values
 
         with torch.autocast(device_type=obs.device.type, dtype=torch.bfloat16, cache_enabled=True):
             for _ in range(self.args.update_epochs):
@@ -339,7 +306,7 @@ class HighLowImpalaTrainer:
             'metrics/learning_rate': current_lr,
         }
 
-    # @torch.compile(mode="max-autotune-no-cudagraphs", fullgraph=True)
+    @torch.compile(mode="max-autotune-no-cudagraphs", fullgraph=True)
     def _train_step(self, 
                     minibatch_env_indices,
                     obs, logprobs, actions, rewards, dones, 
@@ -388,12 +355,6 @@ class HighLowImpalaTrainer:
             ratio = clipped_log_ratio.exp() 
             approx_kl = ((ratio - 1) - clipped_log_ratio).mean()
 
-        precisions = outputs['action_params']['precision']
-        print('    precisions', precisions.min().item(), precisions.max().item())
-        print('    log_ratio', log_ratio.min().item(), log_ratio.max().item())
-        print('    new_logprob', new_logprob.min().item(), new_logprob.max().item())
-        print('    logprobs', logprobs[:, minibatch_env_indices].min().item(), logprobs[:, minibatch_env_indices].max().item())
-
         assert dones[-1, minibatch_env_indices].all(), "All episodes must be terminated at the end of the episode"
         augmented_values = torch.cat([ # [T+1, B]
             values, torch.zeros_like(values[-1])[None, :]])                 
@@ -409,12 +370,13 @@ class HighLowImpalaTrainer:
 
         entropy_value = entropy.mean()
         entropy_loss = -self.args.entropy_coef * entropy_value
+
         loss = (vtrace_results['policy_loss'] 
                 + entropy_loss
                 + vtrace_results['value_loss'] * self.args.vf_coef
                 + pred_settlement_loss * self.args.psettlement_coef
                 + pred_private_roles_loss * self.args.proles_coef)
-        
+
         return {
             'loss': loss, 
             'explained_vars': vtrace_results['value_r2'],
@@ -423,7 +385,8 @@ class HighLowImpalaTrainer:
             'entropy': entropy_value,
             'approx_kls': approx_kl,
             'pred_settlement_loss': pred_settlement_loss,
-            'pred_private_roles_loss': pred_private_roles_loss}
+            'pred_private_roles_loss': pred_private_roles_loss,
+        }
 
     def save_checkpoint(self, step):
         if step < self.last_checkpoint + self.checkpoint_interval:

@@ -56,7 +56,7 @@ HighLowTradingState::HighLowTradingState(std::shared_ptr<const Game> game)
       device_id_(static_cast<const HighLowTradingGame*>(game.get())->GetDeviceId()),
       market_(
         /*num_markets=*/static_cast<const HighLowTradingGame*>(game.get())->GetNumMarkets(), 
-        /*max_price_levels=*/static_cast<const HighLowTradingGame*>(game.get())->GetMaxContractValue() + 1,  // +1 to support prices 1 to max_contract_value inclusive
+        /*max_price_levels=*/static_cast<const HighLowTradingGame*>(game.get())->GetMaxContractValue() + 1,
         /*max_active_orders_per_market=*/static_cast<const HighLowTradingGame*>(game.get())->GetNumPlayers() * 
                                          static_cast<const HighLowTradingGame*>(game.get())->GetStepsPerPlayer() * 2,
         /*max_active_fills_per_market=*/std::min(
