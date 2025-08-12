@@ -146,7 +146,3 @@ class Arena:
 agent_pool = {
     f'random_{j}': get_random_weights()
     for j in range(args.players)}
-
-agent_players = {
-    
-}
