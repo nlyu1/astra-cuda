@@ -43,6 +43,8 @@ class Args:
     """We weigh initial predictions of settlement and info roles less heavily. Decaby by 1/2 every pdecay_tau ratio"""
     max_grad_norm: float = 0.5
     """the maximum norm for the gradient clipping"""
+    effective_bandit_memory_size: int = 10000
+    """the effective memory size of the bandit. Assumes that the main agent is 'totally new' after this many iterations"""
 
     warmup_steps: int = 0
     """number of steps for linear learning rate warmup"""
