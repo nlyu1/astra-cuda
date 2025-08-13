@@ -55,6 +55,20 @@ CUDA_VISIBLE_DEVICES=1 python vtrace.py --game_setting 1 --entropy_coef 0.01 --p
 CUDA_VISIBLE_DEVICES=0 python vtrace.py --game_setting 0 --entropy_coef 0.01 --psettlement_coef 0.2 --gae_lambda 0.9 --proles_coef 0.2 --self_play_prob 0.5 --num_iterations 40000000 --exp_name normal1 --checkpoint_name normal0_135000
 ```
 
+Observing steadily increasing spread. 
+
+# Fourth bootstrap run 
+
+Lower entropy coefficient and higher `gae_lambda`
+
+1. [Small run](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/fg8xn2g8)
+2. [Normal run](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/p9jgqyz5)
+```
+CUDA_VISIBLE_DEVICES=1 python vtrace.py --game_setting 1 --entropy_coef 0.005 --psettlement_coef 0.2 --gae_lambda 0.95 --proles_coef 0.2 --self_play_prob 0.5 --num_iterations 40000000 --exp_name small3 --checkpoint_name small2_180000
+
+CUDA_VISIBLE_DEVICES=0 python vtrace.py --game_setting 0 --entropy_coef 0.005 --psettlement_coef 0.2 --gae_lambda 0.95 --proles_coef 0.2 --self_play_prob 0.5 --num_iterations 40000000 --exp_name normal2 --checkpoint_name normal1_156000
+```
+
 ## How to sync future offline runs
 
 To sync future offline wandb runs to cloud:

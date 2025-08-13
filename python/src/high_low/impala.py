@@ -339,8 +339,9 @@ class HighLowImpalaTrainer:
             'metrics/learning_rate': current_lr,
         }
 
-    # @torch.compile(mode="max-autotune-no-cudagraphs", fullgraph=True)
+    @torch.compile(mode="max-autotune-no-cudagraphs", fullgraph=True)
     def _train_step(self, 
+                    
                     minibatch_env_indices,
                     obs, logprobs, actions, rewards, dones, 
                     actual_settlement, actual_private_roles, pinfo_tensor):
@@ -387,12 +388,6 @@ class HighLowImpalaTrainer:
             clipped_log_ratio = torch.clamp(log_ratio, min=-10.0, max=10.0) # Clip log ratio to prevent exp() overflow (symmetric clipping for KL)
             ratio = clipped_log_ratio.exp() 
             approx_kl = ((ratio - 1) - clipped_log_ratio).mean()
-
-        precisions = outputs['action_params']['precision']
-        print('    precisions', precisions.min().item(), precisions.max().item())
-        print('    log_ratio', log_ratio.min().item(), log_ratio.max().item())
-        print('    new_logprob', new_logprob.min().item(), new_logprob.max().item())
-        print('    logprobs', logprobs[:, minibatch_env_indices].min().item(), logprobs[:, minibatch_env_indices].max().item())
 
         assert dones[-1, minibatch_env_indices].all(), "All episodes must be terminated at the end of the episode"
         augmented_values = torch.cat([ # [T+1, B]
