@@ -27,10 +27,10 @@ fig_mean.show()
 fig_std = plot_stat(sampler, data_type="std", log_scale=True)
 fig_std.show()
 # %%
-fig_alpha = plot_stat(sampler, data_type="alpha", log_scale=False)
+fig_alpha = plot_stat(sampler, data_type="alpha", log_scale=True)
 fig_alpha.show()
 # %%
-fig_beta = plot_stat(sampler, data_type="beta", log_scale=False)
+fig_beta = plot_stat(sampler, data_type="beta", log_scale=True)
 fig_beta.show()
 
 # %%
@@ -48,5 +48,42 @@ fig_sampling = px.bar(
 fig_sampling.update_layout(xaxis_tickangle=-45, width=1200, height=600)
 fig_sampling.show()
 # %%
-df_sampling
+from high_low.rollouts import *
+
+names = [
+    # 'normal3/normal2_204000',
+    'poolrun_selfplayonly/normal2_207000',
+    'poolrun_selfplayonly/normal2_207000',
+    'poolrun_selfplayonly/normal2_207000',
+    'poolrun_selfplayonly/normal2_207000',
+    'normal3/main_42000',
+]
+state_dicts = [
+    torch.load(python_path / 'checkpoints' / (name+'.pt'), weights_only=False)['model_state_dict']
+    for name in names]
+base_args = torch.load(python_path / 'checkpoints' / (names[0]+'.pt'), weights_only=False)['args']
+
+rgen = RolloutGenerator(base_args)
+payoff_matrix = rgen.generate_rollout(state_dicts)
+payoff_vector = payoff_matrix[:, 4, 0]
+payoff_vector
+# %%
+benchmark_weights = state_dicts[0]
+main_weights = state_dicts[4]
+benchmark_payoffs = {}
+benchmark_payoff_list = []
+for benchmark_offset in range(base_args.get_game_config()['players']):
+    benchmark_state_dicts = [
+        benchmark_weights if j != benchmark_offset else main_weights
+        for j in range(base_args.get_game_config()['players'])]
+    payoff_matrix = rgen.generate_rollout(benchmark_state_dicts)
+    model_payoffs = payoff_matrix[benchmark_offset, :, 0]
+    benchmark_payoff_list.append(model_payoffs)
+    for j, role_name in enumerate(['goodValue', 'badValue', 'highLow', 'customer', 'avg']):
+        benchmark_payoffs[f'benchmark {role_name}/{benchmark_offset}'] = model_payoffs[j]
+for role_name in ['goodValue', 'badValue', 'highLow', 'customer', 'avg']:
+    benchmark_payoffs[f'benchmark {role_name}/avg'] = np.mean([
+        benchmark_payoffs[f'benchmark {role_name}/{benchmark_offset}']
+        for benchmark_offset in range(base_args.get_game_config()['players'])])
+benchmark_payoffs
 # %%

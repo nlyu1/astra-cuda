@@ -49,4 +49,4 @@ class RolloutGenerator:
                     self.payoff_matrix[player_idx, role, 1] = player_returns.std()
         self.payoff_matrix[:, 4, 0] = self.returns_buffer.mean(0)
         self.payoff_matrix[:, 4, 1] = self.returns_buffer.std(0)
-        return self.payoff_matrix 
+        return self.payoff_matrix.clone()
