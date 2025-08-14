@@ -43,8 +43,13 @@ class Args:
     """We weigh initial predictions of settlement and info roles less heavily. Decaby by 1/2 every pdecay_tau ratio"""
     max_grad_norm: float = 0.5
     """the maximum norm for the gradient clipping"""
-    effective_bandit_memory_size: int = 10000
-    """the effective memory size of the bandit. Assumes that the main agent is 'totally new' after this many iterations"""
+    effective_sampler_memory_size: int = 500
+    """the effective memory size of the bandit. 
+    Assumes that the main agent is 'totally new' after this many iterations. 
+    Very large values lead to sharp sampling behavior (instability and lack of generalization), while 
+    low values lead to lack of concentration on good players which beat main.
+    Alphas and betas will not go beyond 
+    """
 
     warmup_steps: int = 1000
     """number of steps for linear learning rate warmup"""
@@ -126,9 +131,7 @@ class Args:
             self.players = 5
         elif self.game_setting is not None:
             raise ValueError(f"Invalid game setting: {self.game_setting}")
-        # Since we update Thompson sampler decay only when not self-playing, need to adjust the effective memory size 
-        self.effective_bandit_memory_size = int(self.effective_bandit_memory_size * (1 - self.self_play_prob))
-        
+
         assert self.num_steps == self.steps_per_player, "Training pipeline handles special case."
         assert self.batch_size % self.num_minibatches == 0, "Batch size must be divisible by number of minibatches"
 

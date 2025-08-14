@@ -29,30 +29,73 @@ from sampler import ThompsonSampler
 from timer import Timer, SegmentTimer
 import tyro
 
-exp_name = 'dev'
-python_root = Path(__file__).parent
-project_dir = python_root / 'checkpoints' / exp_name
-assert project_dir.exists(), f"Project directory {project_dir} does not exist"
-def sort_key_fn(x):
-    name = x.stem 
-    if name.startswith('main'):
-        return int(name.split('_')[-1])
-    else:
-        return -1e10 
-    
-available_checkpoints = sorted(project_dir.glob('*.pt'), key=sort_key_fn, reverse=True)
-if len(available_checkpoints) == 0:
-    raise ValueError(f"Need to find checkpoint of name `main_<step>.pt` in {project_dir}")
-available_names = [c.stem for c in available_checkpoints]
-checkpoint = torch.load(available_checkpoints[0], map_location='cuda', weights_only=False)
-args = checkpoint['args']
+args = tyro.cli(Args)
+# args = Args()
+
+args.run_name = f"HighLowMain__{args.exp_name}__{args.seed}__{int(time.time())}"
 args.fill_runtime_args()
+print(args)
+game_config = args.get_game_config()
+env = HighLowTrading(game_config)
+device = torch.device(f'cuda:{args.device_id}')
 
 random.seed(args.seed)
 np.random.seed(args.seed)
 torch.manual_seed(args.seed);
 
+# %% Initialize project directory and the pool 
+python_root = Path(__file__).parent
+project_dir = python_root / 'checkpoints' / args.exp_name
+if project_dir.exists():
+    do_erase = input(f'Project directory {project_dir} already exists. Do you want to erase it? (y/n): ')
+    if do_erase == 'y':
+        shutil.rmtree(project_dir)
+project_dir.mkdir(parents=True)
+print('Saving project files to', project_dir)
 
+# Initialize the pool by writing to seed.pt under project directory 
+seed_path = project_dir / 'seed.pt'
+initial_agent = HighLowTransformerModel(args, env, verbose=False).to(device)
+if args.checkpoint_name != "":
+    # To initialize the pool, it suffices to write weights
+    path = python_root / 'checkpoints' / (args.checkpoint_name + ".pt")
+    weights = torch.load(path, map_location=device, weights_only=False)['model_state_dict']
+    initial_agent.load_state_dict(weights, strict=True)
+    print(f"Loaded checkpoint {args.checkpoint_name} from {path}")
+torch.save({'model_state_dict': initial_agent.state_dict()}, seed_path)
+print(f"Saved pool seed to {seed_path}")
+
+### Load benchmark checkpoint and initialize rollout generator ### 
+benchmark_weights = None 
+if args.benchmark_checkpoint_name != "": 
+    benchmark_path = python_root / 'checkpoints' / (args.benchmark_checkpoint_name + ".pt")
+    benchmark_weights = torch.load(benchmark_path, map_location=device, weights_only=False)['model_state_dict']
+    try:
+        initial_agent.load_state_dict(benchmark_weights, strict=True)
+        print(f"Loaded benchmark checkpoint {args.benchmark_checkpoint_name} from {benchmark_path}")
+    except Exception as e:
+        print(f"Benchmark checkpoint {args.benchmark_checkpoint_name} cannot be loaded: {e}")
+        exit()
+    rollout_generator = RolloutGenerator(args)
+
+cannot_be_loaded = set()
+def update_from_dir(sampler): # sampler should be ThompsonSampler
+    # Match against existing weights inside bandit.py. If doesn't exist, then add to pool 
+    for path in project_dir.glob('*.pt'):
+        name = path.stem
+        if name in cannot_be_loaded or name in sampler.player_names:
+            continue 
+        try: # Load weights and add to bandit 
+            weights = torch.load(path, weights_only=False, map_location=device)['model_state_dict']
+            initial_agent.load_state_dict(weights)
+            sampler.register_player(name, weights)
+            print(f'Added {name} from {path} into pool. Pool now contains {len(sampler.player_names)} elements.')
+        except Exception as e:
+            cannot_be_loaded.add(path)
+            print(f'{path} cannot be loaded: {e}')
+    return sampler
+pool = ThompsonSampler(args.effective_bandit_memory_size)
+pool = update_from_dir(pool)
 
 # %% Initialize buffer and main agent 
 num_features = env.num_features()
@@ -200,19 +243,20 @@ for iteration in pbar:
                                 'pool/std': pool.snapshot_plot(info_type='std')}
                 logging_inputs['pool_logs'] = pool_logs
                 # Benchmark against benchmark checkpoint 
-                benchmark_payoffs = {}
-                for benchmark_offset in range(game_config['players']):
-                    benchmark_state_dicts = [
-                        benchmark_weights if j != benchmark_offset else main_agent.state_dict()
-                        for j in range(game_config['players'])]
-                    model_payoffs = rollout_generator.generate_rollout(benchmark_state_dicts)[benchmark_offset, :, 0]
-                    for j, role_name in enumerate(['goodValue', 'badValue', 'highLow', 'customer', 'avg']):
-                        benchmark_payoffs[f'benchmark {role_name}/{benchmark_offset}'] = model_payoffs[j]
-                for role_name in ['goodValue', 'badValue', 'highLow', 'customer', 'avg']:
-                    benchmark_payoffs[f'benchmark {role_name}/avg'] = np.mean([
-                        benchmark_payoffs[f'benchmark {role_name}/{benchmark_offset}']
-                        for benchmark_offset in range(game_config['players'])])
-                logging_inputs['benchmark_payoffs'] = benchmark_payoffs
+                if benchmark_weights is not None:
+                    benchmark_payoffs = {}
+                    for benchmark_offset in range(game_config['players']):
+                        benchmark_state_dicts = [
+                            benchmark_weights if j != benchmark_offset else main_agent.state_dict()
+                            for j in range(game_config['players'])]
+                        model_payoffs = rollout_generator.generate_rollout(benchmark_state_dicts)[benchmark_offset, :, 0]
+                        for j, role_name in enumerate(['goodValue', 'badValue', 'highLow', 'customer', 'avg']):
+                            benchmark_payoffs[f'benchmark {role_name}/{benchmark_offset}'] = model_payoffs[j]
+                    for role_name in ['goodValue', 'badValue', 'highLow', 'customer', 'avg']:
+                        benchmark_payoffs[f'benchmark {role_name}/avg'] = np.mean([
+                            benchmark_payoffs[f'benchmark {role_name}/{benchmark_offset}']
+                            for benchmark_offset in range(game_config['players'])])
+                    logging_inputs['benchmark_payoffs'] = benchmark_payoffs
             logger.update_stats(logging_inputs, global_step, heavy_updates=heavy_logging_update)
 
         # Populate buffer's actual private info. See `env.py` env_pinfo_target method. Used for private info loss calculation. 

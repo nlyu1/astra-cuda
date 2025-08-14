@@ -89,8 +89,10 @@ Main takeaways for seed training:
 3. Use small gae_lambda. 
 4. Use lr warmup. All ingredients above are important. 
 
+Initialize with a pool. Changed effective memory size to 1000 to reduce overly sharp sampling behavior. 
+
 ```
-CUDA_VISIBLE_DEVICES=1 python main_process.py --game_setting 1 --entropy_coef 0.01 --gae_lambda 0.0 --psettlement_coef 0.0 --proles_coef 0.0 --game_setting 1 --entropy_coef 0.01 --num_iterations 4000000000000 --self_play_prob 0.0 --iterations_per_heavy_logging 1500 --benchmark_checkpoint_name poolrun_selfplayonly/small3_129000 --exp_name smallthompson
+CUDA_VISIBLE_DEVICES=1 python main_process.py --game_setting 1 --entropy_coef 0.003 --gae_lambda 0.95 --psettlement_coef 0.2 --proles_coef 0.2 --game_setting 1 --num_iterations 4000000000000 --self_play_prob 0.5 --iterations_per_heavy_logging 1500 --benchmark_checkpoint_name poolrun_selfplayonly/small3_129000 --exp_name smallthompson_again --checkpoint_name poolrun_selfplayonly/small3_126000
 ```
 
 ## Thompson-sampling main only
@@ -98,5 +100,5 @@ CUDA_VISIBLE_DEVICES=1 python main_process.py --game_setting 1 --entropy_coef 0.
 [Run](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/85r0ld5f)
 
 ```
-CUDA_VISIBLE_DEVICES=0 python main_process.py --game_setting 0 --entropy_coef 0.003 --psettlement_coef 0.2 --gae_lambda 0.95 --proles_coef 0.2 --self_play_prob 0.5 --iterations_per_heavy_logging 1500 --num_iterations 40000000 --exp_name normal3 --checkpoint_name normal2_207000
+CUDA_VISIBLE_DEVICES=0 python main_process.py --game_setting 0 --entropy_coef 0.003 --psettlement_coef 0.2 --gae_lambda 0.95 --proles_coef 0.2 --self_play_prob 0.5 --iterations_per_heavy_logging 1500 --num_iterations 40000000 --exp_name normal3 --checkpoint_name poolrun_selfplayonly/normal2_204000 --benchmark_checkpoint_name poolrun_selfplayonly/normal2_207000
 ```

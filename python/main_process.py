@@ -50,7 +50,10 @@ if project_dir.exists():
     do_erase = input(f'Project directory {project_dir} already exists. Do you want to erase it? (y/n): ')
     if do_erase == 'y':
         shutil.rmtree(project_dir)
-project_dir.mkdir(parents=True)
+        print(f'    Erased project directory {project_dir} and starting from scratch')
+    else:
+        print(f'    Initializing pool from existing checkpoints in {project_dir}')
+project_dir.mkdir(parents=True, exist_ok=True)
 print('Saving project files to', project_dir)
 
 # Initialize the pool by writing to seed.pt under project directory 
@@ -94,7 +97,7 @@ def update_from_dir(sampler): # sampler should be ThompsonSampler
             cannot_be_loaded.add(path)
             print(f'{path} cannot be loaded: {e}')
     return sampler
-pool = ThompsonSampler(args.effective_bandit_memory_size)
+pool = ThompsonSampler(args.effective_sampler_memory_size)
 pool = update_from_dir(pool)
 
 # %% Initialize buffer and main agent 
@@ -133,7 +136,7 @@ gc.disable() # Disable garbage collection for performance
 
 segment_timer.tick('init_agents')
 for iteration in pbar:
-    if iteration > 0 and iteration % 100 == 0: # Manual GC every 100 iterations
+    if iteration > 0 and iteration % 200 == 0: # Manual GC every 100 iterations
         gc.collect() 
     self_play = random.random() < args.self_play_prob
     # Pick npc agents and player offset
@@ -239,9 +242,6 @@ for iteration in pbar:
                 logger.counter - logger.last_heavy_counter > args.iterations_per_heavy_logging 
                 and player_offset == 0)
             if heavy_logging_update:
-                pool_logs = {'pool/mean': pool.snapshot_plot(info_type='mean'),
-                                'pool/std': pool.snapshot_plot(info_type='std')}
-                logging_inputs['pool_logs'] = pool_logs
                 # Benchmark against benchmark checkpoint 
                 if benchmark_weights is not None:
                     benchmark_payoffs = {}

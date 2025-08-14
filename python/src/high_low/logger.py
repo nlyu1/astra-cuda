@@ -75,7 +75,7 @@ class HighLowLogger:
             'reward/welfare': returns.sum(-1).mean().item(),
             'reward/missed_positions': position_diff}
         log_data = log_data | logging_inputs['segment_timer']
-        for k in ['pool_logs', 'benchmark_payoffs']:
+        for k in ['benchmark_payoffs']:
             if k in logging_inputs:
                 log_data = log_data | logging_inputs[k]
 
