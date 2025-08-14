@@ -1,11 +1,12 @@
 import time 
+from collections import defaultdict
 from collections import deque
 
 class Timer:
-    def __init__(self):
+    def __init__(self, length=11):
         self.start_time = time.time()
-        self.elapsed_times = deque(maxlen=100)
-        self.steps = deque(maxlen=100)
+        self.elapsed_times = deque(maxlen=length)
+        self.steps = deque(maxlen=length)
 
     def tick(self, num_steps):
         """
@@ -25,3 +26,19 @@ class OneTickTimer:
         elapsed_time = time.time() - self.start_time
         self.start_time = time.time()
         return elapsed_time
+    
+class SegmentTimer:
+    def __init__(self):
+        self.elapsed_times = {}
+        self.last_name = None 
+        self.last_time = None 
+
+    def tick(self, name):
+        if self.last_name is None:
+            self.last_name = name 
+            self.last_time = time.time() * 1e3
+            return 
+        new_time = time.time() * 1e3
+        self.elapsed_times[self.last_name] = new_time - self.last_time
+        self.last_time = new_time
+        self.last_name = name 

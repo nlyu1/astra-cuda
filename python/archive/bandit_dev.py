@@ -16,7 +16,7 @@ from high_low.config import Args
 from high_low.env import HighLowTrading
 from high_low.agent import HighLowTransformerModel
 from high_low.rollouts import RolloutGenerator
-from bandit import ThompsonBandit
+from python.archive.bandit_dev import ThompsonBandit
 
 # %%
 

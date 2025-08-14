@@ -74,6 +74,10 @@ class HighLowLogger:
             'reward/customer': player_rewards[customer_mask].mean().item(),
             'reward/welfare': returns.sum(-1).mean().item(),
             'reward/missed_positions': position_diff}
+        log_data = log_data | logging_inputs['segment_timer']
+        for k in ['pool_logs', 'benchmark_payoffs']:
+            if k in logging_inputs:
+                log_data = log_data | logging_inputs[k]
 
         for s in [-10, -6, 0, 6, 10]: 
             size_mask = (customer_size_sum == s)

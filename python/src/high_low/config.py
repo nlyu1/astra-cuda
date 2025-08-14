@@ -46,7 +46,7 @@ class Args:
     effective_bandit_memory_size: int = 10000
     """the effective memory size of the bandit. Assumes that the main agent is 'totally new' after this many iterations"""
 
-    warmup_steps: int = 0
+    warmup_steps: int = 1000
     """number of steps for linear learning rate warmup"""
 
     ##### Model specific arguments #####
@@ -64,18 +64,16 @@ class Args:
     """Number of vectorized times to interact with environment per 
     Per each iteration, we sample (num_envs * num_steps) frames to form a batch, 
     then split into (num_minibatches) minibatches and update network for (update_epochs) epochs."""
-    iterations_per_pool_update: int = 3000
-    """Number of iterations between pool updates. Set to none to do static training."""
-    iterations_to_first_pool_update: int = 0 
-    """Only start updating the pool after this many iterations."""
     self_play_prob: float = 0.0
     """Probability of self-playing (having fixed copies of self being opponent instead of pool-selected opponents)"""
     checkpoint_name: str = ""
     """Name of the checkpoint to load (e.g. 'name' for 'checkpoints/name.pt'). If empty, we start from scratch."""
+    benchmark_checkpoint_name: str = ""
+    """Name of the checkpoint to benchmark against. If empty, we do not benchmark. Model is not explicitly trained against benchmark."""
 
     #### Logging specification ####
     iterations_per_checkpoint: int = 3000
-    """Number of iterations between checkpoints"""
+    """Number of iterations between checkpoints. Pool is automatically updated after checkpointing"""
     iterations_per_heavy_logging: int = 1000
     """Number of iterations between heavy logging"""
 
@@ -128,6 +126,8 @@ class Args:
             self.players = 5
         elif self.game_setting is not None:
             raise ValueError(f"Invalid game setting: {self.game_setting}")
+        # Since we update Thompson sampler decay only when not self-playing, need to adjust the effective memory size 
+        self.effective_bandit_memory_size = int(self.effective_bandit_memory_size * (1 - self.self_play_prob))
         
         assert self.num_steps == self.steps_per_player, "Training pipeline handles special case."
         assert self.batch_size % self.num_minibatches == 0, "Batch size must be divisible by number of minibatches"
@@ -141,9 +141,6 @@ class Args:
         self.total_timesteps = self.num_iterations * self.batch_size
         print(f'Sampling {self.batch_size} frames per iteration across {self.num_envs} environments')
         print(f'Per-gradient step batch size: {self.batch_size // self.num_minibatches}. {self.num_minibatches} gradient steps for {self.update_epochs} updates')
-
-        if self.iterations_per_pool_update is None:
-            self.iterations_per_pool_update = self.num_iterations
 
     def get_game_config(self):
         game_config = {

@@ -78,3 +78,25 @@ To sync future offline wandb runs to cloud:
 3. Sync offline runs: `wandb sync checkpoints/logs/wandb/offline-run-YYYYMMDD_HHMMSS-RUNID/`
 
 Local wandb logs are stored in: `python/checkpoints/logs/wandb/`
+
+
+# Thompson sampling + exploiter
+
+Main takeaways for seed training:
+
+1. Don't add private info modeling. Else training will be unstable. 
+2. Don't add self-play. 
+3. Use small gae_lambda. 
+4. Use lr warmup. All ingredients above are important. 
+
+```
+CUDA_VISIBLE_DEVICES=1 python main_process.py --game_setting 1 --entropy_coef 0.01 --gae_lambda 0.0 --psettlement_coef 0.0 --proles_coef 0.0 --game_setting 1 --entropy_coef 0.01 --num_iterations 4000000000000 --self_play_prob 0.0 --iterations_per_heavy_logging 1500 --benchmark_checkpoint_name poolrun_selfplayonly/small3_129000 --exp_name smallthompson
+```
+
+## Thompson-sampling main only
+
+[Run](https://wandb.ai/lyuxingjian-na/HighLowTrading/runs/85r0ld5f)
+
+```
+CUDA_VISIBLE_DEVICES=0 python main_process.py --game_setting 0 --entropy_coef 0.003 --psettlement_coef 0.2 --gae_lambda 0.95 --proles_coef 0.2 --self_play_prob 0.5 --iterations_per_heavy_logging 1500 --num_iterations 40000000 --exp_name normal3 --checkpoint_name normal2_207000
+```

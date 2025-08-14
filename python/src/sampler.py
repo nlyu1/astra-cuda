@@ -6,7 +6,7 @@ import plotly.graph_objects as go
 def beta_std(alpha, beta):
     return np.sqrt((alpha * beta) / ((alpha + beta)**2 * (alpha + beta + 1)))
 
-class ThompsonBandit:
+class ThompsonSampler:
     """
     Non-stationary Thompson sampling (Bernoulli) for multi-armed bandits. 
     Used to select the player which is most probable to win against the running main. 
@@ -79,9 +79,6 @@ class ThompsonBandit:
 
         means = self.parameters[:, 0] / (self.parameters[:, 0] + self.parameters[:, 1])
         stds = beta_std(self.parameters[:, 0], self.parameters[:, 1])
-        # for i in range(len(selection_indices)):
-        #     self.first_added[self.player_names[selection_indices[i]]] = min(
-        #         self.first_added[self.player_names[selection_indices[i]]], self.index)
         self.snapshots.append(np.concatenate([means[:, np.newaxis], stds[:, np.newaxis]], axis=1))
 
     def _process_snapshots(self):
@@ -124,24 +121,23 @@ class ThompsonBandit:
         with open(file_path, 'wb') as f:
             pickle.dump(save_data, f) 
 
-    def plot_snapshots(self):
+    def snapshot_plot(self, info_type='mean'):
         """
         x-axis should be number of steps (index)
         y-axis shows win probability (mean only)
         Note that each players' score should be appropriately offset by the step at which they were added. 
         """
+        assert info_type in ['mean', 'std'], "Can only plot mean or std"
         fig = go.Figure()
         processed_snapshots = self._process_snapshots()
         
         # Use a color palette
         colors = ['blue', 'red', 'green', 'orange', 'purple', 'brown', 'pink', 'gray', 'olive', 'cyan']
-        total_steps = max(len(processed_snapshots[player_name]['mean']) for player_name in processed_snapshots)
+        total_steps = max(len(processed_snapshots[player_name][info_type]) for player_name in processed_snapshots)
         x_values = list(range(total_steps))
         for idx, player_name in enumerate(processed_snapshots):
-            means = np.array(processed_snapshots[player_name]['mean'])
+            means = np.array(processed_snapshots[player_name][info_type])
             first_step = int(self.first_added[player_name])
-            print(player_name, first_step, len(means))
-            print(means)
                 
             padded_means = np.pad(means, (first_step, 0), mode='constant', constant_values=np.nan)
             color = colors[idx % len(colors)]
@@ -153,17 +149,25 @@ class ThompsonBandit:
                 mode='lines',
                 name=player_name,
                 line=dict(color=color, width=2),
-                hovertemplate='%{text}<br>Step: %{x}<br>Win Probability: %{y:.3f}<extra></extra>',
                 text=[player_name] * len(x_values)))
                 
         fig.update_layout(
-            title='Thompson Sampling Win Probability Estimates',
-            xaxis_title='Update Step',
-            yaxis_title='Win Probability',
             yaxis=dict(range=[0, 1]),
             width=1200,
             height=600,
             template='plotly_white',
             legend=dict(yanchor="top", y=0.99, xanchor="right", x=0.99),
-            hovermode='x')
+            hovermode='x',
+            annotations=[
+                dict(
+                    text='Thompson Sampling Win Probability Estimates',
+                    xref='paper',
+                    yref='paper',
+                    x=0.5,
+                    y=-0.15,
+                    xanchor='center',
+                    yanchor='top',
+                    showarrow=False,
+                    font=dict(size=12))
+            ])
         return fig
