@@ -8,13 +8,14 @@ import plotly.graph_objects as go
 import plotly.express as px
 import torch
 from collections import defaultdict
+python_path = Path(__file__).parent
 
-sys.path.append('./src')
+sys.path.append(str(python_path / 'src'))
 from sampler import *
 
 # %%
 # Main analysis
-pool_path = Path('checkpoints/normal3')
+pool_path = python_path / 'checkpoints' / 'normal3'
 print(f"Loading checkpoint from {pool_path}...")
 sampler = load_from_file(pool_path / 'pool.pkl')
 
