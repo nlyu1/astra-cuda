@@ -78,7 +78,8 @@ for benchmark_offset in range(base_args.get_game_config()['players']):
         for j in range(base_args.get_game_config()['players'])]
     payoff_matrix = rgen.generate_rollout(benchmark_state_dicts)
     model_payoffs = payoff_matrix[benchmark_offset, :, 0]
-    benchmark_payoff_list.append(model_payoffs)
+    print(payoff_matrix[:, 4, 0])
+    benchmark_payoff_list.append(payoff_matrix.clone())
     for j, role_name in enumerate(['goodValue', 'badValue', 'highLow', 'customer', 'avg']):
         benchmark_payoffs[f'benchmark {role_name}/{benchmark_offset}'] = model_payoffs[j]
 for role_name in ['goodValue', 'badValue', 'highLow', 'customer', 'avg']:
@@ -86,4 +87,7 @@ for role_name in ['goodValue', 'badValue', 'highLow', 'customer', 'avg']:
         benchmark_payoffs[f'benchmark {role_name}/{benchmark_offset}']
         for benchmark_offset in range(base_args.get_game_config()['players'])])
 benchmark_payoffs
+# %%
+
+[b[:, 4, 0] for b in benchmark_payoff_list]
 # %%
