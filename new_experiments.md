@@ -102,10 +102,21 @@ CUDA_VISIBLE_DEVICES=1 python main_process.py --game_setting 1 --entropy_coef 0.
 CUDA_VISIBLE_DEVICES=0 python main_process.py --game_setting 0 --entropy_coef 0.003 --psettlement_coef 0.2 --gae_lambda 0.95 --proles_coef 0.2 --self_play_prob 0.5 --iterations_per_heavy_logging 1500 --num_iterations 40000000 --exp_name normal3 --checkpoint_name poolrun_selfplayonly/normal2_204000 --benchmark_checkpoint_name poolrun_selfplayonly/normal2_207000
 ```
 
-## Exploiter process for normal3
+## Exploiter process and main process
 
 Run this in a separate terminal to continuously train exploiters against the latest main checkpoint:
 
 ```
-CUDA_VISIBLE_DEVICES=1 python exploiter_process.py checkpoints/normal3
+CUDA_VISIBLE_DEVICES=0 python main_process.py --game_setting 0 --entropy_coef 0.002 --psettlement_coef 0.2 --gae_lambda 0.99 --proles_coef 0.2 --self_play_prob 0.5 --iterations_per_heavy_logging 1500 --num_iterations 40000000 --exp_name normal4 --checkpoint_name normal3/main_51000 --benchmark_checkpoint_name normal3/main_51000
+
+CUDA_VISIBLE_DEVICES=1 python exploiter_process.py checkpoints/normal4
+```
+We have observed cyclical behavior (e.g. starting `normal4` from the last checkpoint of `normal3` only, without carrying over the pool,makes the new agent "forget"). 
+
+# Self-play vs no self-play
+
+```
+CUDA_VISIBLE_DEVICES=1 python main_process.py --game_setting 0 --entropy_coef 0.002 --psettlement_coef 0.2 --gae_lambda 0.99 --proles_coef 0.2 --self_play_prob 0.5 --iterations_per_heavy_logging 1500 --num_iterations 40000000 --exp_name normal5 --checkpoint_name normal4/main_123000 --benchmark_checkpoint_name normal4/main_72000
+
+CUDA_VISIBLE_DEVICES=0 python main_process.py --game_setting 0 --entropy_coef 0.002 --psettlement_coef 0.2 --gae_lambda 0.99 --proles_coef 0.2 --self_play_prob 0.0 --iterations_per_heavy_logging 1500 --num_iterations 40000000 --exp_name normal5_nsp --checkpoint_name normal4/main_123000 --benchmark_checkpoint_name normal4/main_72000
 ```

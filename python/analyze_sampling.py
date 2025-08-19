@@ -15,7 +15,7 @@ from sampler import *
 
 # %%
 # Main analysis
-pool_path = python_path / 'checkpoints' / 'normal3'
+pool_path = python_path / 'checkpoints' / 'normal4'
 print(f"Loading checkpoint from {pool_path}...")
 sampler = load_from_file(pool_path / 'pool.pkl')
 
@@ -47,16 +47,21 @@ fig_sampling = px.bar(
 )
 fig_sampling.update_layout(xaxis_tickangle=-45, width=1200, height=600)
 fig_sampling.show()
+
+# %%
+
+player_idx = sampler.names_of_players['normal3_51000']
+sampler.snapshots[player_idx]
+
 # %%
 from high_low.rollouts import *
 
 names = [
-    # 'normal3/normal2_204000',
-    'poolrun_selfplayonly/normal2_207000',
-    'poolrun_selfplayonly/normal2_207000',
-    'poolrun_selfplayonly/normal2_207000',
-    'poolrun_selfplayonly/normal2_207000',
-    'normal3/main_42000',
+    'normal4/main_99000',
+    'normal4/main_99000',
+    'normal4/main_99000',
+    'normal4/main_99000',
+    'normal3/main_51000',
 ]
 state_dicts = [
     torch.load(python_path / 'checkpoints' / (name+'.pt'), weights_only=False)['model_state_dict']
@@ -68,8 +73,8 @@ payoff_matrix = rgen.generate_rollout(state_dicts)
 payoff_vector = payoff_matrix[:, 4, 0]
 payoff_vector
 # %%
-benchmark_weights = state_dicts[0]
-main_weights = state_dicts[4]
+benchmark_weights = state_dicts[4]
+main_weights = state_dicts[0]
 benchmark_payoffs = {}
 benchmark_payoff_list = []
 for benchmark_offset in range(base_args.get_game_config()['players']):

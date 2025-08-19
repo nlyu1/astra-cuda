@@ -56,8 +56,8 @@ if project_dir.exists():
 project_dir.mkdir(parents=True, exist_ok=True)
 print('Saving project files to', project_dir)
 
-# Initialize the pool by writing to seed.pt under project directory 
-seed_path = project_dir / 'seed.pt'
+# Initialize the pool by writing to main_0 under project directory 
+seed_path = project_dir / 'main_0.pt'
 initial_agent = HighLowTransformerModel(args, env, verbose=False).to(device)
 if args.checkpoint_name != "":
     # To initialize the pool, it suffices to write weights
@@ -65,7 +65,7 @@ if args.checkpoint_name != "":
     weights = torch.load(path, map_location=device, weights_only=False)['model_state_dict']
     initial_agent.load_state_dict(weights, strict=True)
     print(f"Loaded checkpoint {args.checkpoint_name} from {path}")
-torch.save({'model_state_dict': initial_agent.state_dict()}, seed_path)
+torch.save({'model_state_dict': initial_agent.state_dict(), 'args': args}, seed_path)
 print(f"Saved pool seed to {seed_path}")
 
 ### Load benchmark checkpoint and initialize rollout generator ### 

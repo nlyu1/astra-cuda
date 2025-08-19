@@ -202,7 +202,7 @@ def plot_stat(sampler, data_type="mean", log_scale=True):
     fig.update_layout(
         title=title, xaxis_title="Steps", yaxis_title=title,
         width=1200, height=600, template='plotly_white',
-        legend=dict(yanchor="top", y=0.99, xanchor="right", x=0.99)
+        # legend=dict(yanchor="top", y=0.99, xanchor="right", x=0.99)
     )
     if data_type == "mean":
         ref_value = np.log10(0.5) if log_scale else 0.5
